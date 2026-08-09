@@ -1,0 +1,7 @@
+﻿services:
+  bodega.platform:
+    image: bodega.platform
+    build:
+      context: .
+      dockerfile: Bodega.Platform/Dockerfile
+
