@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Application.QueryServices;
@@ -48,6 +49,7 @@ public class WarehousesController(
     }
 
     [HttpPost]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Create a warehouse", OperationId = "CreateWarehouse")]
     [SwaggerResponse(StatusCodes.Status201Created, "The warehouse was created", typeof(WarehouseResource))]
     public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseResource resource, CancellationToken cancellationToken)
@@ -64,6 +66,7 @@ public class WarehousesController(
     }
 
     [HttpPatch("{id:int}")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Update a warehouse", OperationId = "UpdateWarehouse")]
     public async Task<IActionResult> UpdateWarehouse([FromRoute] int id, [FromBody] UpdateWarehouseResource resource,
         CancellationToken cancellationToken)

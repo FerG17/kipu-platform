@@ -4,14 +4,19 @@ using Bodega.Platform.Dashboard.Application.QueryServices;
 using Bodega.Platform.Dashboard.Domain.Model.Queries;
 using Bodega.Platform.Dashboard.Interfaces.Rest.Resources;
 using Bodega.Platform.Dashboard.Interfaces.Rest.Transform;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Shared.Application;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Bodega.Platform.Dashboard.Interfaces.Rest;
 
-/// <summary>Every value here is computed live from Product/Inventory/Sales — never from a stored snapshot (architecture doc §6.8).</summary>
-[Authorize]
+/// <summary>
+///     Every value here is computed live from Product/Inventory/Sales — never
+///     from a stored snapshot (architecture doc §6.8). Business-wide
+///     financial/operational overview, restricted to the owner role.
+/// </summary>
+[Authorize(RoleNames.Admin)]
 [ApiController]
 [Route("api/v1/dashboard")]
 [Produces(MediaTypeNames.Application.Json)]

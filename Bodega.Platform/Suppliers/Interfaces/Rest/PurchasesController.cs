@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Interfaces.Rest.ProblemDetails;
@@ -13,7 +14,7 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace Bodega.Platform.Suppliers.Interfaces.Rest;
 
-[Authorize]
+[Authorize(RoleNames.Admin, RoleNames.Warehouse)]
 [ApiController]
 [Route("api/v1/purchases")]
 [Produces(MediaTypeNames.Application.Json)]

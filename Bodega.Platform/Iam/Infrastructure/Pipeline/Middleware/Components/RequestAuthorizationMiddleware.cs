@@ -19,6 +19,11 @@ namespace Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Components;
 ///     an explicit "log out everywhere", or deactivating a user actually
 ///     revoke already-issued tokens immediately, instead of leaving them
 ///     valid until they naturally expire.
+///
+///     Also enforces role-based authorization: if the matched endpoint's
+///     [Authorize] attribute lists specific roles, the token's role claim
+///     must be one of them, or the request is rejected with 403 — see
+///     AuthorizeAttribute for the full role matrix rationale.
 /// </summary>
 public class RequestAuthorizationMiddleware(RequestDelegate next)
 {
@@ -40,6 +45,17 @@ public class RequestAuthorizationMiddleware(RequestDelegate next)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
+        }
+
+        var authorizeAttribute = context.GetEndpoint()?.Metadata.GetMetadata<AuthorizeAttribute>();
+        if (authorizeAttribute is { Roles.Length: > 0 })
+        {
+            var role = principal.FindFirst(ClaimTypes.Role)?.Value;
+            if (role == null || !authorizeAttribute.Roles.Contains(role))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
         }
 
         context.User = principal;

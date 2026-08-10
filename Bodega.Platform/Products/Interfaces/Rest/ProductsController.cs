@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Application.QueryServices;
@@ -50,6 +51,7 @@ public class ProductsController(
     }
 
     [HttpPost]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Create a product", OperationId = "CreateProduct")]
     [SwaggerResponse(StatusCodes.Status201Created, "The product was created", typeof(ProductResource))]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductResource resource, CancellationToken cancellationToken)
@@ -66,6 +68,7 @@ public class ProductsController(
     }
 
     [HttpPatch("{id:int}")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Update a product", OperationId = "UpdateProduct")]
     public async Task<IActionResult> UpdateProduct([FromRoute] int id, [FromBody] UpdateProductResource resource,
         CancellationToken cancellationToken)
@@ -79,6 +82,7 @@ public class ProductsController(
 
     /// <summary>Business rule: blocked (409) if the product still has stock in any warehouse.</summary>
     [HttpDelete("{id:int}")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Delete a product", OperationId = "DeleteProduct")]
     [SwaggerResponse(StatusCodes.Status409Conflict, "The product still has stock")]
     public async Task<IActionResult> DeleteProduct([FromRoute] int id, CancellationToken cancellationToken)
@@ -94,6 +98,7 @@ public class ProductsController(
     ///     StockMovement".
     /// </summary>
     [HttpPost("{id:int}/stock-intake")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Register a stock intake for a product", OperationId = "RegisterStockIntake")]
     public async Task<IActionResult> RegisterStockIntake([FromRoute] int id, [FromBody] RegisterStockIntakeResource resource,
         CancellationToken cancellationToken)

@@ -20,6 +20,7 @@ namespace Bodega.Platform.Iam.Application.Internal.CommandServices;
 public class UserCommandService(
     IUserRepository userRepository,
     IBusinessRepository businessRepository,
+    IRoleRepository roleRepository,
     ITokenService tokenService,
     IHashingService hashingService,
     IUnitOfWork unitOfWork,
@@ -40,7 +41,8 @@ public class UserCommandService(
             return Result<(User user, string token)>.Failure(IamError.InvalidCredentials,
                 localizer[nameof(IamError.InvalidCredentials)]);
 
-        var token = tokenService.GenerateToken(user);
+        var roleName = await ResolveRoleNameAsync(user.RoleId, cancellationToken);
+        var token = tokenService.GenerateToken(user, roleName);
         return Result<(User user, string token)>.Success((user, token));
     }
 
@@ -97,7 +99,8 @@ public class UserCommandService(
 
             await transaction.CommitAsync(cancellationToken);
 
-            var token = tokenService.GenerateToken(user);
+            var roleName = await ResolveRoleNameAsync(user.RoleId, cancellationToken);
+            var token = tokenService.GenerateToken(user, roleName);
             return Result<(User user, string token)>.Success((user, token));
         }
         catch (Exception)
@@ -171,5 +174,12 @@ public class UserCommandService(
         userRepository.Remove(user);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result.Success();
+    }
+
+    /// <summary>Role has no BusinessId (fixed platform-wide catalog), so this lookup is never tenant-filtered.</summary>
+    private async Task<string> ResolveRoleNameAsync(int roleId, CancellationToken cancellationToken)
+    {
+        var role = await roleRepository.FindByIdAsync(roleId, cancellationToken);
+        return role?.Position ?? string.Empty;
     }
 }

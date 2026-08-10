@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Sales.Application.CommandServices;
 using Bodega.Platform.Sales.Application.QueryServices;
@@ -19,7 +20,7 @@ namespace Bodega.Platform.Sales.Interfaces.Rest;
 ///     SalesController: attaching a payment plan never touches how the
 ///     underlying Sale was created, totaled, or had its stock decremented.
 /// </summary>
-[Authorize]
+[Authorize(RoleNames.Admin, RoleNames.Cashier)]
 [ApiController]
 [Route("api/v1/payment-plans")]
 [Produces(MediaTypeNames.Application.Json)]
