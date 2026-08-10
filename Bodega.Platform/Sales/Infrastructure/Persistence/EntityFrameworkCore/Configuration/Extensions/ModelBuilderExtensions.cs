@@ -59,5 +59,20 @@ public static class ModelBuilderExtensions
             entity.HasOne<Business>().WithMany().HasForeignKey(customer => customer.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        builder.Entity<PaymentPlan>(entity =>
+        {
+            entity.HasKey(plan => plan.Id);
+            entity.Property(plan => plan.Id).ValueGeneratedOnAdd();
+
+            entity.HasOne<Business>().WithMany().HasForeignKey(plan => plan.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One plan per sale — mirrors "at most one plan per sale" in the
+            // domain (PaymentPlanCommandService rejects a second one).
+            entity.HasOne<Sale>().WithOne().HasForeignKey<PaymentPlan>(plan => plan.SaleId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(plan => plan.SaleId).IsUnique();
+        });
     }
 }
