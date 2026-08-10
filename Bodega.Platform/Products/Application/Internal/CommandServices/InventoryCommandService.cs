@@ -205,6 +205,18 @@ public class InventoryCommandService(
     /// </summary>
     public async Task<Result<Batch>> Handle(CreateOrUpdateBatchCommand command, CancellationToken cancellationToken)
     {
+        // Tenant-scoped read (AppDbContext's BusinessId query filter), so a
+        // ProductId belonging to another business resolves to null here —
+        // without this check, a batch tagged with command.BusinessId could
+        // otherwise get created pointing at a product it doesn't own.
+        var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
+        if (product == null)
+            return Result<Batch>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
+
+        if (command.Expiration.HasValue && command.Expiration.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+            return Result<Batch>.Failure(ProductError.InvalidExpirationDate,
+                localizer[nameof(ProductError.InvalidExpirationDate)]);
+
         var existingBatch = await batchRepository.FindActiveByProductIdAsync(command.ProductId, cancellationToken);
 
         Batch batch;
@@ -223,9 +235,8 @@ public class InventoryCommandService(
 
         await unitOfWork.CompleteAsync(cancellationToken);
 
-        var product = await productRepository.FindByIdAsync(batch.ProductId, cancellationToken);
         await mediator.PublishAsync(
-            new BatchRegisteredEvent(batch.Id, batch.ProductId, product?.Name ?? string.Empty, batch.BusinessId, batch.Expiration),
+            new BatchRegisteredEvent(batch.Id, batch.ProductId, product.Name, batch.BusinessId, batch.Expiration),
             cancellationToken);
 
         return Result<Batch>.Success(batch);

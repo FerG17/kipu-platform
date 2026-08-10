@@ -62,6 +62,9 @@
   <data name="InvalidQuantity" xml:space="preserve">
     <value>Quantity must be a positive integer.</value>
   </data>
+  <data name="InvalidExpirationDate" xml:space="preserve">
+    <value>Expiration date cannot be in the past.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>
