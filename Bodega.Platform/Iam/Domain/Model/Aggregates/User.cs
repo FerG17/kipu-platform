@@ -33,6 +33,17 @@ public class User(
     public string Status { get; private set; } = "ACTIVE";
     public string Phone { get; private set; } = phone;
 
+    /// <summary>
+    ///     Bumped every time the password changes (and available for a future
+    ///     explicit "log out of all devices" action). Embedded in every JWT
+    ///     issued for this user; RequestAuthorizationMiddleware rejects any
+    ///     token whose TokenVersion claim doesn't match the current value —
+    ///     this is what makes a password change actually invalidate tokens
+    ///     issued before it, instead of leaving them valid until they expire
+    ///     on their own.
+    /// </summary>
+    public int TokenVersion { get; private set; }
+
     public User UpdateProfile(string name, string lastName, string phone)
     {
         Name = name;
@@ -44,6 +55,14 @@ public class User(
     public User UpdatePasswordHash(string passwordHash)
     {
         PasswordHash = passwordHash;
+        TokenVersion++;
+        return this;
+    }
+
+    /// <summary>Invalidates every token issued for this user so far, without changing the password.</summary>
+    public User RevokeAllSessions()
+    {
+        TokenVersion++;
         return this;
     }
 
@@ -60,6 +79,7 @@ public class User(
     public User Deactivate()
     {
         Status = "INACTIVE";
+        TokenVersion++;
         return this;
     }
 }
