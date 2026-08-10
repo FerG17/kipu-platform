@@ -21,6 +21,7 @@ public class InventoryCommandService(
     IStockMovementRepository stockMovementRepository,
     IBatchRepository batchRepository,
     IProductRepository productRepository,
+    IWarehouseRepository warehouseRepository,
     IUnitOfWork unitOfWork,
     IMediator mediator,
     IStringLocalizer<ProductMessages> localizer)
@@ -48,6 +49,21 @@ public class InventoryCommandService(
     {
         if (command.Quantity < 0)
             return Result<InventoryItem>.Failure(ProductError.InvalidQuantity, localizer[nameof(ProductError.InvalidQuantity)]);
+
+        // Both reads go through the tenant-scoped repositories (AppDbContext's
+        // BusinessId query filter), so a ProductId/WarehouseId belonging to
+        // another business resolves to null here — without this check
+        // nothing else in this method re-validates ownership, and a new
+        // InventoryItem/StockMovement would otherwise get created tagged with
+        // command.BusinessId but pointing at a product/warehouse it doesn't
+        // actually own.
+        var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
+        if (product == null)
+            return Result<InventoryItem>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
+
+        var warehouse = await warehouseRepository.FindByIdAsync(command.WarehouseId, cancellationToken);
+        if (warehouse == null)
+            return Result<InventoryItem>.Failure(ProductError.WarehouseNotFound, localizer[nameof(ProductError.WarehouseNotFound)]);
 
         var existingItem = await inventoryItemRepository.FindByProductAndWarehouseAsync(command.ProductId,
             command.WarehouseId, cancellationToken);

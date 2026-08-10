@@ -32,6 +32,7 @@ public static class SuppliersActionResultAssembler
         {
             SuppliersError.SupplierNotFound => StatusCodes.Status404NotFound,
             SuppliersError.PurchaseOrderNotFound => StatusCodes.Status404NotFound,
+            SuppliersError.ProductNotFound => StatusCodes.Status404NotFound,
             SuppliersError.InvalidStatusTransition => StatusCodes.Status409Conflict,
             SuppliersError.EmptyPurchaseOrderLines => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError

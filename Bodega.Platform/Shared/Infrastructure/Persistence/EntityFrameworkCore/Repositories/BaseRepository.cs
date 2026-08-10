@@ -23,9 +23,16 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : 
         await Context.Set<TEntity>().AddAsync(entity, cancellationToken);
     }
 
+    /// <summary>
+    ///     Deliberately a filtered LINQ query, not DbSet.FindAsync — Find can
+    ///     return an entity straight from the change tracker without
+    ///     re-applying global query filters (see AppDbContext's
+    ///     BusinessId-scoped filters), which would be a tenant-isolation gap.
+    /// </summary>
     public async Task<TEntity?> FindByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await Context.Set<TEntity>().FindAsync([id], cancellationToken);
+        return await Context.Set<TEntity>()
+            .FirstOrDefaultAsync(entity => EF.Property<int>(entity, "Id") == id, cancellationToken);
     }
 
     public void Update(TEntity entity)

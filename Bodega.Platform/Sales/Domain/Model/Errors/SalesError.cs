@@ -4,6 +4,7 @@ public enum SalesError
 {
     SaleNotFound,
     CustomerNotFound,
+    ProductNotFound,
     InsufficientStock,
     SaleAlreadyCancelled,
     EmptySaleLines,
