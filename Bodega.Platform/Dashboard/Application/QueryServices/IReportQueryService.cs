@@ -11,4 +11,7 @@ public interface IReportQueryService
 
     /// <summary>Re-runs the report's live query (using its stored Type/DateFrom/DateTo) and renders it as CSV — never from a stored snapshot.</summary>
     Task<Result<string>> ExportReportAsCsv(int reportId, CancellationToken cancellationToken);
+
+    /// <summary>Same live re-run, rendered as PDF via QuestPDF — only supported for ReportType.StockMovements.</summary>
+    Task<Result<byte[]>> ExportReportAsPdf(int reportId, CancellationToken cancellationToken);
 }

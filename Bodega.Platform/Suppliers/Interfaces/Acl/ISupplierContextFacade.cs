@@ -12,4 +12,14 @@ public interface ISupplierContextFacade
     ///     PurchaseDetailId is provided.
     /// </summary>
     Task<(string SupplierName, int ProductId)?> GetPurchaseOrderDetailInfo(int purchaseDetailId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     "Name LastName", same composition as GetPurchaseOrderDetailInfo —
+    ///     used by Dashboard's "STOCK_MOVEMENTS" report to filter by
+    ///     supplier: StockMovement only stores a free-text Supplier string
+    ///     (set from this same name when Suppliers marks a purchase order
+    ///     RECEIVED), so filtering by SupplierId means resolving the name
+    ///     here first, then matching it against that text field.
+    /// </summary>
+    Task<string?> GetSupplierName(int supplierId, CancellationToken cancellationToken);
 }

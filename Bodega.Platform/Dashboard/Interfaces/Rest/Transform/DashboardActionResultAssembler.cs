@@ -15,9 +15,12 @@ public static class DashboardActionResultAssembler
     {
         if (result.IsSuccess) return onSuccess(result.Value!);
 
-        var statusCode = result.Error is DashboardError.ReportNotFound
-            ? StatusCodes.Status404NotFound
-            : StatusCodes.Status500InternalServerError;
+        var statusCode = result.Error switch
+        {
+            DashboardError.ReportNotFound => StatusCodes.Status404NotFound,
+            DashboardError.UnsupportedReportTypeForPdf => StatusCodes.Status400BadRequest,
+            _ => StatusCodes.Status500InternalServerError
+        };
         return problemDetailsFactory.ToActionResult(statusCode, result.Error?.ToString() ?? "InternalServerError", result.Message);
     }
 }

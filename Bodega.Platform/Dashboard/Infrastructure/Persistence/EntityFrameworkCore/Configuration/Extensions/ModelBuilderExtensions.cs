@@ -17,6 +17,13 @@ public static class ModelBuilderExtensions
             entity.Property(report => report.DateFrom).HasDateOnlyConversion();
             entity.Property(report => report.DateTo).HasDateOnlyConversion();
 
+            // Plain columns, no FK constraint: unlike BusinessId (the tenant
+            // root), Product/Supplier are peer bounded contexts reached only
+            // through their ACL facades — a report should stay valid history
+            // even if the product/supplier it once filtered by gets deleted.
+            entity.Property(report => report.ProductId);
+            entity.Property(report => report.SupplierId);
+
             entity.HasOne<Business>().WithMany().HasForeignKey(report => report.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
