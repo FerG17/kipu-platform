@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Iam.Application.CommandServices;
 using Bodega.Platform.Iam.Application.Internal.OutboundServices;
@@ -23,6 +24,9 @@ public class UserCommandService(
     IHashingService hashingService,
     IUnitOfWork unitOfWork,
     IProductContextFacade productContextFacade,
+    IValidator<SignUpCommand> signUpValidator,
+    IValidator<InviteUserCommand> inviteUserValidator,
+    IValidator<ChangePasswordCommand> changePasswordValidator,
     IStringLocalizer<IamMessages> localizer)
     : IUserCommandService
 {
@@ -58,6 +62,10 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<(User user, string token)>> Handle(SignUpCommand command, CancellationToken cancellationToken)
     {
+        if (!(await signUpValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<(User user, string token)>.Failure(IamError.WeakPassword,
+                localizer[nameof(IamError.WeakPassword)]);
+
         if (await userRepository.ExistsByEmailAsync(command.Email, cancellationToken))
             return Result<(User user, string token)>.Failure(IamError.EmailAlreadyTaken,
                 localizer[nameof(IamError.EmailAlreadyTaken), command.Email]);
@@ -107,6 +115,9 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<User>> Handle(InviteUserCommand command, CancellationToken cancellationToken)
     {
+        if (!(await inviteUserValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<User>.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
+
         if (await userRepository.ExistsByEmailAsync(command.Email, cancellationToken))
             return Result<User>.Failure(IamError.EmailAlreadyTaken,
                 localizer[nameof(IamError.EmailAlreadyTaken), command.Email]);
@@ -137,6 +148,9 @@ public class UserCommandService(
 
     public async Task<Result> Handle(ChangePasswordCommand command, CancellationToken cancellationToken)
     {
+        if (!(await changePasswordValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
+
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
         if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 

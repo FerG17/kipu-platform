@@ -24,8 +24,10 @@ public class BatchRepository(AppDbContext context) : BaseRepository<Batch>(conte
         return await Context.Set<Batch>().Where(batch => batch.BusinessId == businessId).ToListAsync(cancellationToken);
     }
 
+    /// <summary>IgnoreQueryFilters() deliberately — the alerts expiration sweep runs outside any authenticated business and needs every business's active batches, see IBatchRepository.</summary>
     public async Task<IEnumerable<Batch>> FindAllActiveAsync(CancellationToken cancellationToken = default)
     {
-        return await Context.Set<Batch>().Where(batch => batch.Status == BatchStatus.Active).ToListAsync(cancellationToken);
+        return await Context.Set<Batch>().IgnoreQueryFilters()
+            .Where(batch => batch.Status == BatchStatus.Active).ToListAsync(cancellationToken);
     }
 }

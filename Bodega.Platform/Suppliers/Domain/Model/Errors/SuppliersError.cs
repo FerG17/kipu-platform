@@ -4,6 +4,7 @@ public enum SuppliersError
 {
     SupplierNotFound,
     PurchaseOrderNotFound,
+    ProductNotFound,
     InvalidStatusTransition,
     EmptyPurchaseOrderLines,
     DatabaseError

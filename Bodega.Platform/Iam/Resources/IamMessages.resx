@@ -56,6 +56,9 @@
   <data name="CurrentPasswordInvalid" xml:space="preserve">
     <value>Current password is incorrect.</value>
   </data>
+  <data name="WeakPassword" xml:space="preserve">
+    <value>Password must be at least 8 characters long and include at least one letter and one number.</value>
+  </data>
   <data name="OperationCancelled" xml:space="preserve">
     <value>The operation was cancelled.</value>
   </data>

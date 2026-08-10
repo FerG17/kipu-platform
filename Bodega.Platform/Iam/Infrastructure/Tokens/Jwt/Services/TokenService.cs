@@ -17,6 +17,7 @@ namespace Bodega.Platform.Iam.Infrastructure.Tokens.Jwt.Services;
 public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
 {
     private const string BusinessIdClaimType = "business_id";
+    public const string TokenVersionClaimType = "token_version";
     private readonly TokenSettings _tokenSettings = tokenSettings.Value;
 
     public string GenerateToken(User user)
@@ -30,7 +31,8 @@ public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(BusinessIdClaimType, user.BusinessId.ToString()),
-                new Claim(ClaimTypes.Role, user.RoleId.ToString())
+                new Claim(ClaimTypes.Role, user.RoleId.ToString()),
+                new Claim(TokenVersionClaimType, user.TokenVersion.ToString())
             ]),
             Expires = DateTime.UtcNow.AddDays(_tokenSettings.ExpirationDays),
             SigningCredentials =

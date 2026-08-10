@@ -47,6 +47,9 @@
   <data name="CustomerNotFound" xml:space="preserve">
     <value>Cliente no encontrado.</value>
   </data>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>Uno o más productos de la venta no fueron encontrados.</value>
+  </data>
   <data name="InsufficientStock" xml:space="preserve">
     <value>Una o más líneas no tienen stock suficiente.</value>
   </data>

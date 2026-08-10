@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Bodega.Platform.Iam.Application.CommandServices;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Iam.Interfaces.Rest.Resources;
@@ -13,6 +14,7 @@ namespace Bodega.Platform.Iam.Interfaces.Rest;
 [Route("api/v1/authentication")]
 [Produces(MediaTypeNames.Application.Json)]
 [SwaggerTag("Sign-in and sign-up")]
+[EnableRateLimiting("auth")]
 public class AuthenticationController(
     IUserCommandService userCommandService,
     ProblemDetailsFactory problemDetailsFactory)

@@ -43,6 +43,13 @@ public class SaleCommandService(
 
         foreach (var line in command.Lines)
         {
+            // Explicit existence check first (not just relying on the stock
+            // check below): a quantity-0 line for a product outside this
+            // business would otherwise pass "stock >= 0" silently and let a
+            // Sale reference a ProductId it doesn't own.
+            if (!await productContextFacade.ProductExists(line.ProductId, cancellationToken))
+                return Result<Sale>.Failure(SalesError.ProductNotFound, localizer[nameof(SalesError.ProductNotFound)]);
+
             var availableStock = await productContextFacade.GetAvailableStock(line.ProductId, cancellationToken);
             if (availableStock < line.Quantity)
                 return Result<Sale>.Failure(SalesError.InsufficientStock, localizer[nameof(SalesError.InsufficientStock)]);

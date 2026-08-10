@@ -42,6 +42,7 @@ public static class SalesActionResultAssembler
         {
             SalesError.SaleNotFound => StatusCodes.Status404NotFound,
             SalesError.CustomerNotFound => StatusCodes.Status404NotFound,
+            SalesError.ProductNotFound => StatusCodes.Status404NotFound,
             SalesError.InsufficientStock => StatusCodes.Status409Conflict,
             SalesError.SaleAlreadyCancelled => StatusCodes.Status409Conflict,
             SalesError.EmptySaleLines => StatusCodes.Status400BadRequest,
