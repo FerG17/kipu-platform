@@ -243,11 +243,14 @@ builder.Services.AddScoped<IProductContextFacade, ProductContextFacade>();
 
 builder.Services.AddScoped<ISaleRepository, SaleRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IPaymentPlanRepository, PaymentPlanRepository>();
 
 builder.Services.AddScoped<ISaleCommandService, SaleCommandService>();
 builder.Services.AddScoped<ICustomerCommandService, CustomerCommandService>();
+builder.Services.AddScoped<IPaymentPlanCommandService, PaymentPlanCommandService>();
 builder.Services.AddScoped<ISaleQueryService, SaleQueryService>();
 builder.Services.AddScoped<ICustomerQueryService, CustomerQueryService>();
+builder.Services.AddScoped<IPaymentPlanQueryService, PaymentPlanQueryService>();
 
 builder.Services.AddScoped<ISalesContextFacade, SalesContextFacade>();
 

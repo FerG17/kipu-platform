@@ -59,6 +59,18 @@
   <data name="EmptySaleLines" xml:space="preserve">
     <value>Una venta debe tener al menos una línea.</value>
   </data>
+  <data name="PaymentPlanNotFound" xml:space="preserve">
+    <value>Plan de pago no encontrado.</value>
+  </data>
+  <data name="PaymentPlanAlreadyExists" xml:space="preserve">
+    <value>Esta venta ya tiene un plan de pago.</value>
+  </data>
+  <data name="InstallmentsFullyPaid" xml:space="preserve">
+    <value>Todas las cuotas ya fueron pagadas.</value>
+  </data>
+  <data name="InvalidInstallmentCount" xml:space="preserve">
+    <value>El número de cuotas debe ser al menos 1.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>
