@@ -1,7 +1,12 @@
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Cortex.Mediator.DependencyInjection;
+using FluentValidation;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Microsoft.OpenApi;
+using Serilog;
 using Bodega.Platform.Iam.Application.CommandServices;
 using Bodega.Platform.Iam.Application.Internal.CommandServices;
 using Bodega.Platform.Iam.Application.Internal.OutboundServices;
@@ -67,12 +72,30 @@ using Bodega.Platform.Shared.Resources;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Don't leak "Server: Kestrel" (or version info) to clients.
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
+// Structured logging — console sink, enriched per-request with the
+// authenticated user/business below (see UseSerilogRequestLogging). Only
+// ever logs identifiers (UserId/BusinessId), never passwords, tokens, or
+// other request/response bodies — no sink here captures those.
+builder.Host.UseSerilog((context, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"));
+
 // Add services to the container.
 
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddControllers().AddDataAnnotationsLocalization();
 
 builder.Services.AddProblemDetails();
+
+// FluentValidation — command validators (e.g. password policy) are
+// discovered by convention from this assembly; see Iam's *CommandValidator
+// classes under Domain/Model/Commands/Validation.
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // CORS — allows the Vue frontend (a different origin) to call this API.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -82,6 +105,34 @@ builder.Services.AddCors(options =>
         policy => policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader());
+});
+
+// Rate limiting — a global per-IP budget for the whole API, plus a much
+// stricter policy for authentication endpoints specifically (sign-in/sign-up
+// are the classic brute-force/credential-stuffing target).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 120,
+                QueueLimit = 0
+            }));
+
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 10,
+                QueueLimit = 0
+            }));
 });
 
 // Database — MySQL via EF Core. Connection string may contain %VAR% placeholders
@@ -246,6 +297,48 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 app.UseGlobalExceptionHandler();
 
+// One structured log line per request (method, path, status, duration),
+// enriched with who made it once auth resolves it downstream — the "who did
+// what and when" audit trail for this phase. Never logs bodies, so a
+// password/token in a request never ends up in a log line.
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var businessId = httpContext.User.FindFirst("business_id")?.Value;
+        if (userId != null) diagnosticContext.Set("UserId", userId);
+        if (businessId != null) diagnosticContext.Set("BusinessId", businessId);
+    };
+});
+
+// Security headers on every response — defense in depth against MIME
+// sniffing, clickjacking, and leaking which tech stack this is (helps an
+// attacker pick known exploits, no reason to make that easy).
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers.Remove("X-Powered-By");
+
+    // Swagger UI (dev/staging only, see below) needs to load its own
+    // inline scripts/styles — a strict CSP there would break it, so this
+    // only applies once Swagger is gone in Production, where every
+    // response is plain JSON and can be locked all the way down.
+    if (app.Environment.IsProduction())
+        context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+
+    await next();
+});
+
+if (!app.Environment.IsDevelopment())
+{
+    // HTTPS is a hard requirement in every environment except local dev
+    // (where running without TLS is fine/expected).
+    app.UseHsts();
+}
+
 var supportedCultures = new[] { "en", "es" };
 var localizationOptions = new RequestLocalizationOptions()
     .SetDefaultCulture(supportedCultures[0])
@@ -253,12 +346,20 @@ var localizationOptions = new RequestLocalizationOptions()
     .AddSupportedUICultures(supportedCultures);
 app.UseRequestLocalization(localizationOptions);
 
-app.UseSwagger();
-app.UseSwaggerUI();
+// Swagger UI documents (and lets you call) every endpoint — fine as a dev
+// tool, not something to expose publicly once this is handling a real
+// business's data.
+if (!app.Environment.IsProduction())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseCors("BodegaFrontend");
 
 app.UseRouting();
+
+app.UseRateLimiter();
 
 app.UseRequestAuthorization();
 
