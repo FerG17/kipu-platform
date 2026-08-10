@@ -4,4 +4,26 @@
     build:
       context: .
       dockerfile: Bodega.Platform/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: dev_password
+      MYSQL_DATABASE: bodega_platform
+    ports:
+      - "3307:3306"
+    volumes:
+      - bodega-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdev_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bodega-mysql-data:
 
