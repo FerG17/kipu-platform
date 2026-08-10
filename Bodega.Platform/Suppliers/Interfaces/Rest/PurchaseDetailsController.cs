@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Suppliers.Application.QueryServices;
 using Bodega.Platform.Suppliers.Domain.Model.Queries;
@@ -13,7 +14,7 @@ namespace Bodega.Platform.Suppliers.Interfaces.Rest;
 ///     purchase order's lines are always created atomically with
 ///     CreatePurchaseOrderCommand.
 /// </summary>
-[Authorize]
+[Authorize(RoleNames.Admin, RoleNames.Warehouse)]
 [ApiController]
 [Route("api/v1/purchase-details")]
 [Produces(MediaTypeNames.Application.Json)]

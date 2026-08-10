@@ -5,6 +5,7 @@ using Bodega.Platform.Alerts.Application.QueryServices;
 using Bodega.Platform.Alerts.Domain.Model.Queries;
 using Bodega.Platform.Alerts.Interfaces.Rest.Resources;
 using Bodega.Platform.Alerts.Interfaces.Rest.Transform;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Interfaces.Rest.ProblemDetails;
@@ -38,6 +39,7 @@ public class AlertRulesController(
 
     /// <summary>Creates or updates the rule for the given AlertType — one rule per (business, type).</summary>
     [HttpPost]
+    [Authorize(RoleNames.Admin)]
     [SwaggerOperation(Summary = "Create or update an alert rule", OperationId = "CreateOrUpdateAlertRule")]
     public async Task<IActionResult> CreateOrUpdateAlertRule([FromBody] CreateOrUpdateAlertRuleResource resource,
         CancellationToken cancellationToken)
@@ -53,6 +55,7 @@ public class AlertRulesController(
     }
 
     [HttpPatch]
+    [Authorize(RoleNames.Admin)]
     [SwaggerOperation(Summary = "Update an alert rule (alias for POST — same upsert semantics)", OperationId = "UpdateAlertRule")]
     public Task<IActionResult> UpdateAlertRule([FromBody] CreateOrUpdateAlertRuleResource resource, CancellationToken cancellationToken)
     {

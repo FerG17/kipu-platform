@@ -6,6 +6,7 @@ using Bodega.Platform.Dashboard.Application.QueryServices;
 using Bodega.Platform.Dashboard.Domain.Model.Queries;
 using Bodega.Platform.Dashboard.Interfaces.Rest.Resources;
 using Bodega.Platform.Dashboard.Interfaces.Rest.Transform;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Interfaces.Rest.ProblemDetails;
@@ -17,9 +18,10 @@ namespace Bodega.Platform.Dashboard.Interfaces.Rest;
 ///     Reports are persisted for history (decided §8.3) — unlike the
 ///     frontend's current 100%-in-memory generation — but their figures are
 ///     never snapshotted: both generation and export re-run the same live
-///     queries against Sales/Product.
+///     queries against Sales/Product. Same restriction as DashboardController
+///     — financial reporting is owner-only.
 /// </summary>
-[Authorize]
+[Authorize(RoleNames.Admin)]
 [ApiController]
 [Route("api/v1/reports")]
 [Produces(MediaTypeNames.Application.Json)]
