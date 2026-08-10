@@ -8,5 +8,9 @@ public enum SalesError
     InsufficientStock,
     SaleAlreadyCancelled,
     EmptySaleLines,
+    PaymentPlanNotFound,
+    PaymentPlanAlreadyExists,
+    InstallmentsFullyPaid,
+    InvalidInstallmentCount,
     DatabaseError
 }

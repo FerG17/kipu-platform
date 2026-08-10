@@ -46,6 +46,10 @@ public static class SalesActionResultAssembler
             SalesError.InsufficientStock => StatusCodes.Status409Conflict,
             SalesError.SaleAlreadyCancelled => StatusCodes.Status409Conflict,
             SalesError.EmptySaleLines => StatusCodes.Status400BadRequest,
+            SalesError.PaymentPlanNotFound => StatusCodes.Status404NotFound,
+            SalesError.PaymentPlanAlreadyExists => StatusCodes.Status409Conflict,
+            SalesError.InstallmentsFullyPaid => StatusCodes.Status409Conflict,
+            SalesError.InvalidInstallmentCount => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
     }
