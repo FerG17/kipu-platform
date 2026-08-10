@@ -43,8 +43,23 @@ public interface IProductContextFacade
 
     /// <summary>Ranked by real InventoryItem stock — never by quantity sold.</summary>
     Task<IReadOnlyCollection<TopStockProductInfo>> GetTopStockProducts(int businessId, int count, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Stock movements ("entradas/salidas") for the Dashboard "STOCK_MOVEMENTS"
+    ///     report — dateFrom/dateTo/productId are all optional and combinable.
+    ///     Product names are resolved here so Dashboard never needs its own
+    ///     Product lookup. supplierId filtering happens in Dashboard itself
+    ///     (via ISupplierContextFacade, matching the free-text Supplier field
+    ///     stored on StockMovement) — this method only applies the two filters
+    ///     that live directly on StockMovement/Product.
+    /// </summary>
+    Task<IReadOnlyCollection<StockMovementReportLine>> GetStockMovementsForReport(int businessId, DateOnly? dateFrom,
+        DateOnly? dateTo, int? productId, CancellationToken cancellationToken);
 }
 
 public record ProductKpisSnapshot(int TotalProducts, int LowStockCount, int ExpiringSoonCount, decimal InventoryValue);
 
 public record TopStockProductInfo(int ProductId, string ProductName, int TotalStock);
+
+public record StockMovementReportLine(int ProductId, string ProductName, string Type, int Quantity, string Supplier,
+    string Note, DateTimeOffset RegisteredAt);

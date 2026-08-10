@@ -44,6 +44,9 @@
   <data name="ReportNotFound" xml:space="preserve">
     <value>Reporte no encontrado.</value>
   </data>
+  <data name="UnsupportedReportTypeForPdf" xml:space="preserve">
+    <value>La exportación a PDF solo está disponible para reportes de tipo STOCK_MOVEMENTS.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

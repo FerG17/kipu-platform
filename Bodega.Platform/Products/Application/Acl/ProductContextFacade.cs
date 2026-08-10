@@ -16,7 +16,8 @@ public class ProductContextFacade(
     IInventoryQueryService inventoryQueryService,
     IProductQueryService productQueryService,
     IBatchRepository batchRepository,
-    IProductRepository productRepository)
+    IProductRepository productRepository,
+    IStockMovementRepository stockMovementRepository)
     : IProductContextFacade
 {
     public async Task<int> CreateDefaultWarehouse(int businessId, CancellationToken cancellationToken)
@@ -105,6 +106,22 @@ public class ProductContextFacade(
                 group.Sum(item => item.StockUnit)))
             .OrderByDescending(info => info.TotalStock)
             .Take(count)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyCollection<StockMovementReportLine>> GetStockMovementsForReport(int businessId,
+        DateOnly? dateFrom, DateOnly? dateTo, int? productId, CancellationToken cancellationToken)
+    {
+        var movements = await stockMovementRepository.FindFilteredByBusinessIdAsync(businessId, dateFrom, dateTo, productId,
+            cancellationToken);
+
+        var products = await productQueryService.Handle(new GetAllProductsByBusinessIdQuery(businessId, null), cancellationToken);
+        var nameByProductId = products.ToDictionary(product => product.Id, product => product.Name);
+
+        return movements
+            .Select(movement => new StockMovementReportLine(movement.ProductId,
+                nameByProductId.GetValueOrDefault(movement.ProductId, string.Empty), movement.Type, movement.Quantity,
+                movement.Supplier, movement.Note, movement.RegisteredAt))
             .ToList();
     }
 }
