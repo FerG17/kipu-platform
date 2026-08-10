@@ -7,6 +7,7 @@ public static class GenerateReportCommandFromResourceAssembler
 {
     public static GenerateReportCommand ToCommandFromResource(GenerateReportResource resource, int businessId)
     {
-        return new GenerateReportCommand(businessId, resource.Type, resource.DateFrom, resource.DateTo);
+        return new GenerateReportCommand(businessId, resource.Type, resource.DateFrom, resource.DateTo, resource.ProductId,
+            resource.SupplierId);
     }
 }

@@ -68,4 +68,17 @@ public class ReportsController(
         return DashboardActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             csv => File(Encoding.UTF8.GetBytes(csv), "text/csv", $"report-{id}.csv"));
     }
+
+    /// <summary>Only STOCK_MOVEMENTS ("entradas/salidas") reports support PDF today — see ReportQueryService.ExportReportAsPdf.</summary>
+    [HttpGet("{id:int}/export/pdf")]
+    [SwaggerOperation(Summary = "Export a report as PDF, re-running its live query", OperationId = "ExportReportAsPdf")]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "The report was not found")]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "PDF export isn't supported for this report's type")]
+    public async Task<IActionResult> ExportReportAsPdf([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var result = await reportQueryService.ExportReportAsPdf(id, cancellationToken);
+
+        return DashboardActionResultAssembler.ToActionResult(result, problemDetailsFactory,
+            pdf => File(pdf, "application/pdf", $"report-{id}.pdf"));
+    }
 }

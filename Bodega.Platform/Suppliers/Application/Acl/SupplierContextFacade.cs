@@ -18,4 +18,10 @@ public class SupplierContextFacade(IPurchaseOrderRepository purchaseOrderReposit
 
         return (supplierName, detail.ProductId);
     }
+
+    public async Task<string?> GetSupplierName(int supplierId, CancellationToken cancellationToken)
+    {
+        var supplier = await supplierRepository.FindByIdAsync(supplierId, cancellationToken);
+        return supplier == null ? null : $"{supplier.Name} {supplier.LastName}".Trim();
+    }
 }
