@@ -47,6 +47,9 @@
   <data name="PurchaseOrderNotFound" xml:space="preserve">
     <value>Orden de compra no encontrada.</value>
   </data>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>Uno o más productos de la orden de compra no fueron encontrados.</value>
+  </data>
   <data name="InvalidStatusTransition" xml:space="preserve">
     <value>Estado inválido para esta orden de compra.</value>
   </data>

@@ -24,10 +24,16 @@ public class AlertRepository(AppDbContext context) : BaseRepository<Alert>(conte
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    ///     IgnoreQueryFilters() deliberately: called both from request-scoped
+    ///     event handlers (harmless — ProductId is a globally unique PK, so
+    ///     the match is exact regardless) and from the alerts expiration
+    ///     sweep, which runs outside any authenticated business.
+    /// </summary>
     public async Task<Alert?> FindActiveByProductAndTypeAsync(int productId, string type, int? batchId,
         int? warehouseId = null, CancellationToken cancellationToken = default)
     {
-        return await Context.Set<Alert>().FirstOrDefaultAsync(
+        return await Context.Set<Alert>().IgnoreQueryFilters().FirstOrDefaultAsync(
             alert => alert.ProductId == productId && alert.Type == type && alert.BatchId == batchId
                      && alert.WarehouseId == warehouseId && alert.Status != AlertStatus.Resolved,
             cancellationToken);

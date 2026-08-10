@@ -32,6 +32,12 @@ public class PurchaseOrderCommandService(
         if (supplier == null)
             return Result<PurchaseOrder>.Failure(SuppliersError.SupplierNotFound, localizer[nameof(SuppliersError.SupplierNotFound)]);
 
+        foreach (var line in command.Lines)
+        {
+            if (!await productContextFacade.ProductExists(line.ProductId, cancellationToken))
+                return Result<PurchaseOrder>.Failure(SuppliersError.ProductNotFound, localizer[nameof(SuppliersError.ProductNotFound)]);
+        }
+
         var purchaseOrder = new PurchaseOrder(command.BusinessId, command.SupplierId, command.Date, command.ExpectedDate,
             command.Currency, command.Description);
         foreach (var line in command.Lines)
