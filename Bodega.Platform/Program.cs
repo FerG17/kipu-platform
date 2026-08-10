@@ -72,6 +72,11 @@ using Bodega.Platform.Shared.Infrastructure.Security;
 using Bodega.Platform.Shared.Interfaces.Rest.ProblemDetails;
 using Bodega.Platform.Shared.Resources;
 
+// QuestPDF requires an explicit license declaration before generating any
+// document, or it throws at first use — Community is free for this app's
+// size (small business, not the revenue tier that requires a paid license).
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Don't leak "Server: Kestrel" (or version info) to clients.

@@ -12,7 +12,8 @@ public class ReportCommandService(IReportRepository reportRepository, IUnitOfWor
 {
     public async Task<Result<Report>> Handle(GenerateReportCommand command, CancellationToken cancellationToken)
     {
-        var report = new Report(command.BusinessId, command.Type, command.DateFrom, command.DateTo);
+        var report = new Report(command.BusinessId, command.Type, command.DateFrom, command.DateTo, command.ProductId,
+            command.SupplierId);
         await reportRepository.AddAsync(report, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<Report>.Success(report);
