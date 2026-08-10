@@ -1,3 +1,4 @@
+using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
 using Bodega.Platform.Products.Interfaces.Acl;
@@ -48,10 +49,12 @@ public class AlertExpirationSweepJob(
         var alertRepository = scope.ServiceProvider.GetRequiredService<IAlertRepository>();
         var alertRuleRepository = scope.ServiceProvider.GetRequiredService<IAlertRuleRepository>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var notificationDispatcher = scope.ServiceProvider.GetRequiredService<IAlertNotificationDispatcher>();
 
         var batches = await productContextFacade.GetAllActiveBatchesForExpirationSweep(cancellationToken);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var rulesByBusiness = new Dictionary<int, int>();
+        var newAlerts = new List<Alert>();
 
         foreach (var batch in batches)
         {
@@ -77,27 +80,42 @@ public class AlertExpirationSweepJob(
             if (isExpired)
             {
                 var message = $"{batch.ProductName} venció.";
-                if (existingExpired != null) existingExpired.RefreshStockInfo(AlertSeverity.High, message, 0);
-                else await alertRepository.AddAsync(
-                    new Alert(batch.BusinessId, batch.ProductId, batch.BatchId, batch.ProductName, AlertType.Expired,
-                        AlertSeverity.High, message, 0, 0, daysToExpiry),
-                    cancellationToken);
+                if (existingExpired != null)
+                {
+                    existingExpired.RefreshStockInfo(AlertSeverity.High, message, 0);
+                }
+                else
+                {
+                    var alert = new Alert(batch.BusinessId, batch.ProductId, batch.BatchId, batch.ProductName,
+                        AlertType.Expired, AlertSeverity.High, message, 0, 0, daysToExpiry);
+                    await alertRepository.AddAsync(alert, cancellationToken);
+                    newAlerts.Add(alert);
+                }
 
                 existingExpiringSoon?.Resolve();
             }
             else if (isExpiringSoon)
             {
                 var message = $"{batch.ProductName} vence en {daysToExpiry} día(s).";
-                if (existingExpiringSoon != null) existingExpiringSoon.RefreshStockInfo(AlertSeverity.Medium, message, 0);
-                else await alertRepository.AddAsync(
-                    new Alert(batch.BusinessId, batch.ProductId, batch.BatchId, batch.ProductName, AlertType.Expiration,
-                        AlertSeverity.Medium, message, 0, 0, daysToExpiry),
-                    cancellationToken);
+                if (existingExpiringSoon != null)
+                {
+                    existingExpiringSoon.RefreshStockInfo(AlertSeverity.Medium, message, 0);
+                }
+                else
+                {
+                    var alert = new Alert(batch.BusinessId, batch.ProductId, batch.BatchId, batch.ProductName,
+                        AlertType.Expiration, AlertSeverity.Medium, message, 0, 0, daysToExpiry);
+                    await alertRepository.AddAsync(alert, cancellationToken);
+                    newAlerts.Add(alert);
+                }
 
                 existingExpired?.Resolve();
             }
         }
 
         await unitOfWork.CompleteAsync(cancellationToken);
+
+        foreach (var alert in newAlerts)
+            await notificationDispatcher.NotifyAsync(alert, cancellationToken);
     }
 }
