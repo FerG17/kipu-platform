@@ -32,6 +32,7 @@ public static class AlertsActionResultAssembler
         {
             AlertsError.AlertNotFound => StatusCodes.Status404NotFound,
             AlertsError.AlertAlreadyResolved => StatusCodes.Status409Conflict,
+            AlertsError.InvalidThreshold => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
     }

@@ -47,6 +47,9 @@
   <data name="AlertAlreadyResolved" xml:space="preserve">
     <value>Esta alerta ya fue resuelta.</value>
   </data>
+  <data name="InvalidThreshold" xml:space="preserve">
+    <value>El umbral no puede ser negativo.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

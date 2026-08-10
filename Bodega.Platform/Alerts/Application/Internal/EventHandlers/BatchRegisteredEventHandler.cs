@@ -1,3 +1,4 @@
+using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
 using Bodega.Platform.Products.Domain.Model.Events;
@@ -16,7 +17,8 @@ namespace Bodega.Platform.Alerts.Application.Internal.EventHandlers;
 public class BatchRegisteredEventHandler(
     IAlertRepository alertRepository,
     IAlertRuleRepository alertRuleRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IAlertNotificationDispatcher notificationDispatcher)
     : IEventHandler<BatchRegisteredEvent>
 {
     public async Task Handle(BatchRegisteredEvent domainEvent, CancellationToken cancellationToken)
@@ -37,25 +39,37 @@ public class BatchRegisteredEventHandler(
         var isExpiringSoon = ExpirationRules.IsExpiringSoon(domainEvent.Expiration, today, thresholdDays);
         var daysToExpiry = domainEvent.Expiration?.DayNumber - today.DayNumber;
 
+        Alert? newAlert = null;
+
         if (isExpired)
         {
             var message = $"{domainEvent.ProductName} venció.";
-            if (existingExpired != null) existingExpired.RefreshStockInfo(AlertSeverity.High, message, 0);
-            else await alertRepository.AddAsync(
-                new Alert(domainEvent.BusinessId, domainEvent.ProductId, domainEvent.BatchId, domainEvent.ProductName,
-                    AlertType.Expired, AlertSeverity.High, message, 0, 0, daysToExpiry),
-                cancellationToken);
+            if (existingExpired != null)
+            {
+                existingExpired.RefreshStockInfo(AlertSeverity.High, message, 0);
+            }
+            else
+            {
+                newAlert = new Alert(domainEvent.BusinessId, domainEvent.ProductId, domainEvent.BatchId,
+                    domainEvent.ProductName, AlertType.Expired, AlertSeverity.High, message, 0, 0, daysToExpiry);
+                await alertRepository.AddAsync(newAlert, cancellationToken);
+            }
 
             existingExpiringSoon?.Resolve();
         }
         else if (isExpiringSoon)
         {
             var message = $"{domainEvent.ProductName} vence en {daysToExpiry} día(s).";
-            if (existingExpiringSoon != null) existingExpiringSoon.RefreshStockInfo(AlertSeverity.Medium, message, 0);
-            else await alertRepository.AddAsync(
-                new Alert(domainEvent.BusinessId, domainEvent.ProductId, domainEvent.BatchId, domainEvent.ProductName,
-                    AlertType.Expiration, AlertSeverity.Medium, message, 0, 0, daysToExpiry),
-                cancellationToken);
+            if (existingExpiringSoon != null)
+            {
+                existingExpiringSoon.RefreshStockInfo(AlertSeverity.Medium, message, 0);
+            }
+            else
+            {
+                newAlert = new Alert(domainEvent.BusinessId, domainEvent.ProductId, domainEvent.BatchId,
+                    domainEvent.ProductName, AlertType.Expiration, AlertSeverity.Medium, message, 0, 0, daysToExpiry);
+                await alertRepository.AddAsync(newAlert, cancellationToken);
+            }
 
             existingExpired?.Resolve();
         }
@@ -66,5 +80,7 @@ public class BatchRegisteredEventHandler(
         }
 
         await unitOfWork.CompleteAsync(cancellationToken);
+
+        if (newAlert != null) await notificationDispatcher.NotifyAsync(newAlert, cancellationToken);
     }
 }

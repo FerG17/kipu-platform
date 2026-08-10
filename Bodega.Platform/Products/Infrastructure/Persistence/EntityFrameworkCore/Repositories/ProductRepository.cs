@@ -15,4 +15,9 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
         if (!string.IsNullOrEmpty(category)) query = query.Where(product => product.Category == category);
         return await query.ToListAsync(cancellationToken);
     }
+
+    public async Task<IEnumerable<Product>> ListIgnoringTenantAsync(CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Product>().IgnoreQueryFilters().ToListAsync(cancellationToken);
+    }
 }
