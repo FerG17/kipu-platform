@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Application.QueryServices;
@@ -40,6 +41,7 @@ public class InventoriesController(
     }
 
     [HttpPatch("{productId:int}/minimum-stock")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Update a product's minimum stock threshold", OperationId = "UpdateMinimumStock")]
     public async Task<IActionResult> UpdateMinimumStock([FromRoute] int productId, [FromBody] UpdateMinimumStockResource resource,
         CancellationToken cancellationToken)

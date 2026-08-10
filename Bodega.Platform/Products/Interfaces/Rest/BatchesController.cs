@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Application.QueryServices;
@@ -41,6 +42,7 @@ public class BatchesController(
 
     /// <summary>Creates a batch, or updates the product's existing ACTIVE batch in place — see CreateOrUpdateBatchCommand.</summary>
     [HttpPost]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Create or update a product's active batch", OperationId = "CreateOrUpdateBatch")]
     public async Task<IActionResult> CreateOrUpdateBatch([FromBody] CreateOrUpdateBatchResource resource,
         CancellationToken cancellationToken)
