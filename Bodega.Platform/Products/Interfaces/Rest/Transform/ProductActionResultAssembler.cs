@@ -52,6 +52,7 @@ public static class ProductActionResultAssembler
             ProductError.InsufficientStock => StatusCodes.Status409Conflict,
             ProductError.InvalidQuantity => StatusCodes.Status400BadRequest,
             ProductError.WarehouseRequired => StatusCodes.Status400BadRequest,
+            ProductError.InvalidExpirationDate => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
     }

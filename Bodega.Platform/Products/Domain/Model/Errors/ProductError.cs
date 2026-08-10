@@ -9,5 +9,6 @@ public enum ProductError
     InventoryItemNotFound,
     InsufficientStock,
     InvalidQuantity,
+    InvalidExpirationDate,
     DatabaseError
 }
