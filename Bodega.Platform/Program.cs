@@ -37,9 +37,11 @@ using Bodega.Platform.Dashboard.Infrastructure.Persistence.EntityFrameworkCore.R
 using Bodega.Platform.Dashboard.Resources;
 using Bodega.Platform.Alerts.Application.CommandServices;
 using Bodega.Platform.Alerts.Application.Internal.CommandServices;
+using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Application.QueryServices;
 using Bodega.Platform.Alerts.Application.Internal.QueryServices;
 using Bodega.Platform.Alerts.Domain.Repositories;
+using Bodega.Platform.Alerts.Infrastructure.Notifications;
 using Bodega.Platform.Alerts.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Bodega.Platform.Alerts.Infrastructure.Pipeline.BackgroundServices;
 using Bodega.Platform.Alerts.Resources;
@@ -270,6 +272,11 @@ builder.Services.AddScoped<IAlertCommandService, AlertCommandService>();
 builder.Services.AddScoped<IAlertRuleCommandService, AlertRuleCommandService>();
 builder.Services.AddScoped<IAlertQueryService, AlertQueryService>();
 builder.Services.AddScoped<IAlertRuleQueryService, AlertRuleQueryService>();
+
+// Placeholder until a real email/push implementation exists — swapping it
+// in later is a one-line change here, no changes needed anywhere alerts
+// are created (see IAlertNotificationDispatcher).
+builder.Services.AddScoped<IAlertNotificationDispatcher, NoOpAlertNotificationDispatcher>();
 
 // Event handlers are auto-discovered by AddCortexMediator's assembly scan
 // (StockLevelChangedEventHandler, BatchRegisteredEventHandler) — no

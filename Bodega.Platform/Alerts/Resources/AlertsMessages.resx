@@ -47,6 +47,9 @@
   <data name="AlertAlreadyResolved" xml:space="preserve">
     <value>This alert was already resolved.</value>
   </data>
+  <data name="InvalidThreshold" xml:space="preserve">
+    <value>Threshold value cannot be negative.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>

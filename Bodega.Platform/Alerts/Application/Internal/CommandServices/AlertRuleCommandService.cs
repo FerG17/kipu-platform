@@ -1,16 +1,26 @@
+using Microsoft.Extensions.Localization;
 using Bodega.Platform.Alerts.Application.CommandServices;
 using Bodega.Platform.Alerts.Domain.Model.Commands;
 using Bodega.Platform.Alerts.Domain.Model.Entities;
+using Bodega.Platform.Alerts.Domain.Model.Errors;
 using Bodega.Platform.Alerts.Domain.Repositories;
+using Bodega.Platform.Alerts.Resources;
 using Bodega.Platform.Shared.Application.Model;
 using Bodega.Platform.Shared.Domain.Repositories;
 
 namespace Bodega.Platform.Alerts.Application.Internal.CommandServices;
 
-public class AlertRuleCommandService(IAlertRuleRepository alertRuleRepository, IUnitOfWork unitOfWork) : IAlertRuleCommandService
+public class AlertRuleCommandService(
+    IAlertRuleRepository alertRuleRepository,
+    IUnitOfWork unitOfWork,
+    IStringLocalizer<AlertsMessages> localizer)
+    : IAlertRuleCommandService
 {
     public async Task<Result<AlertRule>> Handle(CreateOrUpdateAlertRuleCommand command, CancellationToken cancellationToken)
     {
+        if (command.ThresholdValue < 0)
+            return Result<AlertRule>.Failure(AlertsError.InvalidThreshold, localizer[nameof(AlertsError.InvalidThreshold)]);
+
         var existing = await alertRuleRepository.FindByBusinessIdAndTypeAsync(command.BusinessId, command.AlertType,
             cancellationToken);
 

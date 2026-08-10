@@ -59,7 +59,7 @@ public class ProductContextFacade(
     public async Task<IReadOnlyCollection<ActiveBatchInfo>> GetAllActiveBatchesForExpirationSweep(CancellationToken cancellationToken)
     {
         var batches = await batchRepository.FindAllActiveAsync(cancellationToken);
-        var products = await productRepository.ListAsync(cancellationToken);
+        var products = await productRepository.ListIgnoringTenantAsync(cancellationToken);
         var productNamesById = products.ToDictionary(product => product.Id, product => product.Name);
 
         return batches
