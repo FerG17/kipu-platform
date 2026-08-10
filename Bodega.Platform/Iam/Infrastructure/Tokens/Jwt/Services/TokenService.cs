@@ -20,7 +20,7 @@ public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
     public const string TokenVersionClaimType = "token_version";
     private readonly TokenSettings _tokenSettings = tokenSettings.Value;
 
-    public string GenerateToken(User user)
+    public string GenerateToken(User user, string roleName)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_tokenSettings.Secret);
@@ -31,7 +31,7 @@ public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(BusinessIdClaimType, user.BusinessId.ToString()),
-                new Claim(ClaimTypes.Role, user.RoleId.ToString()),
+                new Claim(ClaimTypes.Role, roleName),
                 new Claim(TokenVersionClaimType, user.TokenVersion.ToString())
             ]),
             Expires = DateTime.UtcNow.AddDays(_tokenSettings.ExpirationDays),

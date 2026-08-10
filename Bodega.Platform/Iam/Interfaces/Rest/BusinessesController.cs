@@ -2,6 +2,7 @@ using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
 using Bodega.Platform.Iam.Application.CommandServices;
 using Bodega.Platform.Iam.Application.QueryServices;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Domain.Model.Queries;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Iam.Interfaces.Rest.Resources;
@@ -35,6 +36,7 @@ public class BusinessesController(
 
     /// <summary>Updates business profile fields.</summary>
     [HttpPatch("{id:int}")]
+    [Authorize(RoleNames.Admin)]
     [SwaggerOperation(Summary = "Update a business", OperationId = "UpdateBusiness")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "The business was not found")]
     public async Task<IActionResult> UpdateBusiness([FromRoute] int id, [FromBody] UpdateBusinessResource resource,

@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Products.Application.QueryServices;
 using Bodega.Platform.Products.Domain.Model.Queries;
@@ -9,7 +10,8 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace Bodega.Platform.Products.Interfaces.Rest;
 
-[Authorize]
+/// <summary>Inventory audit trail — not part of a cashier's day-to-day, restricted to the roles that actually move stock.</summary>
+[Authorize(RoleNames.Admin, RoleNames.Warehouse)]
 [ApiController]
 [Route("api/v1/stock-movements")]
 [Produces(MediaTypeNames.Application.Json)]

@@ -5,7 +5,8 @@ namespace Bodega.Platform.Iam.Application.Internal.OutboundServices;
 
 public interface ITokenService
 {
-    string GenerateToken(User user);
+    /// <summary>roleName is the Role's Position (e.g. "ADMIN") — embedded as the token's role claim, checked by [Authorize(Roles = ...)].</summary>
+    string GenerateToken(User user, string roleName);
 
     /// <summary>
     ///     Validates a bearer token and, if valid, returns the ClaimsPrincipal

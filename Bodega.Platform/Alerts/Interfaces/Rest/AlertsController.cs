@@ -6,6 +6,7 @@ using Bodega.Platform.Alerts.Domain.Model.Commands;
 using Bodega.Platform.Alerts.Domain.Model.Queries;
 using Bodega.Platform.Alerts.Interfaces.Rest.Resources;
 using Bodega.Platform.Alerts.Interfaces.Rest.Transform;
+using Bodega.Platform.Iam.Domain.Model.Entities;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Interfaces.Rest.ProblemDetails;
@@ -49,6 +50,7 @@ public class AlertsController(
 
     /// <summary>Manual/technical creation — the normal path is the reactive engine, not this endpoint (see architecture doc §6.5).</summary>
     [HttpPost]
+    [Authorize(RoleNames.Admin)]
     [SwaggerOperation(Summary = "Create a manual/technical alert", OperationId = "CreateAlert")]
     public async Task<IActionResult> CreateAlert([FromBody] CreateAlertResource resource, CancellationToken cancellationToken)
     {
@@ -64,6 +66,7 @@ public class AlertsController(
 
     /// <summary>Domain action, not a field replacement — POST, not PATCH (see architecture doc §8.4).</summary>
     [HttpPost("{id:int}/acknowledge")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Acknowledge an alert", OperationId = "AcknowledgeAlert")]
     public async Task<IActionResult> AcknowledgeAlert([FromRoute] int id, CancellationToken cancellationToken)
     {
@@ -74,6 +77,7 @@ public class AlertsController(
 
     /// <summary>Resolving is final — an already-RESOLVED alert stays immutable history (409 on a second attempt).</summary>
     [HttpPost("{id:int}/resolve")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
     [SwaggerOperation(Summary = "Resolve an alert", OperationId = "ResolveAlert")]
     [SwaggerResponse(StatusCodes.Status409Conflict, "The alert was already resolved")]
     public async Task<IActionResult> ResolveAlert([FromRoute] int id, CancellationToken cancellationToken)
