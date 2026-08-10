@@ -59,6 +59,18 @@
   <data name="EmptySaleLines" xml:space="preserve">
     <value>A sale must have at least one line.</value>
   </data>
+  <data name="PaymentPlanNotFound" xml:space="preserve">
+    <value>Payment plan not found.</value>
+  </data>
+  <data name="PaymentPlanAlreadyExists" xml:space="preserve">
+    <value>This sale already has a payment plan.</value>
+  </data>
+  <data name="InstallmentsFullyPaid" xml:space="preserve">
+    <value>All installments have already been paid.</value>
+  </data>
+  <data name="InvalidInstallmentCount" xml:space="preserve">
+    <value>Total installments must be at least 1.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>
