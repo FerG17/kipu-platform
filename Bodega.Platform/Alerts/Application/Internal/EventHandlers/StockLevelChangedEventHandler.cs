@@ -1,3 +1,4 @@
+using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
 using Bodega.Platform.Products.Domain.Model.Events;
@@ -22,7 +23,8 @@ namespace Bodega.Platform.Alerts.Application.Internal.EventHandlers;
 public class StockLevelChangedEventHandler(
     IAlertRepository alertRepository,
     IAlertRuleRepository alertRuleRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IAlertNotificationDispatcher notificationDispatcher)
     : IEventHandler<StockLevelChangedEvent>
 {
     public async Task Handle(StockLevelChangedEvent domainEvent, CancellationToken cancellationToken)
@@ -42,25 +44,39 @@ public class StockLevelChangedEventHandler(
         var isOutOfStock = StockRules.IsOutOfStock(domainEvent.NewQuantity);
         var isLowStock = StockRules.IsLowStock(domainEvent.NewQuantity, domainEvent.MinimumStock);
 
+        Alert? newAlert = null;
+
         if (isOutOfStock && outOfStockEnabled)
         {
             var message = $"{domainEvent.ProductName} está agotado.";
-            if (existingOutOfStock != null) existingOutOfStock.RefreshStockInfo(AlertSeverity.High, message, domainEvent.NewQuantity);
-            else await alertRepository.AddAsync(
-                new Alert(domainEvent.BusinessId, domainEvent.ProductId, null, domainEvent.ProductName, AlertType.OutOfStock,
-                    AlertSeverity.High, message, domainEvent.NewQuantity, domainEvent.MinimumStock, null, domainEvent.WarehouseId),
-                cancellationToken);
+            if (existingOutOfStock != null)
+            {
+                existingOutOfStock.RefreshStockInfo(AlertSeverity.High, message, domainEvent.NewQuantity);
+            }
+            else
+            {
+                newAlert = new Alert(domainEvent.BusinessId, domainEvent.ProductId, null, domainEvent.ProductName,
+                    AlertType.OutOfStock, AlertSeverity.High, message, domainEvent.NewQuantity, domainEvent.MinimumStock,
+                    null, domainEvent.WarehouseId);
+                await alertRepository.AddAsync(newAlert, cancellationToken);
+            }
 
             existingLowStock?.Resolve();
         }
         else if (isLowStock && lowStockEnabled)
         {
             var message = $"{domainEvent.ProductName} tiene stock bajo ({domainEvent.NewQuantity} unidades, mínimo {domainEvent.MinimumStock}).";
-            if (existingLowStock != null) existingLowStock.RefreshStockInfo(AlertSeverity.Medium, message, domainEvent.NewQuantity);
-            else await alertRepository.AddAsync(
-                new Alert(domainEvent.BusinessId, domainEvent.ProductId, null, domainEvent.ProductName, AlertType.LowStock,
-                    AlertSeverity.Medium, message, domainEvent.NewQuantity, domainEvent.MinimumStock, null, domainEvent.WarehouseId),
-                cancellationToken);
+            if (existingLowStock != null)
+            {
+                existingLowStock.RefreshStockInfo(AlertSeverity.Medium, message, domainEvent.NewQuantity);
+            }
+            else
+            {
+                newAlert = new Alert(domainEvent.BusinessId, domainEvent.ProductId, null, domainEvent.ProductName,
+                    AlertType.LowStock, AlertSeverity.Medium, message, domainEvent.NewQuantity, domainEvent.MinimumStock,
+                    null, domainEvent.WarehouseId);
+                await alertRepository.AddAsync(newAlert, cancellationToken);
+            }
 
             existingOutOfStock?.Resolve();
         }
@@ -72,5 +88,10 @@ public class StockLevelChangedEventHandler(
         }
 
         await unitOfWork.CompleteAsync(cancellationToken);
+
+        // Only notify on a brand-new alert, not every refresh of an
+        // already-active one — otherwise every sale/intake touching a
+        // product that's still low would re-notify on the same situation.
+        if (newAlert != null) await notificationDispatcher.NotifyAsync(newAlert, cancellationToken);
     }
 }
