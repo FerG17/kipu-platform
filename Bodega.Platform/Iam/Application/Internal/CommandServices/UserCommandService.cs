@@ -121,6 +121,14 @@ public class UserCommandService(
         if (!(await inviteUserValidator.ValidateAsync(command, cancellationToken)).IsValid)
             return Result<User>.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
 
+        // RoleId came straight from the request body into the User row with
+        // no check at all. A nonexistent role hit the foreign key and blew up
+        // as an unhandled DbUpdateException — a 500 for what is plainly a bad
+        // request. Checked against the real catalog rather than a hardcoded
+        // list so it stays correct if roles are ever added.
+        if (await roleRepository.FindByIdAsync(command.RoleId, cancellationToken) == null)
+            return Result<User>.Failure(IamError.RoleNotFound, localizer[nameof(IamError.RoleNotFound)]);
+
         if (await userRepository.ExistsByEmailAsync(command.Email, cancellationToken))
             return Result<User>.Failure(IamError.EmailAlreadyTaken,
                 localizer[nameof(IamError.EmailAlreadyTaken), command.Email]);

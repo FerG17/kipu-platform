@@ -7,6 +7,7 @@ public enum SalesError
     ProductNotFound,
     InsufficientStock,
     SaleAlreadyCancelled,
+    InvalidStatusTransition,
     EmptySaleLines,
     InvalidSaleLine,
     PaymentPlanNotFound,
