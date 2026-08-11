@@ -1,4 +1,6 @@
 using Cortex.Mediator;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Products.Interfaces.Acl;
@@ -20,6 +22,7 @@ public class PurchaseOrderCommandService(
     IProductContextFacade productContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
+    IValidator<CreatePurchaseOrderCommand> createPurchaseOrderValidator,
     IStringLocalizer<SuppliersMessages> localizer,
     IBusinessClock businessClock)
     : IPurchaseOrderCommandService
@@ -29,6 +32,12 @@ public class PurchaseOrderCommandService(
         if (command.Lines.Count == 0)
             return Result<PurchaseOrder>.Failure(SuppliersError.EmptyPurchaseOrderLines,
                 localizer[nameof(SuppliersError.EmptyPurchaseOrderLines)]);
+
+        // Quantities and money on a purchase line were never checked at all —
+        // see CreatePurchaseOrderCommandValidator.
+        if (!(await createPurchaseOrderValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<PurchaseOrder>.Failure(SuppliersError.InvalidPurchaseOrderLine,
+                localizer[nameof(SuppliersError.InvalidPurchaseOrderLine)]);
 
         var supplier = await supplierRepository.FindByIdAsync(command.SupplierId, cancellationToken);
         if (supplier == null)
@@ -107,8 +116,20 @@ public class PurchaseOrderCommandService(
             foreach (var line in purchaseOrder.Details)
             {
                 var note = $"Orden de compra #{purchaseOrder.Id}";
-                await productContextFacade.RegisterStockIntake(line.ProductId, purchaseOrder.BusinessId, line.Quantity,
-                    line.UnitPrice, supplierName, note, purchaseOrder.SupplierId, cancellationToken);
+                var stocked = await productContextFacade.RegisterStockIntake(line.ProductId, purchaseOrder.BusinessId,
+                    line.Quantity, line.UnitPrice, supplierName, note, purchaseOrder.SupplierId, cancellationToken);
+                if (stocked) continue;
+
+                // RECEIVED is a promise that the goods are on the shelf. This
+                // used to be a fire-and-forget call whose outcome was thrown
+                // away, so an intake that failed (no warehouse to receive
+                // into, a product since removed) still left the order marked
+                // RECEIVED with nothing added to inventory — the mirror of the
+                // swallowed DecrementStock this codebase already fixed on the
+                // sales side. The order only moves if its stock really did.
+                await transaction.RollbackAsync(cancellationToken);
+                return Result<PurchaseOrder>.Failure(SuppliersError.DatabaseError,
+                    localizer[nameof(SuppliersError.DatabaseError)]);
             }
 
             await transaction.CommitAsync(cancellationToken);
@@ -119,6 +140,17 @@ public class PurchaseOrderCommandService(
                 cancellationToken);
 
             return Result<PurchaseOrder>.Success(purchaseOrder);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request already moved this order to RECEIVED. The status
+            // guard above is a read, so several simultaneous submits all
+            // passed it and each booked the same delivery: twenty units
+            // arrived as one hundred and sixty. The concurrency token makes
+            // only the first write land.
+            await transaction.RollbackAsync(cancellationToken);
+            return Result<PurchaseOrder>.Failure(SuppliersError.InvalidStatusTransition,
+                localizer[nameof(SuppliersError.InvalidStatusTransition)]);
         }
         catch (Exception)
         {

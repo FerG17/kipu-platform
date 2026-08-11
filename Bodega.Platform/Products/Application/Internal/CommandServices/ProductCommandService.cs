@@ -1,4 +1,5 @@
 using Cortex.Mediator;
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Domain.Model.Aggregates;
@@ -17,11 +18,20 @@ public class ProductCommandService(
     IInventoryItemRepository inventoryItemRepository,
     IUnitOfWork unitOfWork,
     IMediator mediator,
+    IValidator<CreateProductCommand> createProductValidator,
+    IValidator<UpdateProductCommand> updateProductValidator,
     IStringLocalizer<ProductMessages> localizer)
     : IProductCommandService
 {
     public async Task<Result<Product>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
     {
+        // Nothing checked these before: a blank name was accepted, a negative
+        // price landed in the inventory-value KPI, and a name past its
+        // varchar(150) reached MySQL and came back as a 500.
+        if (!(await createProductValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Product>.Failure(ProductError.InvalidProductData,
+                localizer[nameof(ProductError.InvalidProductData)]);
+
         var product = new Product(command.BusinessId, command.Name, command.Description, command.Category,
             command.BasePrice);
         await productRepository.AddAsync(product, cancellationToken);
@@ -35,6 +45,10 @@ public class ProductCommandService(
 
     public async Task<Result<Product>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
     {
+        if (!(await updateProductValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Product>.Failure(ProductError.InvalidProductData,
+                localizer[nameof(ProductError.InvalidProductData)]);
+
         var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
         if (product == null)
             return Result<Product>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);

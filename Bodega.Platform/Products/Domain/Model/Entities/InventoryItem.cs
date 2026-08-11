@@ -1,3 +1,4 @@
+using Bodega.Platform.Shared.Domain.Model.Entities;
 using Bodega.Platform.Shared.Domain.Model.Services;
 
 namespace Bodega.Platform.Products.Domain.Model.Entities;
@@ -11,6 +12,7 @@ namespace Bodega.Platform.Products.Domain.Model.Entities;
 ///     is already supported without a future migration.
 /// </summary>
 public class InventoryItem(int productId, int warehouseId, int businessId, int stockUnit, int minimumStock)
+    : IVersionedEntity
 {
     public InventoryItem() : this(0, 0, 0, 0, 0)
     {
@@ -23,6 +25,12 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
     public int StockUnit { get; private set; } = stockUnit;
     public int MinimumStock { get; private set; } = minimumStock;
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    ///     Optimistic-concurrency token — this is the row two tills selling the
+    ///     same shelf collide on. See <see cref="IVersionedEntity" />.
+    /// </summary>
+    public int Version { get; set; }
 
     public bool IsLowStock => StockRules.IsLowStock(StockUnit, MinimumStock);
     public bool IsOutOfStock => StockRules.IsOutOfStock(StockUnit);

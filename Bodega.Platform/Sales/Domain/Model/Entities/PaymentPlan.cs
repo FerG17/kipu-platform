@@ -1,3 +1,5 @@
+using Bodega.Platform.Shared.Domain.Model.Entities;
+
 namespace Bodega.Platform.Sales.Domain.Model.Entities;
 
 /// <summary>
@@ -8,7 +10,7 @@ namespace Bodega.Platform.Sales.Domain.Model.Entities;
 ///     untouched). Attached to an existing Sale after the fact via a
 ///     separate command, at most one plan per sale.
 /// </summary>
-public class PaymentPlan(int saleId, int businessId, int totalInstallments)
+public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IVersionedEntity
 {
     public PaymentPlan() : this(0, 0, 1)
     {
@@ -19,6 +21,13 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments)
     public int BusinessId { get; private set; } = businessId;
     public int TotalInstallments { get; private set; } = totalInstallments;
     public int PaidInstallments { get; private set; }
+
+    /// <summary>
+    ///     Optimistic-concurrency token — keeps two payments registered at the
+    ///     same instant from both counting against the same installment.
+    ///     See <see cref="IVersionedEntity" />.
+    /// </summary>
+    public int Version { get; set; }
 
     public bool IsFullyPaid => PaidInstallments >= TotalInstallments;
 

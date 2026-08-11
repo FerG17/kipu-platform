@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Sales.Application.CommandServices;
 using Bodega.Platform.Sales.Domain.Model.Aggregates;
@@ -65,7 +66,20 @@ public class PaymentPlanCommandService(
 
         plan.RegisterPayment();
         paymentPlanRepository.Update(plan);
-        await unitOfWork.CompleteAsync(cancellationToken);
+
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // "Is it already fully paid?" above is a read, so two payments
+            // registered at the same instant both passed it and both counted.
+            // PaymentPlan's concurrency token lets only one of them land; the
+            // other is told to look at the plan again.
+            return Result<PaymentPlan>.Failure(SalesError.ConcurrentModification,
+                localizer[nameof(SalesError.ConcurrentModification)]);
+        }
 
         return Result<PaymentPlan>.Success(plan);
     }

@@ -1,7 +1,9 @@
+using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Cortex.Mediator.DependencyInjection;
 using FluentValidation;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
@@ -117,6 +119,35 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader());
 });
 
+// Behind a reverse proxy or load balancer every request arrives from the
+// proxy's address, so the per-IP rate limiting below silently collapses into
+// a single bucket shared by every client: one attacker exhausts the budget
+// and locks the whole shop out (a trivial denial of service), while the
+// per-attacker brute-force protection the limiter exists for disappears.
+//
+// X-Forwarded-For is client-controlled, so honouring it from an untrusted
+// source hands an attacker the opposite problem — a fresh "IP" per request
+// and no limit at all. It is therefore opt-in and only ever trusted from
+// explicitly configured proxies (ForwardedHeaders:KnownProxies /
+// KnownNetworks), rather than enabled by default. A deployment that puts
+// this behind nginx, a cloud load balancer or a CDN must set them.
+var knownProxies = builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+if (knownProxies.Length > 0)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+        // The defaults trust one hop from localhost; we replace them with the
+        // proxies this deployment actually has.
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
+        foreach (var proxy in knownProxies)
+            if (IPAddress.TryParse(proxy, out var address))
+                options.KnownProxies.Add(address);
+    });
+}
+
 // Rate limiting — a global per-IP budget for the whole API, plus a much
 // stricter policy for authentication endpoints specifically (sign-in/sign-up
 // are the classic brute-force/credential-stuffing target).
@@ -164,11 +195,16 @@ builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
     var connectionString = Environment.ExpandEnvironmentVariables(connectionStringTemplate);
 
     options.UseMySQL(connectionString)
-        .UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>())
-        .EnableDetailedErrors();
+        .UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>());
 
+    // Both of these put row data into exception messages and log lines —
+    // EnableDetailedErrors adds the offending property's value, and
+    // EnableSensitiveDataLogging adds every query parameter. That is a
+    // customer's name and document number sitting in a log file, so neither
+    // belongs anywhere but a developer's machine. EnableDetailedErrors used
+    // to be on in every environment.
     if (builder.Environment.IsDevelopment())
-        options.EnableSensitiveDataLogging();
+        options.EnableDetailedErrors().EnableSensitiveDataLogging();
 });
 
 // Localization — no ResourcesPath override: each bounded context keeps its
@@ -234,7 +270,7 @@ builder.Services.AddSingleton<IBusinessClock, BusinessClock>();
 // publicly known key.
 var tokenSettings = builder.Configuration.GetSection("TokenSettings").Get<TokenSettings>() ?? new TokenSettings();
 tokenSettings.Secret = Environment.ExpandEnvironmentVariables(tokenSettings.Secret);
-JwtSecretGuard.EnsureUsable(tokenSettings.Secret);
+JwtSecretGuard.EnsureUsable(tokenSettings.Secret, builder.Environment.IsDevelopment());
 
 builder.Services.Configure<TokenSettings>(settings =>
 {
@@ -343,6 +379,11 @@ using (var scope = app.Services.CreateScope())
 
 // Configure the HTTP request pipeline.
 app.UseGlobalExceptionHandler();
+
+// Must run before anything reads the caller's address or scheme — the rate
+// limiter partitions on the address, and the request log records it. Only
+// registered when trusted proxies are configured; see ForwardedHeaders above.
+if (knownProxies.Length > 0) app.UseForwardedHeaders();
 
 // One structured log line per request (method, path, status, duration),
 // enriched with who made it once auth resolves it downstream — the "who did

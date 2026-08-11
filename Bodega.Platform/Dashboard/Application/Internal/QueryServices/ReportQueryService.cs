@@ -78,14 +78,19 @@ public class ReportQueryService(
         return Result<byte[]>.Success(pdf);
     }
 
+    // Every row below goes through CsvWriter rather than string interpolation:
+    // product names, supplier names and notes are free text typed by staff,
+    // and this file is opened in a spreadsheet by the owner. See CsvWriter.
+
     private async Task<string> BuildSalesCsv(Report report, CancellationToken cancellationToken)
     {
         var rows = await salesContextFacade.GetSalesForExport(report.BusinessId, report.DateFrom, report.DateTo, cancellationToken);
 
         var builder = new StringBuilder();
-        builder.AppendLine("SaleId,Date,PaymentMethod,TotalAmount,Currency");
+        builder.AppendLine(CsvWriter.Row("SaleId", "Date", "PaymentMethod", "TotalAmount", "Currency"));
         foreach (var row in rows)
-            builder.AppendLine($"{row.SaleId},{row.Date:O},{row.PaymentMethod},{row.TotalAmount},{row.Currency}");
+            builder.AppendLine(CsvWriter.Row(row.SaleId, row.Date.ToString("O"), row.PaymentMethod, row.TotalAmount,
+                row.Currency));
 
         return builder.ToString();
     }
@@ -95,9 +100,9 @@ public class ReportQueryService(
         var rows = await productContextFacade.GetTopStockProducts(report.BusinessId, int.MaxValue, cancellationToken);
 
         var builder = new StringBuilder();
-        builder.AppendLine("ProductId,ProductName,CurrentStock");
+        builder.AppendLine(CsvWriter.Row("ProductId", "ProductName", "CurrentStock"));
         foreach (var row in rows)
-            builder.AppendLine($"{row.ProductId},{row.ProductName},{row.TotalStock}");
+            builder.AppendLine(CsvWriter.Row(row.ProductId, row.ProductName, row.TotalStock));
 
         return builder.ToString();
     }
@@ -107,10 +112,10 @@ public class ReportQueryService(
         var (rows, _, _) = await GetStockMovementLines(report, cancellationToken);
 
         var builder = new StringBuilder();
-        builder.AppendLine("Date,ProductId,ProductName,Type,Quantity,Supplier,Note");
+        builder.AppendLine(CsvWriter.Row("Date", "ProductId", "ProductName", "Type", "Quantity", "Supplier", "Note"));
         foreach (var row in rows)
-            builder.AppendLine(
-                $"{row.RegisteredAt:O},{row.ProductId},{row.ProductName},{row.Type},{row.Quantity},{row.Supplier},{row.Note}");
+            builder.AppendLine(CsvWriter.Row(row.RegisteredAt.ToString("O"), row.ProductId, row.ProductName, row.Type,
+                row.Quantity, row.Supplier, row.Note));
 
         return builder.ToString();
     }

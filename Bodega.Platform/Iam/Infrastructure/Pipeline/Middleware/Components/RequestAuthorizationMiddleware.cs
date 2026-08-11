@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Bodega.Platform.Iam.Application.Internal.OutboundServices;
+using Bodega.Platform.Iam.Domain.Model.Aggregates;
 using Bodega.Platform.Iam.Domain.Repositories;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Iam.Infrastructure.Tokens.Jwt.Services;
@@ -72,6 +73,6 @@ public class RequestAuthorizationMiddleware(RequestDelegate next)
             return false;
 
         var user = await userRepository.FindByIdIgnoringTenantAsync(userId, cancellationToken);
-        return user is { Status: "ACTIVE" } && user.TokenVersion == tokenVersion;
+        return user is { Status: UserStatus.Active } && user.TokenVersion == tokenVersion;
     }
 }

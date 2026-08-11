@@ -50,7 +50,7 @@ public class ApiCorrectnessTests(BodegaApiFactory factory) : IntegrationTestBase
         var client = await CreateBusinessAsync();
         var productId = await CreateProductAsync(client);
         var supplierId = await CreateSupplierAsync(client);
-        var purchaseOrderId = await CreatePurchaseOrderAsync(client, supplierId, productId, quantity: 12);
+        var purchaseOrderId = await CreatePurchaseOrderIdAsync(client, supplierId, productId, quantity: 12);
 
         var first = await client.PatchAsJsonAsync($"/api/v1/purchases/{purchaseOrderId}", new { status = "RECEIVED" });
         first.EnsureSuccessStatusCode();
@@ -84,35 +84,11 @@ public class ApiCorrectnessTests(BodegaApiFactory factory) : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private static async Task<int> CreateSupplierAsync(HttpClient client)
+    /// <summary>Creates the order and returns its id — the shared helper hands back the raw response instead.</summary>
+    private static async Task<int> CreatePurchaseOrderIdAsync(HttpClient client, int supplierId, int productId,
+        int quantity)
     {
-        var response = await client.PostAsJsonAsync("/api/v1/suppliers", new
-        {
-            name = "Distribuidora",
-            lastName = "de prueba",
-            ruc = "20123456789",
-            email = "proveedor@test.local",
-            phone = "999999999",
-            address = "Av. Siempre Viva",
-            contactPerson = "Contacto",
-            category = "ABARROTES"
-        });
-        response.EnsureSuccessStatusCode();
-        return (await ReadJsonAsync(response)).GetProperty("id").GetInt32();
-    }
-
-    private static async Task<int> CreatePurchaseOrderAsync(HttpClient client, int supplierId, int productId, int quantity)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var response = await client.PostAsJsonAsync("/api/v1/purchases", new
-        {
-            supplierId,
-            date = today,
-            expectedDate = today.AddDays(7),
-            currency = "PEN",
-            description = "orden de prueba",
-            lines = new[] { new { productId, quantity, unitPrice = 5m, discount = 0m } }
-        });
+        var response = await CreatePurchaseOrderAsync(client, supplierId, productId, quantity);
         response.EnsureSuccessStatusCode();
         return (await ReadJsonAsync(response)).GetProperty("id").GetInt32();
     }
