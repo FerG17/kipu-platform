@@ -121,9 +121,19 @@ public class SaleCommandService(
         return Result<Sale>.Success(sale);
     }
 
+    /// <summary>
+    ///     Cancelling means the goods came back, so the stock comes back with
+    ///     them — the sale's lines are returned to inventory in the same
+    ///     transaction as the status change. Before this, cancelling only
+    ///     flipped the status: the units stayed deducted forever while the
+    ///     revenue disappeared, so inventory drifted below reality with every
+    ///     cancellation and nothing ever reconciled it.
+    /// </summary>
     public async Task<Result<Sale>> Handle(UpdateSaleStatusCommand command, CancellationToken cancellationToken)
     {
-        var sale = await saleRepository.FindByIdAsync(command.SaleId, cancellationToken);
+        // With details: the lines are what has to go back on the shelf, and
+        // the plain FindByIdAsync does not load them.
+        var sale = await saleRepository.FindByIdWithDetailsAsync(command.SaleId, cancellationToken);
         if (sale == null) return Result<Sale>.Failure(SalesError.SaleNotFound, localizer[nameof(SalesError.SaleNotFound)]);
 
         // The requested status used to be ignored entirely: every call fell
@@ -138,11 +148,37 @@ public class SaleCommandService(
         if (sale.Status == SaleStatus.Cancelled)
             return Result<Sale>.Failure(SalesError.SaleAlreadyCancelled, localizer[nameof(SalesError.SaleAlreadyCancelled)]);
 
-        sale.Cancel();
-        saleRepository.Update(sale);
-        await unitOfWork.CompleteAsync(cancellationToken);
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            sale.Cancel();
+            saleRepository.Update(sale);
+            await unitOfWork.CompleteAsync(cancellationToken);
 
-        logger.LogInformation("Sale {SaleId} cancelled for business {BusinessId}", sale.Id, sale.BusinessId);
+            foreach (var line in sale.SaleDetails)
+            {
+                var restored = await productContextFacade.RestoreStock(line.ProductId, sale.BusinessId, line.Quantity,
+                    cancellationToken);
+                if (restored) continue;
+
+                await transaction.RollbackAsync(cancellationToken);
+                logger.LogWarning(
+                    "Cancellation of sale {SaleId} rolled back: stock for product {ProductId} could not be restored",
+                    sale.Id, line.ProductId);
+                return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            logger.LogError(exception, "Failed to cancel sale {SaleId} for business {BusinessId}", sale.Id, sale.BusinessId);
+            return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
+        }
+
+        logger.LogInformation("Sale {SaleId} cancelled for business {BusinessId}: {LineCount} line(s) returned to stock",
+            sale.Id, sale.BusinessId, sale.SaleDetails.Count);
 
         return Result<Sale>.Success(sale);
     }

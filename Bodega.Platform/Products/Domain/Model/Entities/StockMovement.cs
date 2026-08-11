@@ -4,6 +4,13 @@ public static class StockMovementType
 {
     public const string Intake = "INTAKE";
     public const string Sale = "SALE";
+
+    /// <summary>
+    ///     Goods coming back from a cancelled sale. Deliberately distinct
+    ///     from Intake — booking a return as a purchase would show phantom
+    ///     merchandise arriving in the entradas/salidas report.
+    /// </summary>
+    public const string Return = "RETURN";
 }
 
 /// <summary>

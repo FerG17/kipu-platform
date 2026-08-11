@@ -37,6 +37,13 @@ public class ProductContextFacade(
         return result.IsSuccess;
     }
 
+    public async Task<bool> RestoreStock(int productId, int businessId, int quantity, CancellationToken cancellationToken)
+    {
+        var result = await inventoryCommandService.Handle(new RegisterStockReturnCommand(productId, businessId, quantity),
+            cancellationToken);
+        return result.IsSuccess;
+    }
+
     public async Task<int> GetAvailableStock(int productId, CancellationToken cancellationToken)
     {
         var items = await inventoryQueryService.Handle(new GetInventoryByProductIdQuery(productId), cancellationToken);
