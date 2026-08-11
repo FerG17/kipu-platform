@@ -190,6 +190,49 @@ public class InventoryCommandService(
     }
 
     /// <summary>
+    ///     Puts units back after a sale is cancelled — the mirror of
+    ///     RegisterStockSaleCommand, called by Sales through the facade.
+    ///
+    ///     Returns everything to the product's lowest-numbered warehouse,
+    ///     which is the one the sale drew from first (that handler consumes
+    ///     warehouses in WarehouseId order). For a single-warehouse bodega —
+    ///     the real case here — that is exact. With stock split across
+    ///     warehouses the totals stay right but the per-warehouse split can
+    ///     shift, because a Sale does not record which warehouses it took
+    ///     from; making that exact would mean storing the split on the sale
+    ///     itself, which is not worth the schema for this shop.
+    /// </summary>
+    public async Task<Result<InventoryItem>> Handle(RegisterStockReturnCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Quantity <= 0)
+            return Result<InventoryItem>.Failure(ProductError.InvalidQuantity, localizer[nameof(ProductError.InvalidQuantity)]);
+
+        var item = (await inventoryItemRepository.FindAllByProductIdAsync(command.ProductId, cancellationToken))
+            .OrderBy(candidate => candidate.WarehouseId)
+            .FirstOrDefault();
+
+        if (item == null)
+            return Result<InventoryItem>.Failure(ProductError.InventoryItemNotFound,
+                localizer[nameof(ProductError.InventoryItemNotFound)]);
+
+        item.AddStock(command.Quantity);
+        inventoryItemRepository.Update(item);
+
+        await stockMovementRepository.AddAsync(
+            new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, command.Quantity,
+                StockMovementType.Return, string.Empty, "Venta cancelada"),
+            cancellationToken);
+
+        await unitOfWork.CompleteAsync(cancellationToken);
+
+        // Re-runs the alert rules: returning stock can take a product back
+        // out of LOW_STOCK/OUT_OF_STOCK, which should resolve those alerts.
+        await PublishStockLevelChangedEvent(item, cancellationToken);
+
+        return Result<InventoryItem>.Success(item);
+    }
+
+    /// <summary>
     ///     Applies the same minimum-stock threshold to every InventoryItem the
     ///     product has (one per warehouse it's split into) — the product edit
     ///     form only exposes a single "stock mínimo" field, so this keeps that

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using Bodega.Platform.Tests.Infrastructure;
 
 namespace Bodega.Platform.Tests;
@@ -68,6 +69,31 @@ public class SalesIntegrityTests(BodegaApiFactory factory) : IntegrationTestBase
         var response = await CreateSaleAsync(client, SaleLine(productId, quantity: 1, unitPrice: 10m, discount: 2m));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     Cancelling a sale means the goods came back, so the stock has to
+    ///     come back with them. It used to just flip the status: the units
+    ///     stayed deducted forever while the revenue disappeared, so the
+    ///     inventory drifted below reality with every cancellation.
+    /// </summary>
+    [Fact]
+    public async Task CancellingASale_ReturnsTheSoldUnitsToStock()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
+
+        var saleResponse = await CreateSaleAsync(client, SaleLine(productId, quantity: 4, unitPrice: 10m));
+        saleResponse.EnsureSuccessStatusCode();
+        var saleId = (await ReadJsonAsync(saleResponse)).GetProperty("id").GetInt32();
+        Assert.Equal(6, await GetTotalStockAsync(client, productId));
+
+        var cancelResponse = await client.PatchAsJsonAsync($"/api/v1/sales/{saleId}", new { status = "CANCELLED" });
+        cancelResponse.EnsureSuccessStatusCode();
+
+        Assert.Equal(10, await GetTotalStockAsync(client, productId));
     }
 
     /// <summary>
