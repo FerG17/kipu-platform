@@ -4,5 +4,6 @@ public enum DashboardError
 {
     ReportNotFound,
     UnsupportedReportTypeForPdf,
+    InvalidReportData,
     DatabaseError
 }

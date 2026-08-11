@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
@@ -18,7 +19,8 @@ public class BatchRegisteredEventHandler(
     IAlertRepository alertRepository,
     IAlertRuleRepository alertRuleRepository,
     IUnitOfWork unitOfWork,
-    IAlertNotificationDispatcher notificationDispatcher)
+    IAlertNotificationDispatcher notificationDispatcher,
+    ILogger<BatchRegisteredEventHandler> logger)
     : IEventHandler<BatchRegisteredEvent>
 {
     public async Task Handle(BatchRegisteredEvent domainEvent, CancellationToken cancellationToken)
@@ -81,6 +83,13 @@ public class BatchRegisteredEventHandler(
 
         await unitOfWork.CompleteAsync(cancellationToken);
 
-        if (newAlert != null) await notificationDispatcher.NotifyAsync(newAlert, cancellationToken);
+        if (newAlert != null)
+        {
+            logger.LogWarning(
+                "Alert {AlertType} ({Severity}) created for product {ProductId} ({ProductName}), batch {BatchId}, in business {BusinessId}: {Message}",
+                newAlert.Type, newAlert.Severity, newAlert.ProductId, domainEvent.ProductName, domainEvent.BatchId,
+                newAlert.BusinessId, newAlert.Message);
+            await notificationDispatcher.NotifyAsync(newAlert, cancellationToken);
+        }
     }
 }

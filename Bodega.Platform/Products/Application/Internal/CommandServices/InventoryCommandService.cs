@@ -1,4 +1,5 @@
 using Cortex.Mediator;
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Domain.Model.Commands;
@@ -24,6 +25,7 @@ public class InventoryCommandService(
     IWarehouseRepository warehouseRepository,
     IUnitOfWork unitOfWork,
     IMediator mediator,
+    IValidator<CreateOrUpdateBatchCommand> createOrUpdateBatchValidator,
     IStringLocalizer<ProductMessages> localizer)
     : IInventoryCommandService
 {
@@ -205,6 +207,9 @@ public class InventoryCommandService(
     /// </summary>
     public async Task<Result<Batch>> Handle(CreateOrUpdateBatchCommand command, CancellationToken cancellationToken)
     {
+        if (!(await createOrUpdateBatchValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Batch>.Failure(ProductError.InvalidPurchasePrice, localizer[nameof(ProductError.InvalidPurchasePrice)]);
+
         // Tenant-scoped read (AppDbContext's BusinessId query filter), so a
         // ProductId belonging to another business resolves to null here —
         // without this check, a batch tagged with command.BusinessId could

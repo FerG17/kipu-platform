@@ -115,6 +115,10 @@ public class AlertExpirationSweepJob(
 
         await unitOfWork.CompleteAsync(cancellationToken);
 
+        if (newAlerts.Count > 0)
+            logger.LogWarning("Alert expiration sweep created {NewAlertCount} new alert(s) across {BatchCount} active batch(es)",
+                newAlerts.Count, batches.Count);
+
         foreach (var alert in newAlerts)
             await notificationDispatcher.NotifyAsync(alert, cancellationToken);
     }

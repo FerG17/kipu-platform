@@ -53,6 +53,7 @@ public static class ProductActionResultAssembler
             ProductError.InvalidQuantity => StatusCodes.Status400BadRequest,
             ProductError.WarehouseRequired => StatusCodes.Status400BadRequest,
             ProductError.InvalidExpirationDate => StatusCodes.Status400BadRequest,
+            ProductError.InvalidPurchasePrice => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
     }
