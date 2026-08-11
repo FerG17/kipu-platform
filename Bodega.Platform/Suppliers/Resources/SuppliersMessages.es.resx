@@ -59,4 +59,13 @@
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>Otro proceso modificó el registro mientras se ejecutaba esta operación. Inténtalo de nuevo.</value>
+  </data>
+  <data name="InvalidPurchaseOrderLine" xml:space="preserve">
+    <value>Cada línea de la orden de compra debe tener cantidad positiva, precio unitario no negativo y descuento entre 0 y 1.</value>
+  </data>
+  <data name="InvalidSupplierData" xml:space="preserve">
+    <value>El nombre del proveedor es obligatorio y debe respetar el largo permitido.</value>
+  </data>
 </root>

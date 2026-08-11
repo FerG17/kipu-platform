@@ -64,6 +64,18 @@ public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
                 IssuerSigningKey = new SymmetricSecurityKey(key),
                 ValidateIssuer = false,
                 ValidateAudience = false,
+
+                // Spelled out rather than left to the defaults, which are
+                // already correct today: an unsigned token must never be
+                // accepted, and the only algorithm we ever issue is the only
+                // one we accept. Pinning it closes the classic "swap alg and
+                // hand back a token the server verifies differently" family of
+                // attacks by construction, instead of relying on the key type
+                // happening to rule them out.
+                RequireSignedTokens = true,
+                RequireExpirationTime = true,
+                ValidateLifetime = true,
+                ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
                 ClockSkew = TimeSpan.Zero
             }, out _);
 

@@ -77,4 +77,13 @@
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>The record was changed by another operation while this one was running. Please try again.</value>
+  </data>
+  <data name="InvalidProductData" xml:space="preserve">
+    <value>Product name is required and must fit its field lengths; the price must be between 0 and 99,999,999.99.</value>
+  </data>
+  <data name="InvalidWarehouseData" xml:space="preserve">
+    <value>Warehouse name is required and must fit its field lengths.</value>
+  </data>
 </root>

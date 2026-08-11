@@ -50,16 +50,21 @@ public class ProductContextFacade(
         return items.Sum(item => item.StockUnit);
     }
 
-    public async Task RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice,
+    public async Task<bool> RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice,
         string? supplier, string? note, int? supplierId, CancellationToken cancellationToken)
     {
         var warehouses = await warehouseQueryService.Handle(new GetAllWarehousesByBusinessIdQuery(businessId), cancellationToken);
         var warehouse = warehouses.FirstOrDefault();
-        if (warehouse == null) return;
+
+        // A business with nowhere to receive into is a real failure, not a
+        // no-op to pass over in silence — the caller has to know the goods
+        // never landed.
+        if (warehouse == null) return false;
 
         var command = new RegisterStockIntakeCommand(productId, businessId, warehouse.Id, quantity, purchasePrice, null,
             supplier, note, null, supplierId);
-        await inventoryCommandService.Handle(command, cancellationToken);
+        var result = await inventoryCommandService.Handle(command, cancellationToken);
+        return result.IsSuccess;
     }
 
     public async Task<bool> ProductExists(int productId, CancellationToken cancellationToken)

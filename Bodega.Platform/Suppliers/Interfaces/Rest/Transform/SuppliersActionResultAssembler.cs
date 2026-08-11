@@ -35,6 +35,9 @@ public static class SuppliersActionResultAssembler
             SuppliersError.ProductNotFound => StatusCodes.Status404NotFound,
             SuppliersError.InvalidStatusTransition => StatusCodes.Status409Conflict,
             SuppliersError.EmptyPurchaseOrderLines => StatusCodes.Status400BadRequest,
+            SuppliersError.InvalidPurchaseOrderLine => StatusCodes.Status400BadRequest,
+            SuppliersError.InvalidSupplierData => StatusCodes.Status400BadRequest,
+            SuppliersError.ConcurrentModification => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

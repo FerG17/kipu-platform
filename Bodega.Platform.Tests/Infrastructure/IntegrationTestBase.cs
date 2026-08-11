@@ -18,14 +18,34 @@ public abstract class IntegrationTestBase(BodegaApiFactory factory)
 
     protected readonly HttpClient Client = factory.CreateClient();
 
+    /// <summary>Role ids as seeded by the InitialCreate migration — see RoleNames.</summary>
+    protected const int AdminRoleId = 1;
+
+    protected const int CashierRoleId = 2;
+    protected const int WarehouseRoleId = 3;
+
+    protected const string ValidPassword = "Passw0rd!test";
+
     /// <summary>Signs up a brand-new business and returns a client authenticated as its ADMIN owner.</summary>
     protected async Task<HttpClient> CreateBusinessAsync()
     {
+        return (await CreateBusinessWithOwnerAsync()).Client;
+    }
+
+    /// <summary>
+    ///     Same as <see cref="CreateBusinessAsync" /> but also hands back the
+    ///     owner's credentials, id and raw token — the security tests need
+    ///     those to re-authenticate, tamper with a token, or invite members.
+    /// </summary>
+    protected async Task<(HttpClient Client, string Email, int UserId, int BusinessId, string Token)>
+        CreateBusinessWithOwnerAsync()
+    {
         var email = $"owner-{Guid.NewGuid():N}@test.local";
+
         var response = await Client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
         {
             email,
-            password = "Passw0rd!test",
+            password = ValidPassword,
             name = "Test",
             lastName = "Owner",
             businessName = "Bodega de prueba",
@@ -33,24 +53,104 @@ public abstract class IntegrationTestBase(BodegaApiFactory factory)
         });
         response.EnsureSuccessStatusCode();
 
-        var token = (await ReadJsonAsync(response)).GetProperty("token").GetString();
+        var body = await ReadJsonAsync(response);
+        var token = body.GetProperty("token").GetString()!;
 
-        var authenticated = factory.CreateClient();
-        authenticated.DefaultRequestHeaders.Authorization = new("Bearer", token);
-        return authenticated;
+        return (AuthenticatedClient(token), email, body.GetProperty("id").GetInt32(),
+            body.GetProperty("businessId").GetInt32(), token);
     }
 
-    protected static async Task<int> CreateProductAsync(HttpClient client, decimal basePrice = 10m)
+    /// <summary>Invites a team member with the given role into the admin's business, and signs in as them.</summary>
+    protected async Task<HttpClient> InviteAndSignInAsync(HttpClient adminClient, int roleId)
     {
-        var response = await client.PostAsJsonAsync("/api/v1/products", new
+        var email = await InviteMemberAsync(adminClient, roleId);
+        return AuthenticatedClient(await SignInForTokenAsync(email, ValidPassword));
+    }
+
+    /// <summary>Invites a team member and returns their email (they can then be signed in, or deactivated, by the test).</summary>
+    protected async Task<string> InviteMemberAsync(HttpClient adminClient, int roleId)
+    {
+        var email = $"member-{Guid.NewGuid():N}@test.local";
+
+        var response = await adminClient.PostAsJsonAsync("/api/v1/users", new
         {
-            name = "Producto de prueba",
+            email,
+            password = ValidPassword,
+            name = "Team",
+            lastName = "Member",
+            roleId,
+            phone = ""
+        });
+        response.EnsureSuccessStatusCode();
+
+        return email;
+    }
+
+    /// <summary>Signs in and returns the raw JWT, so a test can inspect or tamper with it.</summary>
+    protected async Task<string> SignInForTokenAsync(string email, string password)
+    {
+        var response = await Client.PostAsJsonAsync("/api/v1/authentication/sign-in", new { email, password });
+        response.EnsureSuccessStatusCode();
+        return (await ReadJsonAsync(response)).GetProperty("token").GetString()!;
+    }
+
+    protected HttpClient AuthenticatedClient(string token)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+        return client;
+    }
+
+    protected static async Task<int> CreateSupplierAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/v1/suppliers", new
+        {
+            name = "Proveedor",
+            lastName = "de prueba",
+            ruc = "20123456789",
+            email = "proveedor@test.local",
+            phone = "999888777",
+            address = "Av. Siempre Viva 742",
+            contactPerson = "Contacto",
+            category = "GRAINS"
+        });
+        response.EnsureSuccessStatusCode();
+        return (await ReadJsonAsync(response)).GetProperty("id").GetInt32();
+    }
+
+    protected static async Task<HttpResponseMessage> CreatePurchaseOrderAsync(HttpClient client, int supplierId,
+        int productId, int quantity, decimal unitPrice = 5m, decimal discount = 0m)
+    {
+        return await client.PostAsJsonAsync("/api/v1/purchases", new
+        {
+            supplierId,
+            date = DateOnly.FromDateTime(DateTime.UtcNow),
+            expectedDate = (DateOnly?)null,
+            currency = "PEN",
+            description = "orden de prueba",
+            lines = new[] { new { productId, quantity, unitPrice, discount } }
+        });
+    }
+
+    protected static async Task<int> CreateProductAsync(HttpClient client, decimal basePrice = 10m,
+        string name = "Producto de prueba")
+    {
+        var response = await CreateProductResponseAsync(client, basePrice, name);
+        response.EnsureSuccessStatusCode();
+        return (await ReadJsonAsync(response)).GetProperty("id").GetInt32();
+    }
+
+    /// <summary>The raw response, for tests that assert on how a bad product payload is rejected.</summary>
+    protected static async Task<HttpResponseMessage> CreateProductResponseAsync(HttpClient client,
+        decimal basePrice = 10m, string name = "Producto de prueba")
+    {
+        return await client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name,
             description = "creado por un test",
             category = "ABARROTES",
             basePrice
         });
-        response.EnsureSuccessStatusCode();
-        return (await ReadJsonAsync(response)).GetProperty("id").GetInt32();
     }
 
     /// <summary>Every business gets an "Almacén Principal" created during sign-up.</summary>

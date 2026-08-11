@@ -52,6 +52,8 @@ public static class SalesActionResultAssembler
             SalesError.PaymentPlanAlreadyExists => StatusCodes.Status409Conflict,
             SalesError.InstallmentsFullyPaid => StatusCodes.Status409Conflict,
             SalesError.InvalidInstallmentCount => StatusCodes.Status400BadRequest,
+            SalesError.InvalidCustomerData => StatusCodes.Status400BadRequest,
+            SalesError.ConcurrentModification => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

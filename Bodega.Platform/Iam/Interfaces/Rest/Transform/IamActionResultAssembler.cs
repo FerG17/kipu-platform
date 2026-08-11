@@ -48,6 +48,7 @@ public static class IamActionResultAssembler
             IamError.WeakPassword => StatusCodes.Status400BadRequest,
             IamError.RoleNotFound => StatusCodes.Status400BadRequest,
             IamError.EmailAlreadyTaken => StatusCodes.Status409Conflict,
+            IamError.CannotRemoveLastAdmin => StatusCodes.Status409Conflict,
             IamError.UserNotFound => StatusCodes.Status404NotFound,
             IamError.BusinessNotFound => StatusCodes.Status404NotFound,
             _ => StatusCodes.Status500InternalServerError

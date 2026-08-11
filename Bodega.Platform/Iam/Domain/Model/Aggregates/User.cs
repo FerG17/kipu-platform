@@ -3,6 +3,18 @@ using System.Text.Json.Serialization;
 namespace Bodega.Platform.Iam.Domain.Model.Aggregates;
 
 /// <summary>
+///     The values <see cref="User.Status" /> can hold. Only ACTIVE may sign in
+///     or carry a usable token — checked both at sign-in
+///     (UserCommandService) and on every request
+///     (RequestAuthorizationMiddleware).
+/// </summary>
+public static class UserStatus
+{
+    public const string Active = "ACTIVE";
+    public const string Inactive = "INACTIVE";
+}
+
+/// <summary>
 ///     The user aggregate — an individual with access to a Business (tenant).
 ///     Password is never exposed on serialization; only PasswordHash is
 ///     persisted, set once at creation and only ever changed through
@@ -30,7 +42,7 @@ public class User(
     public string LastName { get; private set; } = lastName;
     public int BusinessId { get; private set; } = businessId;
     public int RoleId { get; private set; } = roleId;
-    public string Status { get; private set; } = "ACTIVE";
+    public string Status { get; private set; } = UserStatus.Active;
     public string Phone { get; private set; } = phone;
 
     /// <summary>
@@ -78,7 +90,7 @@ public class User(
 
     public User Deactivate()
     {
-        Status = "INACTIVE";
+        Status = UserStatus.Inactive;
         TokenVersion++;
         return this;
     }

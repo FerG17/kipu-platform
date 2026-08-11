@@ -82,15 +82,18 @@ Ya configurado y documentado aparte en `resumen_config_lector_YHD-1100CB.md` (mi
 5. **Diseño del frontend**: hay cambios de diseño pendientes de discutir (el usuario los mencionó pero se pospuso hasta avanzar el dominio del backend).
 6. **Nombre real de la bodega**: cuando se tenga, renombrar namespaces (`Bodega.Platform` → nombre final), `package.json`, nombre de base de datos, política CORS, y — importante — reemplazar el logo (`qullqa_logo.jpeg` todavía tiene "QULLQA" incrustado en la imagen).
 7. ~~Decidir si conviene branch protection u otras reglas en los repos públicos nuevos.~~ **Hecho (2026-08-10)**: se instaló y autenticó GitHub CLI, se creó la rama `develop` en `bodega-platform` (a partir de `main`), y se activó branch protection (PR obligatorio antes de mergear, sin force-push, sin borrado) en `main` y `develop` de `bodega-platform`, y en `main` de `bodega-webapp` (su `develop` se crea cuando arranque la fase de frontend).
-8. **Seguridad**: aplicar un enfoque estricto en capas (autenticación, aislamiento multi-tenant, hardening de API, frontend) — detallado como fases dedicadas en `plan_desarrollo_bodega.md`. **Backend hecho** (Fase B0.5 + las correcciones de la auditoría, PRs #10–#16); falta la parte del frontend (Fase F0.5).
+8. **Seguridad**: aplicar un enfoque estricto en capas (autenticación, aislamiento multi-tenant, hardening de API, frontend) — detallado como fases dedicadas en `plan_desarrollo_bodega.md`. **Backend hecho** (Fase B0.5, las correcciones de la auditoría independiente en los PRs #10–#20, y la auditoría adversarial del 2026-08-11); falta la parte del frontend (Fase F0.5).
 
 ## Estado actual (2026-08-11)
 
-**Backend completo** (Fases B0 a B6) y **auditado de forma independiente** por tres agentes sin contexto previo del desarrollo, que encontraron defectos críticos reales — todos corregidos en los PRs #10 a #16. Detalle completo en la sección "2.bis Auditoría independiente" de `plan_desarrollo_bodega.md`.
+**Backend completo** (Fases B0 a B6) y auditado **dos veces**:
 
-Lo más grave que encontró la auditoría: el secreto JWT nunca se expandía desde su variable de entorno, así que en producción la clave de firma habría sido una cadena pública del repositorio — cualquiera podía haber forjado un token de administrador. No llegó a ser explotable porque el proyecto todavía no está desplegado.
+1. **Auditoría independiente** por tres agentes sin contexto previo del desarrollo, que encontraron defectos críticos reales — corregidos en los PRs #10 a #20. Lo más grave: el secreto JWT nunca se expandía desde su variable de entorno, así que en producción la clave de firma habría sido una cadena pública del repositorio, y cualquiera podría haber forjado un token de administrador. No llegó a ser explotable porque el proyecto todavía no está desplegado.
+2. **Auditoría de seguridad adversarial (2026-08-11)**, planteada desde la perspectiva de un atacante. El aislamiento entre negocios, la matriz de roles y la validación de tokens aguantaron todos los intentos. Lo que no aguantó fue la **concurrencia**: ocho ventas simultáneas de la última unidad se confirmaban las ocho, cancelar una venta ocho veces devolvía su stock ocho veces, y recibir una orden de compra ocho veces metía ocho veces la mercadería. También apareció **inyección de fórmulas en el CSV** de reportes: un empleado de almacén podía nombrar un producto de forma que ejecutara código en la máquina del dueño al abrir el export.
 
-Hay una **red de seguridad de 24 tests de integración** (`dotnet test` con el MySQL de Docker levantado) contra la API HTTP real. Cada test que cubre un bug de la auditoría fue verificado en rojo contra el código previo antes de aceptarse.
+Detalle completo en las secciones "2.bis" y "2.ter" de `plan_desarrollo_bodega.md`.
+
+Hay una **red de seguridad de 109 tests de integración** (`dotnet test` con el MySQL de Docker levantado) contra la API HTTP real, de los cuales 85 son adversariales: intentan cruzar la frontera entre negocios, escalar de rol, forjar tokens y ganar carreras de concurrencia. Cada test que cubre un bug de las auditorías fue verificado en rojo contra el código previo antes de aceptarse.
 
 **Frontend sin empezar** — Fases F0 a F7 pendientes.
 
