@@ -65,8 +65,11 @@ public class ReportFilterTests(BodegaApiFactory factory) : IntegrationTestBase(f
 
         var csv = await GenerateAndExportStockMovementReportAsync(client, wantedSupplierId);
 
-        Assert.Contains(",7,", csv);
-        Assert.DoesNotContain(",99,", csv);
+        // Quantities are quoted now that every exported field is (see
+        // CsvWriter — an unquoted field let a comma or a formula in a product
+        // name rewrite the sheet), so the quantity column reads "7", not ,7,.
+        Assert.Contains("\"7\"", csv);
+        Assert.DoesNotContain("\"99\"", csv);
     }
 
     private static async Task<string> GenerateAndExportStockMovementReportAsync(HttpClient client, int supplierId)

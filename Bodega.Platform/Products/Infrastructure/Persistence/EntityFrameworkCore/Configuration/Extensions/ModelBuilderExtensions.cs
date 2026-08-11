@@ -50,6 +50,12 @@ public static class ModelBuilderExtensions
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Id).ValueGeneratedOnAdd();
 
+            // Two tills selling the same shelf land on this row at the same
+            // time; the token makes each UPDATE conditional on the value the
+            // request actually read, so the loser is rejected instead of
+            // overwriting the winner's decrement. See IVersionedEntity.
+            entity.Property(item => item.Version).IsConcurrencyToken();
+
             // Real N:M — one product can have independent stock per
             // warehouse (architecture doc §8.1).
             entity.HasIndex(item => new { item.ProductId, item.WarehouseId }).IsUnique();

@@ -1,4 +1,5 @@
 using Bodega.Platform.Sales.Domain.Model.Entities;
+using Bodega.Platform.Shared.Domain.Model.Entities;
 
 namespace Bodega.Platform.Sales.Domain.Model.Aggregates;
 
@@ -16,7 +17,7 @@ public static class SaleStatus
 ///     The sale aggregate. TotalAmount is always the server-computed sum of
 ///     its lines' subtotals — never trust a total sent by the client.
 /// </summary>
-public class Sale
+public class Sale : IVersionedEntity
 {
     private readonly List<SaleDetail> _saleDetails = [];
 
@@ -48,6 +49,13 @@ public class Sale
     public DateTimeOffset Date { get; private set; }
     public string Description { get; private set; }
     public string Currency { get; private set; }
+
+    /// <summary>
+    ///     Optimistic-concurrency token — what stops the same sale being
+    ///     cancelled by several requests at once, each returning its units to
+    ///     stock. See <see cref="IVersionedEntity" />.
+    /// </summary>
+    public int Version { get; set; }
 
     public IReadOnlyCollection<SaleDetail> SaleDetails => _saleDetails.AsReadOnly();
 

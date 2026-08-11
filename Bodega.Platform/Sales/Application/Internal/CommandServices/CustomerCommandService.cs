@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Sales.Application.CommandServices;
 using Bodega.Platform.Sales.Domain.Model.Aggregates;
@@ -13,11 +14,17 @@ namespace Bodega.Platform.Sales.Application.Internal.CommandServices;
 public class CustomerCommandService(
     ICustomerRepository customerRepository,
     IUnitOfWork unitOfWork,
+    IValidator<CreateCustomerCommand> createCustomerValidator,
+    IValidator<UpdateCustomerCommand> updateCustomerValidator,
     IStringLocalizer<SalesMessages> localizer)
     : ICustomerCommandService
 {
     public async Task<Result<Customer>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
     {
+        if (!(await createCustomerValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Customer>.Failure(SalesError.InvalidCustomerData,
+                localizer[nameof(SalesError.InvalidCustomerData)]);
+
         var customer = new Customer(command.BusinessId, command.FullName, command.DocumentNumber, command.PhoneNumber,
             command.Email);
         await customerRepository.AddAsync(customer, cancellationToken);
@@ -27,6 +34,10 @@ public class CustomerCommandService(
 
     public async Task<Result<Customer>> Handle(UpdateCustomerCommand command, CancellationToken cancellationToken)
     {
+        if (!(await updateCustomerValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Customer>.Failure(SalesError.InvalidCustomerData,
+                localizer[nameof(SalesError.InvalidCustomerData)]);
+
         var customer = await customerRepository.FindByIdAsync(command.CustomerId, cancellationToken);
         if (customer == null)
             return Result<Customer>.Failure(SalesError.CustomerNotFound, localizer[nameof(SalesError.CustomerNotFound)]);

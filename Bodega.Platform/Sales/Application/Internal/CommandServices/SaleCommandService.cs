@@ -1,5 +1,6 @@
 using Cortex.Mediator;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Bodega.Platform.Products.Interfaces.Acl;
@@ -99,6 +100,20 @@ public class SaleCommandService(
 
                 await transaction.CommitAsync(cancellationToken);
             }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another till took the same units between this request's stock
+                // check and its write. The concurrency token on InventoryItem
+                // is what surfaces it: without it both writes landed and the
+                // shop sold stock it did not have. Insufficient stock is the
+                // honest answer to give the cashier, not a 500.
+                await transaction.RollbackAsync(cancellationToken);
+                logger.LogWarning(
+                    "Sale for business {BusinessId} lost a concurrent race for stock and was rolled back",
+                    command.BusinessId);
+                return Result<Sale>.Failure(SalesError.InsufficientStock,
+                    localizer[nameof(SalesError.InsufficientStock)]);
+            }
             catch (Exception exception)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -169,6 +184,17 @@ public class SaleCommandService(
             }
 
             await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // The same sale was cancelled by a request that got there first.
+            // Without the concurrency token every simultaneous cancellation
+            // committed, and each one handed the sale's units back to stock —
+            // eight clicks on "cancelar" turned four units into thirty-two.
+            await transaction.RollbackAsync(cancellationToken);
+            logger.LogWarning("Cancellation of sale {SaleId} lost a concurrent race and was rolled back", sale.Id);
+            return Result<Sale>.Failure(SalesError.SaleAlreadyCancelled,
+                localizer[nameof(SalesError.SaleAlreadyCancelled)]);
         }
         catch (Exception exception)
         {

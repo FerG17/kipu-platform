@@ -18,9 +18,21 @@ public class GlobalExceptionHandlerMiddleware(RequestDelegate next, ILogger<Glob
         {
             await next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client hung up mid-request. Nothing to report to a socket
+            // that is already gone, and logging it as an error buries real
+            // failures under noise from every closed browser tab.
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "Unhandled exception while processing {Path}", context.Request.Path);
+
+            // Once the response is on the wire its status and headers are
+            // fixed; touching them here throws a second exception that
+            // replaces the original in the logs. A half-written body is all
+            // the caller can get at that point.
+            if (context.Response.HasStarted) throw;
 
             context.Response.ContentType = "application/problem+json";
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
