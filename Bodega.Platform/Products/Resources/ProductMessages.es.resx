@@ -65,6 +65,9 @@
   <data name="InvalidExpirationDate" xml:space="preserve">
     <value>La fecha de vencimiento no puede estar en el pasado.</value>
   </data>
+  <data name="InvalidPurchasePrice" xml:space="preserve">
+    <value>El precio de compra no puede ser negativo.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

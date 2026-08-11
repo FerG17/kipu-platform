@@ -10,5 +10,6 @@ public enum ProductError
     InsufficientStock,
     InvalidQuantity,
     InvalidExpirationDate,
+    InvalidPurchasePrice,
     DatabaseError
 }

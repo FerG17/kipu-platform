@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Sales.Application.CommandServices;
 using Bodega.Platform.Sales.Domain.Model.Aggregates;
@@ -22,12 +23,13 @@ public class PaymentPlanCommandService(
     IPaymentPlanRepository paymentPlanRepository,
     ISaleRepository saleRepository,
     IUnitOfWork unitOfWork,
+    IValidator<CreatePaymentPlanCommand> createPaymentPlanValidator,
     IStringLocalizer<SalesMessages> localizer)
     : IPaymentPlanCommandService
 {
     public async Task<Result<PaymentPlan>> Handle(CreatePaymentPlanCommand command, CancellationToken cancellationToken)
     {
-        if (command.TotalInstallments < 1)
+        if (!(await createPaymentPlanValidator.ValidateAsync(command, cancellationToken)).IsValid)
             return Result<PaymentPlan>.Failure(SalesError.InvalidInstallmentCount,
                 localizer[nameof(SalesError.InvalidInstallmentCount)]);
 

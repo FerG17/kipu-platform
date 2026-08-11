@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Bodega.Platform.Dashboard.Application.QueryServices;
 using Bodega.Platform.Dashboard.Domain.Model.Entities;
 using Bodega.Platform.Dashboard.Domain.Model.Errors;
@@ -19,7 +20,8 @@ public class ReportQueryService(
     ISalesContextFacade salesContextFacade,
     IProductContextFacade productContextFacade,
     ISupplierContextFacade supplierContextFacade,
-    IStringLocalizer<DashboardMessages> localizer)
+    IStringLocalizer<DashboardMessages> localizer,
+    ILogger<ReportQueryService> logger)
     : IReportQueryService
 {
     public async Task<IEnumerable<Report>> Handle(GetAllReportsByBusinessIdQuery query, CancellationToken cancellationToken)
@@ -50,6 +52,9 @@ public class ReportQueryService(
             _ => await BuildSalesCsv(report, cancellationToken)
         };
 
+        logger.LogInformation("Report {ReportId} ({ReportType}) exported as CSV for business {BusinessId}",
+            report.Id, report.Type, report.BusinessId);
+
         return Result<string>.Success(csv);
     }
 
@@ -65,6 +70,10 @@ public class ReportQueryService(
 
         var (lines, productName, supplierName) = await GetStockMovementLines(report, cancellationToken);
         var pdf = StockMovementsPdfGenerator.Generate(report.Id, report.DateFrom, report.DateTo, productName, supplierName, lines);
+
+        logger.LogInformation(
+            "Report {ReportId} (STOCK_MOVEMENTS) exported as PDF for business {BusinessId}: {LineCount} line(s), {SizeBytes} bytes",
+            report.Id, report.BusinessId, lines.Count, pdf.Length);
 
         return Result<byte[]>.Success(pdf);
     }

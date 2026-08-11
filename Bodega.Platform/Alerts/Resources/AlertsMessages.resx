@@ -50,6 +50,9 @@
   <data name="InvalidThreshold" xml:space="preserve">
     <value>Threshold value cannot be negative.</value>
   </data>
+  <data name="InvalidAlertData" xml:space="preserve">
+    <value>Invalid alert data — check the required fields.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>
