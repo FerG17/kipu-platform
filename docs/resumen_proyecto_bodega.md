@@ -90,7 +90,7 @@ Ya configurado y documentado aparte en `resumen_config_lector_YHD-1100CB.md` (mi
 
 Lo más grave que encontró la auditoría: el secreto JWT nunca se expandía desde su variable de entorno, así que en producción la clave de firma habría sido una cadena pública del repositorio — cualquiera podía haber forjado un token de administrador. No llegó a ser explotable porque el proyecto todavía no está desplegado.
 
-Hay una **red de seguridad de 21 tests de integración** (`dotnet test` con el MySQL de Docker levantado) contra la API HTTP real. Cada test que cubre un bug de la auditoría fue verificado en rojo contra el código previo antes de aceptarse.
+Hay una **red de seguridad de 24 tests de integración** (`dotnet test` con el MySQL de Docker levantado) contra la API HTTP real. Cada test que cubre un bug de la auditoría fue verificado en rojo contra el código previo antes de aceptarse.
 
 **Frontend sin empezar** — Fases F0 a F7 pendientes.
 
