@@ -43,6 +43,11 @@ public static class ModelBuilderExtensions
             entity.Property(order => order.ExpectedDate).HasDateOnlyConversion();
             entity.Property(order => order.ReceivedDate).HasDateOnlyConversion();
 
+            // Makes the move to RECEIVED conditional on the status the request
+            // read, so a double submit books the delivery into inventory once
+            // rather than once per request. See IVersionedEntity.
+            entity.Property(order => order.Version).IsConcurrencyToken();
+
             entity.HasOne<Business>().WithMany().HasForeignKey(order => order.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Supplier>().WithMany().HasForeignKey(order => order.SupplierId)

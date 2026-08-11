@@ -14,5 +14,11 @@ public enum SalesError
     PaymentPlanAlreadyExists,
     InstallmentsFullyPaid,
     InvalidInstallmentCount,
+
+    /// <summary>Customer name/document/phone/email outside what its columns accept.</summary>
+    InvalidCustomerData,
+
+    /// <summary>Another request changed the same row first — a conflict the caller can retry (409), not a server fault (500).</summary>
+    ConcurrentModification,
     DatabaseError
 }

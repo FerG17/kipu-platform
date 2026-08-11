@@ -20,6 +20,11 @@ public static class ModelBuilderExtensions
             entity.Property(sale => sale.Description).HasMaxLength(500);
             entity.Property(sale => sale.Currency).IsRequired().HasMaxLength(10);
 
+            // Makes a cancellation conditional on the sale still being in the
+            // state the request read, so simultaneous cancellations can't each
+            // return the same units to stock. See IVersionedEntity.
+            entity.Property(sale => sale.Version).IsConcurrencyToken();
+
             entity.HasOne<Business>().WithMany().HasForeignKey(sale => sale.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
 
@@ -64,6 +69,10 @@ public static class ModelBuilderExtensions
         {
             entity.HasKey(plan => plan.Id);
             entity.Property(plan => plan.Id).ValueGeneratedOnAdd();
+
+            // Keeps two payments registered at the same instant from both
+            // counting against the same installment. See IVersionedEntity.
+            entity.Property(plan => plan.Version).IsConcurrencyToken();
 
             entity.HasOne<Business>().WithMany().HasForeignKey(plan => plan.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);

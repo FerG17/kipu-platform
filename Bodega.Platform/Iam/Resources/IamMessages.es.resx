@@ -71,4 +71,7 @@
   <data name="InternalServerError" xml:space="preserve">
     <value>Ocurrió un error inesperado.</value>
   </data>
+  <data name="CannotRemoveLastAdmin" xml:space="preserve">
+    <value>Un negocio debe conservar al menos un administrador activo; este es el último.</value>
+  </data>
 </root>

@@ -39,8 +39,15 @@ public interface IProductContextFacade
     ///     Suppliers &amp; Replenishment when a purchase order moves to
     ///     RECEIVED. Uses the business's first warehouse (same known
     ///     limitation as RegisterStockSaleCommand — see InventoryCommandService).
+    ///
+    ///     Returns whether the goods actually landed in inventory. This used to
+    ///     return a bare Task and discard the outcome, exactly like
+    ///     DecrementStock once did: an order could be marked RECEIVED and
+    ///     committed while its intake had quietly failed, so inventory
+    ///     permanently understated what the supplier delivered. The caller is
+    ///     expected to abort its transaction when this comes back false.
     /// </summary>
-    Task RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice, string? supplier,
+    Task<bool> RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice, string? supplier,
         string? note, int? supplierId, CancellationToken cancellationToken);
 
     Task<bool> ProductExists(int productId, CancellationToken cancellationToken);

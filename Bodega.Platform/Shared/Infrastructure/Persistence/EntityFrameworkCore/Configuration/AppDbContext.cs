@@ -41,7 +41,7 @@ public class AppDbContext(DbContextOptions options, ICurrentUserAccessor current
 
     protected override void OnConfiguring(DbContextOptionsBuilder builder)
     {
-        builder.AddInterceptors(new AuditableEntityInterceptor());
+        builder.AddInterceptors(new AuditableEntityInterceptor(), new ConcurrencyVersionInterceptor());
         base.OnConfiguring(builder);
     }
 

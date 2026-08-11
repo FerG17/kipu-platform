@@ -9,6 +9,9 @@ public enum IamError
     CurrentPasswordInvalid,
     WeakPassword,
     RoleNotFound,
+
+    /// <summary>Removing this user would leave the business with nobody who can administer it, and there is no recovery path.</summary>
+    CannotRemoveLastAdmin,
     OperationCancelled,
     DatabaseError,
     InternalServerError

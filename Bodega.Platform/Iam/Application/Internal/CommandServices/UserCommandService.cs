@@ -41,6 +41,15 @@ public class UserCommandService(
             return Result<(User user, string token)>.Failure(IamError.InvalidCredentials,
                 localizer[nameof(IamError.InvalidCredentials)]);
 
+        // RequestAuthorizationMiddleware refuses a non-ACTIVE user's token on
+        // every request, but sign-in itself never looked at Status — so a
+        // suspended account still got a 200 and a token that silently failed
+        // everywhere. Answering "invalid credentials" (not "your account is
+        // disabled") keeps sign-in from confirming which emails are real.
+        if (user.Status != UserStatus.Active)
+            return Result<(User user, string token)>.Failure(IamError.InvalidCredentials,
+                localizer[nameof(IamError.InvalidCredentials)]);
+
         var roleName = await ResolveRoleNameAsync(user.RoleId, cancellationToken);
         var token = tokenService.GenerateToken(user, roleName);
         return Result<(User user, string token)>.Success((user, token));
@@ -174,10 +183,28 @@ public class UserCommandService(
         return Result.Success();
     }
 
+    /// <summary>
+    ///     Removing the business's only administrator is refused. Nothing
+    ///     stopped it before, and it is unrecoverable: there is no password
+    ///     reset and no support path, so an owner deleting their own account —
+    ///     which the endpoint happily allowed — left the bodega's products,
+    ///     sales and credit permanently unreachable, with the rows still in the
+    ///     database and no one able to log in and administer them.
+    /// </summary>
     public async Task<Result> Handle(DeleteUserCommand command, CancellationToken cancellationToken)
     {
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
         if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+
+        if (user.RoleId == DefaultOwnerRoleId)
+        {
+            var team = await userRepository.FindAllByBusinessIdAsync(user.BusinessId, cancellationToken);
+            var remainingAdmins = team.Count(member =>
+                member.Id != user.Id && member.RoleId == DefaultOwnerRoleId && member.Status == UserStatus.Active);
+
+            if (remainingAdmins == 0)
+                return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
+        }
 
         userRepository.Remove(user);
         await unitOfWork.CompleteAsync(cancellationToken);

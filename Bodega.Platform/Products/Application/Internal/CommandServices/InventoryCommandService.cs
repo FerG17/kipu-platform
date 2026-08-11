@@ -1,5 +1,6 @@
 using Cortex.Mediator;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Products.Application.CommandServices;
@@ -107,7 +108,19 @@ public class InventoryCommandService(
                 cancellationToken);
         }
 
-        await unitOfWork.CompleteAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Someone sold or restocked the same InventoryItem between this
+            // request's read and its write. Before the concurrency token both
+            // writes committed and the second overwrote the first's total,
+            // quietly losing whichever movement lost the race.
+            return Result<InventoryItem>.Failure(ProductError.ConcurrentModification,
+                localizer[nameof(ProductError.ConcurrentModification)]);
+        }
 
         // Batch data the caller supplied used to be accepted and then thrown
         // away: this handler never touched batchRepository, so registering
@@ -243,6 +256,12 @@ public class InventoryCommandService(
     /// </summary>
     public async Task<Result<InventoryItem>> Handle(UpdateMinimumStockCommand command, CancellationToken cancellationToken)
     {
+        // A negative threshold is meaningless and makes IsLowStock unreachable,
+        // silently disabling the low-stock alert for that product.
+        if (command.MinimumStock < 0)
+            return Result<InventoryItem>.Failure(ProductError.InvalidQuantity,
+                localizer[nameof(ProductError.InvalidQuantity)]);
+
         var items = (await inventoryItemRepository.FindAllByProductIdAsync(command.ProductId, cancellationToken)).ToList();
         if (items.Count == 0)
             return Result<InventoryItem>.Failure(ProductError.InventoryItemNotFound,
@@ -254,7 +273,15 @@ public class InventoryCommandService(
             inventoryItemRepository.Update(item);
         }
 
-        await unitOfWork.CompleteAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<InventoryItem>.Failure(ProductError.ConcurrentModification,
+                localizer[nameof(ProductError.ConcurrentModification)]);
+        }
 
         foreach (var item in items)
             await PublishStockLevelChangedEvent(item, cancellationToken);

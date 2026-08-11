@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Application.Model;
@@ -14,12 +15,18 @@ namespace Bodega.Platform.Suppliers.Application.Internal.CommandServices;
 public class SupplierCommandService(
     ISupplierRepository supplierRepository,
     IUnitOfWork unitOfWork,
+    IValidator<CreateSupplierCommand> createSupplierValidator,
+    IValidator<UpdateSupplierCommand> updateSupplierValidator,
     IStringLocalizer<SuppliersMessages> localizer,
     IBusinessClock businessClock)
     : ISupplierCommandService
 {
     public async Task<Result<Supplier>> Handle(CreateSupplierCommand command, CancellationToken cancellationToken)
     {
+        if (!(await createSupplierValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Supplier>.Failure(SuppliersError.InvalidSupplierData,
+                localizer[nameof(SuppliersError.InvalidSupplierData)]);
+
         var supplier = new Supplier(command.BusinessId, command.Name, command.LastName, command.Ruc, command.Email,
             command.Phone, command.Address, command.ContactPerson, command.Category, businessClock.Today);
         await supplierRepository.AddAsync(supplier, cancellationToken);
@@ -29,6 +36,10 @@ public class SupplierCommandService(
 
     public async Task<Result<Supplier>> Handle(UpdateSupplierCommand command, CancellationToken cancellationToken)
     {
+        if (!(await updateSupplierValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Supplier>.Failure(SuppliersError.InvalidSupplierData,
+                localizer[nameof(SuppliersError.InvalidSupplierData)]);
+
         var supplier = await supplierRepository.FindByIdAsync(command.SupplierId, cancellationToken);
         if (supplier == null)
             return Result<Supplier>.Failure(SuppliersError.SupplierNotFound, localizer[nameof(SuppliersError.SupplierNotFound)]);

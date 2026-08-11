@@ -1,3 +1,4 @@
+using Bodega.Platform.Shared.Domain.Model.Entities;
 using Bodega.Platform.Suppliers.Domain.Model.Entities;
 
 namespace Bodega.Platform.Suppliers.Domain.Model.Aggregates;
@@ -17,7 +18,7 @@ public static class PurchaseOrderStatus
 ///     from a manual inventory intake — this distinction already exists as
 ///     help text in the frontend and is only formalized here.
 /// </summary>
-public class PurchaseOrder
+public class PurchaseOrder : IVersionedEntity
 {
     private readonly List<PurchaseOrderDetail> _details = [];
 
@@ -48,6 +49,13 @@ public class PurchaseOrder
     public string Status { get; private set; }
     public string Currency { get; private set; }
     public string Description { get; private set; }
+
+    /// <summary>
+    ///     Optimistic-concurrency token — what stops one delivery being booked
+    ///     into inventory several times when RECEIVED is submitted twice at
+    ///     once. See <see cref="IVersionedEntity" />.
+    /// </summary>
+    public int Version { get; set; }
 
     public IReadOnlyCollection<PurchaseOrderDetail> Details => _details.AsReadOnly();
 
