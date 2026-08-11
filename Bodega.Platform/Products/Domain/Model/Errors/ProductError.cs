@@ -11,5 +11,7 @@ public enum ProductError
     InvalidQuantity,
     InvalidExpirationDate,
     InvalidPurchasePrice,
+    BatchNotFound,
+    BatchAlreadyDiscarded,
     DatabaseError
 }

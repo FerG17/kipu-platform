@@ -33,5 +33,13 @@ public class BodegaApiFactory : WebApplicationFactory<Program>
         // pushed far out so it can't fire mid-test and mutate alert state
         // underneath an assertion.
         Environment.SetEnvironmentVariable("Alerts__SweepIntervalHours", "24");
+
+        // Every test signs up its own business, and they all look like one
+        // client to the per-IP rate limiter. At the production budget of 10
+        // sign-ups a minute the suite throttles itself with 429s as soon as
+        // it grows past a handful of tests — which is the limiter working
+        // correctly, not a bug, so the tests raise the ceiling instead.
+        Environment.SetEnvironmentVariable("RateLimiting__AuthPermitsPerMinute", "10000");
+        Environment.SetEnvironmentVariable("RateLimiting__GlobalPermitsPerMinute", "10000");
     }
 }
