@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Alerts.Application.CommandServices;
 using Bodega.Platform.Alerts.Domain.Model.Commands;
@@ -13,12 +14,13 @@ namespace Bodega.Platform.Alerts.Application.Internal.CommandServices;
 public class AlertRuleCommandService(
     IAlertRuleRepository alertRuleRepository,
     IUnitOfWork unitOfWork,
+    IValidator<CreateOrUpdateAlertRuleCommand> createOrUpdateAlertRuleValidator,
     IStringLocalizer<AlertsMessages> localizer)
     : IAlertRuleCommandService
 {
     public async Task<Result<AlertRule>> Handle(CreateOrUpdateAlertRuleCommand command, CancellationToken cancellationToken)
     {
-        if (command.ThresholdValue < 0)
+        if (!(await createOrUpdateAlertRuleValidator.ValidateAsync(command, cancellationToken)).IsValid)
             return Result<AlertRule>.Failure(AlertsError.InvalidThreshold, localizer[nameof(AlertsError.InvalidThreshold)]);
 
         var existing = await alertRuleRepository.FindByBusinessIdAndTypeAsync(command.BusinessId, command.AlertType,

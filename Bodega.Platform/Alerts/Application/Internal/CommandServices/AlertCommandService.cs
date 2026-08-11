@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Bodega.Platform.Alerts.Application.CommandServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
@@ -13,12 +14,16 @@ namespace Bodega.Platform.Alerts.Application.Internal.CommandServices;
 public class AlertCommandService(
     IAlertRepository alertRepository,
     IUnitOfWork unitOfWork,
+    IValidator<CreateAlertCommand> createAlertValidator,
     IStringLocalizer<AlertsMessages> localizer)
     : IAlertCommandService
 {
     /// <summary>Manual/technical creation — the normal path is the reactive event handlers, not this. See architecture doc §6.5.</summary>
     public async Task<Result<Alert>> Handle(CreateAlertCommand command, CancellationToken cancellationToken)
     {
+        if (!(await createAlertValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Alert>.Failure(AlertsError.InvalidAlertData, localizer[nameof(AlertsError.InvalidAlertData)]);
+
         var alert = new Alert(command.BusinessId, command.ProductId, command.BatchId, command.ProductName, command.Type,
             command.Severity, command.Message, command.CurrentStock, command.MinStock, command.DaysToExpiry,
             command.WarehouseId);
