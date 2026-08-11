@@ -51,14 +51,14 @@ public class ProductContextFacade(
     }
 
     public async Task RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice,
-        string? supplier, string? note, CancellationToken cancellationToken)
+        string? supplier, string? note, int? supplierId, CancellationToken cancellationToken)
     {
         var warehouses = await warehouseQueryService.Handle(new GetAllWarehousesByBusinessIdQuery(businessId), cancellationToken);
         var warehouse = warehouses.FirstOrDefault();
         if (warehouse == null) return;
 
         var command = new RegisterStockIntakeCommand(productId, businessId, warehouse.Id, quantity, purchasePrice, null,
-            supplier, note, null);
+            supplier, note, null, supplierId);
         await inventoryCommandService.Handle(command, cancellationToken);
     }
 
@@ -121,10 +121,10 @@ public class ProductContextFacade(
     }
 
     public async Task<IReadOnlyCollection<StockMovementReportLine>> GetStockMovementsForReport(int businessId,
-        DateOnly? dateFrom, DateOnly? dateTo, int? productId, CancellationToken cancellationToken)
+        DateOnly? dateFrom, DateOnly? dateTo, int? productId, int? supplierId, CancellationToken cancellationToken)
     {
         var movements = await stockMovementRepository.FindFilteredByBusinessIdAsync(businessId, dateFrom, dateTo, productId,
-            cancellationToken);
+            supplierId, cancellationToken);
 
         var products = await productQueryService.Handle(new GetAllProductsByBusinessIdQuery(businessId, null), cancellationToken);
         var nameByProductId = products.ToDictionary(product => product.Id, product => product.Name);
