@@ -1,3 +1,4 @@
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Application.QueryServices;
 using Bodega.Platform.Products.Domain.Model.Aggregates;
@@ -17,7 +18,8 @@ public class ProductContextFacade(
     IProductQueryService productQueryService,
     IBatchRepository batchRepository,
     IProductRepository productRepository,
-    IStockMovementRepository stockMovementRepository)
+    IStockMovementRepository stockMovementRepository,
+    IBusinessClock businessClock)
     : IProductContextFacade
 {
     public async Task<int> CreateDefaultWarehouse(int businessId, CancellationToken cancellationToken)
@@ -80,7 +82,7 @@ public class ProductContextFacade(
         var inventoryItems = await inventoryQueryService.Handle(new GetInventoryByBusinessIdQuery(businessId), cancellationToken);
         var inventoryItemsList = inventoryItems.ToList();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = businessClock.Today;
         var activeBatches = await batchRepository.FindAllByBusinessIdAsync(businessId, cancellationToken);
         var expiringSoonCount = activeBatches.Count(batch => batch.Status == BatchStatus.Active && batch.IsExpiringSoon(today));
 

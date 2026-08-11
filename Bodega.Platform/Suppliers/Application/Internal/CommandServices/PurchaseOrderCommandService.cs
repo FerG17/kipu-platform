@@ -1,5 +1,6 @@
 using Cortex.Mediator;
 using Microsoft.Extensions.Localization;
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Products.Interfaces.Acl;
 using Bodega.Platform.Shared.Application.Model;
 using Bodega.Platform.Shared.Domain.Repositories;
@@ -19,7 +20,8 @@ public class PurchaseOrderCommandService(
     IProductContextFacade productContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
-    IStringLocalizer<SuppliersMessages> localizer)
+    IStringLocalizer<SuppliersMessages> localizer,
+    IBusinessClock businessClock)
     : IPurchaseOrderCommandService
 {
     public async Task<Result<PurchaseOrder>> Handle(CreatePurchaseOrderCommand command, CancellationToken cancellationToken)
@@ -98,7 +100,7 @@ public class PurchaseOrderCommandService(
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            purchaseOrder.MarkReceived(DateOnly.FromDateTime(DateTime.UtcNow));
+            purchaseOrder.MarkReceived(businessClock.Today);
             purchaseOrderRepository.Update(purchaseOrder);
             await unitOfWork.CompleteAsync(cancellationToken);
 
