@@ -47,6 +47,9 @@
   <data name="UnsupportedReportTypeForPdf" xml:space="preserve">
     <value>La exportación a PDF solo está disponible para reportes de tipo STOCK_MOVEMENTS.</value>
   </data>
+  <data name="InvalidReportData" xml:space="preserve">
+    <value>Datos de reporte inválidos — revisa el tipo y el rango de fechas.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

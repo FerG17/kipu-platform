@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
@@ -24,7 +25,8 @@ public class StockLevelChangedEventHandler(
     IAlertRepository alertRepository,
     IAlertRuleRepository alertRuleRepository,
     IUnitOfWork unitOfWork,
-    IAlertNotificationDispatcher notificationDispatcher)
+    IAlertNotificationDispatcher notificationDispatcher,
+    ILogger<StockLevelChangedEventHandler> logger)
     : IEventHandler<StockLevelChangedEvent>
 {
     public async Task Handle(StockLevelChangedEvent domainEvent, CancellationToken cancellationToken)
@@ -92,6 +94,13 @@ public class StockLevelChangedEventHandler(
         // Only notify on a brand-new alert, not every refresh of an
         // already-active one — otherwise every sale/intake touching a
         // product that's still low would re-notify on the same situation.
-        if (newAlert != null) await notificationDispatcher.NotifyAsync(newAlert, cancellationToken);
+        if (newAlert != null)
+        {
+            logger.LogWarning(
+                "Alert {AlertType} ({Severity}) created for product {ProductId} ({ProductName}) in business {BusinessId}, warehouse {WarehouseId}: {Message}",
+                newAlert.Type, newAlert.Severity, newAlert.ProductId, domainEvent.ProductName, newAlert.BusinessId,
+                domainEvent.WarehouseId, newAlert.Message);
+            await notificationDispatcher.NotifyAsync(newAlert, cancellationToken);
+        }
     }
 }

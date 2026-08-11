@@ -1,5 +1,6 @@
 using Cortex.Mediator;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Bodega.Platform.Products.Interfaces.Acl;
 using Bodega.Platform.Sales.Application.CommandServices;
 using Bodega.Platform.Sales.Domain.Model.Aggregates;
@@ -19,7 +20,8 @@ public class SaleCommandService(
     IProductContextFacade productContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
-    IStringLocalizer<SalesMessages> localizer)
+    IStringLocalizer<SalesMessages> localizer,
+    ILogger<SaleCommandService> logger)
     : ISaleCommandService
 {
     /// <summary>
@@ -74,11 +76,17 @@ public class SaleCommandService(
             var lines = command.Lines.Select(line => (line.ProductId, line.Quantity)).ToList();
             await mediator.PublishAsync(new SaleRegisteredEvent(sale.Id, sale.BusinessId, lines), cancellationToken);
 
+            logger.LogInformation(
+                "Sale {SaleId} registered for business {BusinessId}: {LineCount} line(s), total {TotalAmount} {Currency}, payment method {PaymentMethod}",
+                sale.Id, sale.BusinessId, command.Lines.Count, sale.TotalAmount, sale.Currency, sale.PaymentMethod);
+
             return Result<Sale>.Success(sale);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
             await transaction.RollbackAsync(cancellationToken);
+            logger.LogError(exception, "Failed to register sale for business {BusinessId} ({LineCount} line(s))",
+                command.BusinessId, command.Lines.Count);
             return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
         }
     }
@@ -94,6 +102,9 @@ public class SaleCommandService(
         sale.Cancel();
         saleRepository.Update(sale);
         await unitOfWork.CompleteAsync(cancellationToken);
+
+        logger.LogInformation("Sale {SaleId} cancelled for business {BusinessId}", sale.Id, sale.BusinessId);
+
         return Result<Sale>.Success(sale);
     }
 }
