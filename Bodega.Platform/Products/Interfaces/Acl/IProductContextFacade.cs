@@ -13,8 +13,16 @@ public interface IProductContextFacade
     /// </summary>
     Task<int> CreateDefaultWarehouse(int businessId, CancellationToken cancellationToken);
 
-    /// <summary>Decrements inventory after a confirmed sale — called by Sales &amp; POS.</summary>
-    Task DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken);
+    /// <summary>
+    ///     Decrements inventory after a confirmed sale — called by Sales &amp; POS.
+    ///
+    ///     Returns whether the stock actually came off. This used to return a
+    ///     bare Task and swallow the outcome, which meant a sale could be
+    ///     committed while its stock decrement had silently failed, leaving
+    ///     inventory permanently out of step with what was sold. The caller is
+    ///     expected to abort its transaction when this comes back false.
+    /// </summary>
+    Task<bool> DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken);
 
     /// <summary>Total stock for a product across every warehouse — used by Sales &amp; POS to validate a line before confirming a sale.</summary>
     Task<int> GetAvailableStock(int productId, CancellationToken cancellationToken);

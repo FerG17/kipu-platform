@@ -1,4 +1,5 @@
 using Cortex.Mediator;
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Bodega.Platform.Products.Interfaces.Acl;
@@ -20,21 +21,25 @@ public class SaleCommandService(
     IProductContextFacade productContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
+    IValidator<CreateSaleCommand> createSaleValidator,
     IStringLocalizer<SalesMessages> localizer,
     ILogger<SaleCommandService> logger)
     : ISaleCommandService
 {
     /// <summary>
-    ///     Validates every line has sufficient stock BEFORE writing anything
-    ///     (rejects the whole sale if any line fails — "todo o nada"), then
-    ///     persists the sale and decrements stock for every line inside one
-    ///     explicit transaction, so a failure partway through never leaves a
-    ///     sale registered without its stock actually decremented.
+    ///     Validates every product has sufficient stock BEFORE writing
+    ///     anything (rejects the whole sale if any fails — "todo o nada"),
+    ///     then persists the sale and decrements stock inside one explicit
+    ///     transaction, aborting the whole thing if any decrement fails, so a
+    ///     sale is never registered without its stock actually coming off.
     /// </summary>
     public async Task<Result<Sale>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
     {
         if (command.Lines.Count == 0)
             return Result<Sale>.Failure(SalesError.EmptySaleLines, localizer[nameof(SalesError.EmptySaleLines)]);
+
+        if (!(await createSaleValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Sale>.Failure(SalesError.InvalidSaleLine, localizer[nameof(SalesError.InvalidSaleLine)]);
 
         if (command.CustomerId.HasValue)
         {
@@ -43,52 +48,77 @@ public class SaleCommandService(
                 return Result<Sale>.Failure(SalesError.CustomerNotFound, localizer[nameof(SalesError.CustomerNotFound)]);
         }
 
-        foreach (var line in command.Lines)
+        // Grouped by product, not per line: a POS that scans the same item
+        // twice produces two lines for one product, and checking each line
+        // independently against the same total stock lets their combined
+        // quantity exceed what actually exists.
+        foreach (var productLines in command.Lines.GroupBy(line => line.ProductId))
         {
             // Explicit existence check first (not just relying on the stock
-            // check below): a quantity-0 line for a product outside this
-            // business would otherwise pass "stock >= 0" silently and let a
-            // Sale reference a ProductId it doesn't own.
-            if (!await productContextFacade.ProductExists(line.ProductId, cancellationToken))
+            // check below): a product outside this business would otherwise
+            // be caught only by "stock >= quantity" and report the wrong
+            // reason, and could let a Sale reference a ProductId it doesn't own.
+            if (!await productContextFacade.ProductExists(productLines.Key, cancellationToken))
                 return Result<Sale>.Failure(SalesError.ProductNotFound, localizer[nameof(SalesError.ProductNotFound)]);
 
-            var availableStock = await productContextFacade.GetAvailableStock(line.ProductId, cancellationToken);
-            if (availableStock < line.Quantity)
+            var requestedQuantity = productLines.Sum(line => line.Quantity);
+            var availableStock = await productContextFacade.GetAvailableStock(productLines.Key, cancellationToken);
+            if (availableStock < requestedQuantity)
                 return Result<Sale>.Failure(SalesError.InsufficientStock, localizer[nameof(SalesError.InsufficientStock)]);
         }
 
-        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        Sale sale;
+        await using (var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken))
         {
-            var sale = new Sale(command.BusinessId, command.CustomerId, command.PaymentMethod, command.Currency,
-                command.Description);
-            foreach (var line in command.Lines)
-                sale.AddLine(line.ProductId, line.Quantity, line.UnitPrice, line.Discount);
+            try
+            {
+                sale = new Sale(command.BusinessId, command.CustomerId, command.PaymentMethod, command.Currency,
+                    command.Description);
+                foreach (var line in command.Lines)
+                    sale.AddLine(line.ProductId, line.Quantity, line.UnitPrice, line.Discount);
 
-            await saleRepository.AddAsync(sale, cancellationToken);
-            await unitOfWork.CompleteAsync(cancellationToken);
+                await saleRepository.AddAsync(sale, cancellationToken);
+                await unitOfWork.CompleteAsync(cancellationToken);
 
-            foreach (var line in command.Lines)
-                await productContextFacade.DecrementStock(line.ProductId, command.BusinessId, line.Quantity, cancellationToken);
+                foreach (var line in command.Lines)
+                {
+                    // The pre-check above can still be beaten by a concurrent
+                    // sale, so this is the authoritative one — the sale is only
+                    // real if every unit actually came off inventory.
+                    var decremented = await productContextFacade.DecrementStock(line.ProductId, command.BusinessId,
+                        line.Quantity, cancellationToken);
+                    if (decremented) continue;
 
-            await transaction.CommitAsync(cancellationToken);
+                    await transaction.RollbackAsync(cancellationToken);
+                    logger.LogWarning(
+                        "Sale for business {BusinessId} rolled back: stock for product {ProductId} could not be decremented by {Quantity}",
+                        command.BusinessId, line.ProductId, line.Quantity);
+                    return Result<Sale>.Failure(SalesError.InsufficientStock,
+                        localizer[nameof(SalesError.InsufficientStock)]);
+                }
 
-            var lines = command.Lines.Select(line => (line.ProductId, line.Quantity)).ToList();
-            await mediator.PublishAsync(new SaleRegisteredEvent(sale.Id, sale.BusinessId, lines), cancellationToken);
-
-            logger.LogInformation(
-                "Sale {SaleId} registered for business {BusinessId}: {LineCount} line(s), total {TotalAmount} {Currency}, payment method {PaymentMethod}",
-                sale.Id, sale.BusinessId, command.Lines.Count, sale.TotalAmount, sale.Currency, sale.PaymentMethod);
-
-            return Result<Sale>.Success(sale);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                logger.LogError(exception, "Failed to register sale for business {BusinessId} ({LineCount} line(s))",
+                    command.BusinessId, command.Lines.Count);
+                return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
+            }
         }
-        catch (Exception exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            logger.LogError(exception, "Failed to register sale for business {BusinessId} ({LineCount} line(s))",
-                command.BusinessId, command.Lines.Count);
-            return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
-        }
+
+        // Deliberately outside the try/transaction: the sale is already
+        // committed at this point, so a failure publishing the event or
+        // writing the log must not trigger a rollback of a closed transaction.
+        var eventLines = command.Lines.Select(line => (line.ProductId, line.Quantity)).ToList();
+        await mediator.PublishAsync(new SaleRegisteredEvent(sale.Id, sale.BusinessId, eventLines), cancellationToken);
+
+        logger.LogInformation(
+            "Sale {SaleId} registered for business {BusinessId}: {LineCount} line(s), total {TotalAmount} {Currency}, payment method {PaymentMethod}",
+            sale.Id, sale.BusinessId, command.Lines.Count, sale.TotalAmount, sale.Currency, sale.PaymentMethod);
+
+        return Result<Sale>.Success(sale);
     }
 
     public async Task<Result<Sale>> Handle(UpdateSaleStatusCommand command, CancellationToken cancellationToken)
