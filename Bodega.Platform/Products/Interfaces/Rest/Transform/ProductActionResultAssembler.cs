@@ -54,6 +54,8 @@ public static class ProductActionResultAssembler
             ProductError.WarehouseRequired => StatusCodes.Status400BadRequest,
             ProductError.InvalidExpirationDate => StatusCodes.Status400BadRequest,
             ProductError.InvalidPurchasePrice => StatusCodes.Status400BadRequest,
+            ProductError.BatchNotFound => StatusCodes.Status404NotFound,
+            ProductError.BatchAlreadyDiscarded => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

@@ -34,6 +34,7 @@ public static class AlertsActionResultAssembler
             AlertsError.AlertAlreadyResolved => StatusCodes.Status409Conflict,
             AlertsError.InvalidThreshold => StatusCodes.Status400BadRequest,
             AlertsError.InvalidAlertData => StatusCodes.Status400BadRequest,
+            AlertsError.ProductNotFound => StatusCodes.Status404NotFound,
             _ => StatusCodes.Status500InternalServerError
         };
     }

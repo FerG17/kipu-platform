@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.Extensions.Localization;
+using Bodega.Platform.Products.Interfaces.Acl;
 using Bodega.Platform.Alerts.Application.CommandServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Model.Commands;
@@ -15,6 +16,7 @@ public class AlertCommandService(
     IAlertRepository alertRepository,
     IUnitOfWork unitOfWork,
     IValidator<CreateAlertCommand> createAlertValidator,
+    IProductContextFacade productContextFacade,
     IStringLocalizer<AlertsMessages> localizer)
     : IAlertCommandService
 {
@@ -23,6 +25,16 @@ public class AlertCommandService(
     {
         if (!(await createAlertValidator.ValidateAsync(command, cancellationToken)).IsValid)
             return Result<Alert>.Failure(AlertsError.InvalidAlertData, localizer[nameof(AlertsError.InvalidAlertData)]);
+
+        // ProductId arrived straight from the request body with no ownership
+        // check — the only command service here that skipped it. An admin
+        // could name another business's product, and because the alert lookup
+        // ignores query filters (a product id is globally unique, so the
+        // match is exact), that other business's own alert handler would then
+        // find this row as the "existing" one and refresh it instead of
+        // creating theirs — quietly suppressing their alert.
+        if (!await productContextFacade.ProductExists(command.ProductId, cancellationToken))
+            return Result<Alert>.Failure(AlertsError.ProductNotFound, localizer[nameof(AlertsError.ProductNotFound)]);
 
         var alert = new Alert(command.BusinessId, command.ProductId, command.BatchId, command.ProductName, command.Type,
             command.Severity, command.Message, command.CurrentStock, command.MinStock, command.DaysToExpiry,

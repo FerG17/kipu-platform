@@ -44,9 +44,15 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
         return ExpirationRules.IsExpired(Expiration, today);
     }
 
-    public bool IsExpiringSoon(DateOnly today)
+    /// <summary>
+    ///     thresholdDays defaults to the platform-wide value, but callers
+    ///     that can reach the business's AlertRule should pass its configured
+    ///     one — otherwise this answers "not expiring soon" for a batch that
+    ///     already has a live EXPIRATION alert against it.
+    /// </summary>
+    public bool IsExpiringSoon(DateOnly today, int thresholdDays = ExpirationRules.ExpiringSoonThresholdDays)
     {
-        return ExpirationRules.IsExpiringSoon(Expiration, today);
+        return ExpirationRules.IsExpiringSoon(Expiration, today, thresholdDays);
     }
 
     public Batch UpdateDetails(DateOnly? expiration, decimal purchasePrice, int? inventoryId)
@@ -54,6 +60,21 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
         Expiration = expiration;
         PurchasePrice = purchasePrice;
         InventoryId = inventoryId ?? InventoryId;
+        return this;
+    }
+
+    /// <summary>
+    ///     Retires the batch — the goods were thrown out, returned to the
+    ///     supplier, or otherwise taken off the shelf.
+    ///
+    ///     Until this existed there was no way to stop an expired batch from
+    ///     alerting. It stayed ACTIVE forever, so the periodic sweep raised
+    ///     the same "venció" alert again within hours of every time it was
+    ///     resolved, and the shop had no way to make it stop.
+    /// </summary>
+    public Batch Discard()
+    {
+        Status = BatchStatus.Inactive;
         return this;
     }
 }
