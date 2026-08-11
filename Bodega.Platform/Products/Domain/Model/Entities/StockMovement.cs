@@ -25,7 +25,8 @@ public class StockMovement(
     int quantity,
     string type,
     string supplier,
-    string note)
+    string note,
+    int? supplierId = null)
 {
     public StockMovement() : this(0, 0, 0, 0, StockMovementType.Intake, string.Empty, string.Empty)
     {
@@ -37,7 +38,26 @@ public class StockMovement(
     public int WarehouseId { get; private set; } = warehouseId;
     public int Quantity { get; private set; } = quantity;
     public string Type { get; private set; } = type;
+
+    /// <summary>
+    ///     The supplier's name as it stood when the goods arrived — kept for
+    ///     display, so a historical movement still reads correctly even after
+    ///     the supplier is renamed. Never use it to filter; that is what
+    ///     SupplierId is for.
+    /// </summary>
     public string Supplier { get; private set; } = supplier;
+
+    /// <summary>
+    ///     Stable reference to the supplier, for filtering reports.
+    ///
+    ///     Reports used to filter by matching the Supplier text above against
+    ///     the supplier's current name, so renaming a supplier orphaned every
+    ///     movement it had already produced and the report came back silently
+    ///     empty. Null for movements with no supplier (sales, returns, manual
+    ///     intakes) and for rows created before this column existed.
+    /// </summary>
+    public int? SupplierId { get; private set; } = supplierId;
+
     public string Note { get; private set; } = note;
     public DateTimeOffset RegisteredAt { get; private set; } = DateTimeOffset.UtcNow;
 }

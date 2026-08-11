@@ -15,4 +15,5 @@ public record RegisterStockIntakeCommand(
     DateOnly? Expiration,
     string? Supplier,
     string? Note,
-    int? MinimumStock);
+    int? MinimumStock,
+    int? SupplierId = null);

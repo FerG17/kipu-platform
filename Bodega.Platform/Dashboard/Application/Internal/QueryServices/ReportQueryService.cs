@@ -116,24 +116,21 @@ public class ReportQueryService(
     }
 
     /// <summary>
-    ///     Applies the third filter (supplier) that IProductContextFacade
-    ///     doesn't know about — StockMovement.Supplier is free text, so this
-    ///     resolves the supplier's display name via ISupplierContextFacade
-    ///     and matches it against that text, rather than joining on an id
-    ///     Products has no knowledge of.
+    ///     All three filters are applied in the query now. The supplier one
+    ///     used to be applied here in memory, matching the supplier's current
+    ///     name against the name snapshot stored on each movement — so
+    ///     renaming a supplier silently emptied its report. The name is still
+    ///     resolved, but only to label the PDF's filter summary.
     /// </summary>
     private async Task<(IReadOnlyCollection<StockMovementReportLine> Lines, string? ProductName, string? SupplierName)>
         GetStockMovementLines(Report report, CancellationToken cancellationToken)
     {
         var lines = await productContextFacade.GetStockMovementsForReport(report.BusinessId, report.DateFrom, report.DateTo,
-            report.ProductId, cancellationToken);
+            report.ProductId, report.SupplierId, cancellationToken);
 
         string? supplierName = null;
         if (report.SupplierId.HasValue)
-        {
             supplierName = await supplierContextFacade.GetSupplierName(report.SupplierId.Value, cancellationToken);
-            lines = lines.Where(line => string.Equals(line.Supplier, supplierName, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
 
         // Derived from a matching line rather than a direct lookup (the facade
         // has no "get product name by id" today) — falls back to the raw id
