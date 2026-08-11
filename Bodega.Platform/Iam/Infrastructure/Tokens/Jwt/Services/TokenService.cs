@@ -23,7 +23,10 @@ public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
     public string GenerateToken(User user, string roleName)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_tokenSettings.Secret);
+        // UTF8, not ASCII: ASCII silently replaces every non-ASCII byte with
+        // '?', so a secret with accents or symbols would collapse to far less
+        // entropy than it looks like it has.
+        var key = Encoding.UTF8.GetBytes(_tokenSettings.Secret);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
@@ -48,7 +51,10 @@ public class TokenService(IOptions<TokenSettings> tokenSettings) : ITokenService
         if (string.IsNullOrEmpty(token)) return null;
 
         var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_tokenSettings.Secret);
+        // UTF8, not ASCII: ASCII silently replaces every non-ASCII byte with
+        // '?', so a secret with accents or symbols would collapse to far less
+        // entropy than it looks like it has.
+        var key = Encoding.UTF8.GetBytes(_tokenSettings.Secret);
 
         try
         {

@@ -210,7 +210,21 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // IAM Bounded Context
 
-builder.Services.Configure<TokenSettings>(builder.Configuration.GetSection("TokenSettings"));
+// The JWT signing key uses the same %VAR% placeholder convention as the
+// connection string above, so it needs the same expansion — this was
+// missing, which silently turned the literal placeholder into the HMAC key
+// (see JwtSecretGuard for the full story). Validated eagerly here so a
+// misconfigured deployment crashes at startup instead of booting with a
+// publicly known key.
+var tokenSettings = builder.Configuration.GetSection("TokenSettings").Get<TokenSettings>() ?? new TokenSettings();
+tokenSettings.Secret = Environment.ExpandEnvironmentVariables(tokenSettings.Secret);
+JwtSecretGuard.EnsureUsable(tokenSettings.Secret);
+
+builder.Services.Configure<TokenSettings>(settings =>
+{
+    settings.Secret = tokenSettings.Secret;
+    settings.ExpirationDays = tokenSettings.ExpirationDays;
+});
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IBusinessRepository, BusinessRepository>();
