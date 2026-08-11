@@ -8,6 +8,7 @@ public enum IamError
     BusinessNotFound,
     CurrentPasswordInvalid,
     WeakPassword,
+    RoleNotFound,
     OperationCancelled,
     DatabaseError,
     InternalServerError

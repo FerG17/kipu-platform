@@ -62,6 +62,14 @@ public class PurchaseOrderCommandService(
             return Result<PurchaseOrder>.Failure(SuppliersError.PurchaseOrderNotFound,
                 localizer[nameof(SuppliersError.PurchaseOrderNotFound)]);
 
+        // A received or cancelled order is final. Without this guard, a second
+        // "RECEIVED" — a double click is enough — ran the stock intake again
+        // and booked the same delivery into inventory twice, leaving
+        // duplicate StockMovements in the entradas/salidas report.
+        if (purchaseOrder.Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Cancelled)
+            return Result<PurchaseOrder>.Failure(SuppliersError.InvalidStatusTransition,
+                localizer[nameof(SuppliersError.InvalidStatusTransition)]);
+
         switch (command.Status)
         {
             case PurchaseOrderStatus.Received:
