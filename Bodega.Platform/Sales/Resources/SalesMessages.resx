@@ -59,6 +59,9 @@
   <data name="EmptySaleLines" xml:space="preserve">
     <value>A sale must have at least one line.</value>
   </data>
+  <data name="InvalidStatusTransition" xml:space="preserve">
+    <value>The only status a sale can be moved to is CANCELLED.</value>
+  </data>
   <data name="InvalidSaleLine" xml:space="preserve">
     <value>Every sale line needs a quantity above zero, a non-negative unit price, and a discount between 0 and 1.</value>
   </data>
