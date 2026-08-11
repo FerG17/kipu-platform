@@ -102,7 +102,8 @@ public class InventoryCommandService(
         {
             await stockMovementRepository.AddAsync(
                 new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, command.Quantity,
-                    StockMovementType.Intake, command.Supplier ?? string.Empty, command.Note ?? string.Empty),
+                    StockMovementType.Intake, command.Supplier ?? string.Empty, command.Note ?? string.Empty,
+                    command.SupplierId),
                 cancellationToken);
         }
 

@@ -108,7 +108,7 @@ public class PurchaseOrderCommandService(
             {
                 var note = $"Orden de compra #{purchaseOrder.Id}";
                 await productContextFacade.RegisterStockIntake(line.ProductId, purchaseOrder.BusinessId, line.Quantity,
-                    line.UnitPrice, supplierName, note, cancellationToken);
+                    line.UnitPrice, supplierName, note, purchaseOrder.SupplierId, cancellationToken);
             }
 
             await transaction.CommitAsync(cancellationToken);

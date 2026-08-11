@@ -41,7 +41,7 @@ public interface IProductContextFacade
     ///     limitation as RegisterStockSaleCommand — see InventoryCommandService).
     /// </summary>
     Task RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice, string? supplier,
-        string? note, CancellationToken cancellationToken);
+        string? note, int? supplierId, CancellationToken cancellationToken);
 
     Task<bool> ProductExists(int productId, CancellationToken cancellationToken);
 
@@ -60,16 +60,18 @@ public interface IProductContextFacade
     Task<IReadOnlyCollection<TopStockProductInfo>> GetTopStockProducts(int businessId, int count, CancellationToken cancellationToken);
 
     /// <summary>
-    ///     Stock movements ("entradas/salidas") for the Dashboard "STOCK_MOVEMENTS"
-    ///     report — dateFrom/dateTo/productId are all optional and combinable.
-    ///     Product names are resolved here so Dashboard never needs its own
-    ///     Product lookup. supplierId filtering happens in Dashboard itself
-    ///     (via ISupplierContextFacade, matching the free-text Supplier field
-    ///     stored on StockMovement) — this method only applies the two filters
-    ///     that live directly on StockMovement/Product.
+    ///     Stock movements ("entradas/salidas") for the Dashboard
+    ///     "STOCK_MOVEMENTS" report — all four filters are optional and
+    ///     combinable. Product names are resolved here so Dashboard never
+    ///     needs its own Product lookup.
+    ///
+    ///     The supplier filter used to live in Dashboard, matching the
+    ///     supplier's current name against the free-text name snapshot on
+    ///     each movement; renaming a supplier therefore orphaned its whole
+    ///     history. It is applied here now, against the stable SupplierId.
     /// </summary>
     Task<IReadOnlyCollection<StockMovementReportLine>> GetStockMovementsForReport(int businessId, DateOnly? dateFrom,
-        DateOnly? dateTo, int? productId, CancellationToken cancellationToken);
+        DateOnly? dateTo, int? productId, int? supplierId, CancellationToken cancellationToken);
 }
 
 public record ProductKpisSnapshot(int TotalProducts, int LowStockCount, int ExpiringSoonCount, decimal InventoryValue);
