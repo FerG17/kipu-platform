@@ -24,6 +24,13 @@ public interface IProductContextFacade
     /// </summary>
     Task<bool> DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken);
 
+    /// <summary>
+    ///     Puts units back after a sale is cancelled — the goods returned to
+    ///     the shelf, so the stock has to return with them. Called by Sales &amp;
+    ///     POS when a sale is cancelled.
+    /// </summary>
+    Task<bool> RestoreStock(int productId, int businessId, int quantity, CancellationToken cancellationToken);
+
     /// <summary>Total stock for a product across every warehouse — used by Sales &amp; POS to validate a line before confirming a sale.</summary>
     Task<int> GetAvailableStock(int productId, CancellationToken cancellationToken);
 
