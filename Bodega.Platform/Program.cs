@@ -69,6 +69,7 @@ using Bodega.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Conf
 using Bodega.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Bodega.Platform.Shared.Infrastructure.Pipeline.Middleware.Extensions;
 using Bodega.Platform.Shared.Infrastructure.Security;
+using Bodega.Platform.Shared.Infrastructure.Time;
 using Bodega.Platform.Shared.Interfaces.Rest.ProblemDetails;
 using Bodega.Platform.Shared.Resources;
 
@@ -207,6 +208,11 @@ builder.Services.AddCortexMediator([typeof(Program)]);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Calendar dates ("today", "which sales belong to this day") must follow the
+// bodega's wall clock, not the server's UTC — see IBusinessClock.
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IBusinessClock, BusinessClock>();
 
 // IAM Bounded Context
 
