@@ -230,18 +230,19 @@ Terminadas las fases B0–B6, se auditó todo el backend con **tres agentes inde
 | #14 | `fix/api-correctness` | `PATCH /sales/{id}` ignoraba el status y siempre cancelaba; recibir una orden de compra dos veces duplicaba el stock; `InviteUser` aceptaba cualquier `roleId` → 500 |
 | #15 | `fix/timezone-handling` | Todo el sistema derivaba fechas de calendario desde UTC estando la bodega en UTC-5: después de las 19:00 locales las ventas caían en el reporte del día siguiente y un lote que vencía hoy se rechazaba como vencido. Nuevo `IBusinessClock` |
 | #16 | `fix/alerts-lifecycle` | Alertas de vencido que revivían cada 6h sin poder silenciarlas (nueva baja de lote); regla `EXPIRED` que nunca se consultaba; IDOR en `POST /alerts`; alertas que sobrevivían al producto desactivado; `isExpiringSoon` que ignoraba el umbral configurado |
+| #17 | `docs/audit-corrections` | Las cinco afirmaciones falsas de este documento, corregidas y marcadas |
+| #18 | `feature/restore-stock-on-sale-cancel` | **Decisión del dueño**: cancelar una venta devuelve el stock (así se manejaba en el proyecto universitario). Antes solo cambiaba el estado y las unidades quedaban descontadas para siempre. Nuevo `StockMovementType.Return` para no contaminar el reporte de entradas con compras fantasma |
+| #19 | `fix/report-supplier-filter-by-id` | El filtro de reportes por proveedor comparaba **nombres**, así que renombrar un proveedor vaciaba su historial en silencio. Nueva columna `SupplierId` en `StockMovement`; el nombre queda solo para mostrar |
 
 ### Estado de la red de seguridad
 
-`dotnet test` (con el MySQL de Docker levantado) corre **21 tests de integración** contra la API HTTP real. Cada uno de los que cubre un bug de la auditoría fue verificado **en rojo contra el código previo** antes de aceptarse como verde — un test que pasa desde el principio no prueba nada.
+`dotnet test` (con el MySQL de Docker levantado) corre **24 tests de integración** contra la API HTTP real. Cada uno de los que cubre un bug de la auditoría fue verificado **en rojo contra el código previo** antes de aceptarse como verde — un test que pasa desde el principio no prueba nada.
 
 Aislamiento entre tests por multi-tenancy (cada test hace su propio sign-up), sobre MySQL y no SQLite a propósito: dos de los bugs viven justo en comportamiento específico de MySQL (FK `RESTRICT`, límites de `decimal`) que un motor en memoria no reproduce.
 
 ### Pendientes conocidos, no cerrados
 
 - **Rate limiting detrás de proxy**: particiona por IP de conexión, que detrás de un proxy colapsa a un solo cupo compartido. Arreglarlo requiere `ForwardedHeaders`, y habilitarlo sin declarar proxies de confianza permite falsear la IP vía `X-Forwarded-For` — queda peor que ahora. Necesita la topología real → **va con el despliegue** (Fase X3).
-- **Cancelar una venta no devuelve el stock**: es una decisión de negocio (¿la mercadería volvió?), no un bug obvio. A definir con el dueño.
-- **Filtro de reporte por proveedor**: hace matching por *nombre* contra el texto libre de `StockMovement.Supplier`, así que renombrar un proveedor deja huérfanos sus movimientos previos. La solución correcta es guardar `SupplierId` en `StockMovement`.
 - **Concurrencia**: varias operaciones son check-then-act sin token de concurrencia (cuotas, stock). Mitigado en ventas por el rollback del PR #12, pero no resuelto de fondo.
 - **Código muerto**: la auditoría inventarió bastante (métodos, errores de enum, eventos sin handler). No se limpió todavía.
 
