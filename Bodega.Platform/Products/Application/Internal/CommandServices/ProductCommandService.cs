@@ -76,6 +76,11 @@ public class ProductCommandService(
         product.Deactivate();
         productRepository.Update(product);
         await unitOfWork.CompleteAsync(cancellationToken);
+
+        // Lets Alerts close anything still open for it, so an alert never
+        // outlives the product it points at.
+        await mediator.PublishAsync(new ProductDeactivatedEvent(product.Id, product.BusinessId), cancellationToken);
+
         return Result.Success();
     }
 }

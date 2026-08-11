@@ -50,6 +50,9 @@
   <data name="InvalidThreshold" xml:space="preserve">
     <value>El umbral no puede ser negativo.</value>
   </data>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>Producto no encontrado.</value>
+  </data>
   <data name="InvalidAlertData" xml:space="preserve">
     <value>Datos de alerta inválidos — revisa los campos requeridos.</value>
   </data>

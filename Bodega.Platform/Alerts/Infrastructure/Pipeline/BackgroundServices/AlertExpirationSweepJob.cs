@@ -55,23 +55,26 @@ public class AlertExpirationSweepJob(
 
         var batches = await productContextFacade.GetAllActiveBatchesForExpirationSweep(cancellationToken);
         var today = businessClock.Today;
-        var rulesByBusiness = new Dictionary<int, int>();
+        var rulesByBusiness = new Dictionary<int, ExpirationRuleSettings>();
         var newAlerts = new List<Alert>();
 
         foreach (var batch in batches)
         {
-            if (!rulesByBusiness.TryGetValue(batch.BusinessId, out var thresholdDays))
+            // Cached per business, including the disabled case — a business
+            // with the rule turned off used to re-query the database for
+            // every single one of its batches.
+            if (!rulesByBusiness.TryGetValue(batch.BusinessId, out var rules))
             {
-                var rule = await alertRuleRepository.FindByBusinessIdAndTypeAsync(batch.BusinessId, AlertType.Expiration,
-                    cancellationToken);
-                if (rule is { Enabled: false }) continue;
-
-                thresholdDays = rule?.ThresholdValue ?? ExpirationRules.ExpiringSoonThresholdDays;
-                rulesByBusiness[batch.BusinessId] = thresholdDays;
+                rules = await LoadExpirationRules(alertRuleRepository, batch.BusinessId, cancellationToken);
+                rulesByBusiness[batch.BusinessId] = rules;
             }
 
-            var isExpired = ExpirationRules.IsExpired(batch.Expiration, today);
-            var isExpiringSoon = ExpirationRules.IsExpiringSoon(batch.Expiration, today, thresholdDays);
+            if (!rules.ExpiringSoonEnabled && !rules.ExpiredEnabled) continue;
+
+            var thresholdDays = rules.ThresholdDays;
+            var isExpired = ExpirationRules.IsExpired(batch.Expiration, today) && rules.ExpiredEnabled;
+            var isExpiringSoon = ExpirationRules.IsExpiringSoon(batch.Expiration, today, thresholdDays)
+                                 && rules.ExpiringSoonEnabled;
             var daysToExpiry = batch.Expiration?.DayNumber - today.DayNumber;
 
             var existingExpired = await alertRepository.FindActiveByProductAndTypeAsync(batch.ProductId, AlertType.Expired,
@@ -124,4 +127,25 @@ public class AlertExpirationSweepJob(
         foreach (var alert in newAlerts)
             await notificationDispatcher.NotifyAsync(alert, cancellationToken);
     }
+
+    /// <summary>
+    ///     EXPIRATION and EXPIRED are separate, independently switchable
+    ///     rules; only the first used to be read, so turning EXPIRED off did
+    ///     nothing and turning EXPIRATION off silently killed both.
+    /// </summary>
+    private static async Task<ExpirationRuleSettings> LoadExpirationRules(IAlertRuleRepository alertRuleRepository,
+        int businessId, CancellationToken cancellationToken)
+    {
+        var expiringSoonRule = await alertRuleRepository.FindByBusinessIdAndTypeAsync(businessId, AlertType.Expiration,
+            cancellationToken);
+        var expiredRule = await alertRuleRepository.FindByBusinessIdAndTypeAsync(businessId, AlertType.Expired,
+            cancellationToken);
+
+        return new ExpirationRuleSettings(
+            expiringSoonRule?.Enabled ?? true,
+            expiredRule?.Enabled ?? true,
+            expiringSoonRule?.ThresholdValue ?? ExpirationRules.ExpiringSoonThresholdDays);
+    }
+
+    private readonly record struct ExpirationRuleSettings(bool ExpiringSoonEnabled, bool ExpiredEnabled, int ThresholdDays);
 }

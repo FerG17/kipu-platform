@@ -27,11 +27,19 @@ public class BatchRegisteredEventHandler(
 {
     public async Task Handle(BatchRegisteredEvent domainEvent, CancellationToken cancellationToken)
     {
-        var rule = await alertRuleRepository.FindByBusinessIdAndTypeAsync(domainEvent.BusinessId, AlertType.Expiration,
-            cancellationToken);
-        if (rule is { Enabled: false }) return;
+        // Two independent rules: EXPIRATION governs the "about to expire"
+        // warning, EXPIRED the "already expired" one. Only the first used to
+        // be read, so turning EXPIRED off did nothing at all, and turning
+        // EXPIRATION off silently killed both.
+        var expiringSoonRule = await alertRuleRepository.FindByBusinessIdAndTypeAsync(domainEvent.BusinessId,
+            AlertType.Expiration, cancellationToken);
+        var expiredRule = await alertRuleRepository.FindByBusinessIdAndTypeAsync(domainEvent.BusinessId,
+            AlertType.Expired, cancellationToken);
+        var expiringSoonEnabled = expiringSoonRule?.Enabled ?? true;
+        var expiredEnabled = expiredRule?.Enabled ?? true;
+        if (!expiringSoonEnabled && !expiredEnabled) return;
 
-        var thresholdDays = rule?.ThresholdValue ?? ExpirationRules.ExpiringSoonThresholdDays;
+        var thresholdDays = expiringSoonRule?.ThresholdValue ?? ExpirationRules.ExpiringSoonThresholdDays;
         var today = businessClock.Today;
 
         var existingExpired = await alertRepository.FindActiveByProductAndTypeAsync(domainEvent.ProductId, AlertType.Expired,
@@ -39,8 +47,8 @@ public class BatchRegisteredEventHandler(
         var existingExpiringSoon = await alertRepository.FindActiveByProductAndTypeAsync(domainEvent.ProductId,
             AlertType.Expiration, domainEvent.BatchId, null, cancellationToken);
 
-        var isExpired = ExpirationRules.IsExpired(domainEvent.Expiration, today);
-        var isExpiringSoon = ExpirationRules.IsExpiringSoon(domainEvent.Expiration, today, thresholdDays);
+        var isExpired = ExpirationRules.IsExpired(domainEvent.Expiration, today) && expiredEnabled;
+        var isExpiringSoon = ExpirationRules.IsExpiringSoon(domainEvent.Expiration, today, thresholdDays) && expiringSoonEnabled;
         var daysToExpiry = domainEvent.Expiration?.DayNumber - today.DayNumber;
 
         Alert? newAlert = null;

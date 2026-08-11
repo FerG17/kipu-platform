@@ -6,5 +6,6 @@ public enum AlertsError
     AlertAlreadyResolved,
     InvalidThreshold,
     InvalidAlertData,
+    ProductNotFound,
     DatabaseError
 }

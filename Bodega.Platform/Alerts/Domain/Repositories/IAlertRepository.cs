@@ -17,4 +17,10 @@ public interface IAlertRepository : IBaseRepository<Alert>
     /// </summary>
     Task<Alert?> FindActiveByProductAndTypeAsync(int productId, string type, int? batchId, int? warehouseId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Every still-open alert raised for a batch — closed when the batch is discarded.</summary>
+    Task<IEnumerable<Alert>> FindActiveByBatchIdAsync(int batchId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every still-open alert raised for a product — closed when the product is deactivated.</summary>
+    Task<IEnumerable<Alert>> FindActiveByProductIdAsync(int productId, CancellationToken cancellationToken = default);
 }
