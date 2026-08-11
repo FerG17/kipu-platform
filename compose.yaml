@@ -1,4 +1,4 @@
-﻿services:
+services:
   bodega.platform:
     image: bodega.platform
     build:
@@ -12,18 +12,22 @@
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: dev_password
+      # Read from the untracked .env in this directory (Compose loads it
+      # automatically) — see .env.example. The value used to sit here in
+      # plain text, in a public repository.
+      MYSQL_ROOT_PASSWORD: ${BODEGA_DB_PASSWORD:?set BODEGA_DB_PASSWORD in .env, see .env.example}
       MYSQL_DATABASE: bodega_platform
     ports:
       - "3307:3306"
     volumes:
       - bodega-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdev_password"]
+      # $$ escapes the $ so Compose passes it through and the shell inside the
+      # container expands it, keeping the password out of the compose file.
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
   bodega-mysql-data:
-
