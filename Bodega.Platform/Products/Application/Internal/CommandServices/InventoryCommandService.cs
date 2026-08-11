@@ -106,6 +106,25 @@ public class InventoryCommandService(
 
         await unitOfWork.CompleteAsync(cancellationToken);
 
+        // Batch data the caller supplied used to be accepted and then thrown
+        // away: this handler never touched batchRepository, so registering
+        // goods through the natural "stock intake" path left no batch, no
+        // traceability, and no expiration alert could ever fire for them —
+        // breaking the core "every product has an expiration date" rule.
+        // Delegating keeps the upsert-in-place semantics and fires
+        // BatchRegisteredEvent, so Alerts reacts exactly as it does when the
+        // batch is registered directly.
+        if (command.Expiration.HasValue || command.PurchasePrice.HasValue)
+        {
+            var batchResult = await Handle(
+                new CreateOrUpdateBatchCommand(command.ProductId, command.BusinessId, command.Expiration,
+                    command.PurchasePrice ?? 0m, item.Id),
+                cancellationToken);
+
+            if (batchResult.IsFailure)
+                return Result<InventoryItem>.Failure(batchResult.Error!, batchResult.Message);
+        }
+
         await PublishStockLevelChangedEvent(item, cancellationToken);
 
         return Result<InventoryItem>.Success(item);
