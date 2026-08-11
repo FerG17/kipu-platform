@@ -399,3 +399,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>
+///     Exposed so the integration test project can boot the real application
+///     through WebApplicationFactory&lt;Program&gt; — top-level statements would
+///     otherwise leave this class internal.
+/// </summary>
+public partial class Program;
