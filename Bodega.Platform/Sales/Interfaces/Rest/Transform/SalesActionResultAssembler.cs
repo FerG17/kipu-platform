@@ -46,6 +46,7 @@ public static class SalesActionResultAssembler
             SalesError.InsufficientStock => StatusCodes.Status409Conflict,
             SalesError.SaleAlreadyCancelled => StatusCodes.Status409Conflict,
             SalesError.EmptySaleLines => StatusCodes.Status400BadRequest,
+            SalesError.InvalidSaleLine => StatusCodes.Status400BadRequest,
             SalesError.PaymentPlanNotFound => StatusCodes.Status404NotFound,
             SalesError.PaymentPlanAlreadyExists => StatusCodes.Status409Conflict,
             SalesError.InstallmentsFullyPaid => StatusCodes.Status409Conflict,
