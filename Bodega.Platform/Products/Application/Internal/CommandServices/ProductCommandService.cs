@@ -45,7 +45,23 @@ public class ProductCommandService(
         return Result<Product>.Success(product);
     }
 
-    /// <summary>Business rule: deletion is blocked while any InventoryItem for this product still has stock.</summary>
+    /// <summary>
+    ///     Deactivates the product rather than physically deleting it.
+    ///
+    ///     A hard delete could never actually succeed: alerts, sale lines and
+    ///     purchase lines all hold RESTRICT foreign keys to products, so the
+    ///     database refused the delete and the request died as an unhandled
+    ///     DbUpdateException (a 500 to the caller). The only product that got
+    ///     past the "still has stock" guard below was one sitting at zero —
+    ///     which is precisely the one the alert engine has just flagged
+    ///     OUT_OF_STOCK, guaranteeing the crash.
+    ///
+    ///     Soft delete is also the right domain answer regardless: a product
+    ///     that has ever been sold has to stay resolvable, or historical sales
+    ///     and reports lose the item they refer to. Product already modelled
+    ///     this (ProductStatus.Inactive, Deactivate(), IsActive) — it was
+    ///     simply never wired up.
+    /// </summary>
     public async Task<Result> Handle(DeleteProductCommand command, CancellationToken cancellationToken)
     {
         var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
@@ -57,7 +73,8 @@ public class ProductCommandService(
             return Result.Failure(ProductError.CannotDeleteWithStock,
                 localizer[nameof(ProductError.CannotDeleteWithStock)]);
 
-        productRepository.Remove(product);
+        product.Deactivate();
+        productRepository.Update(product);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result.Success();
     }
