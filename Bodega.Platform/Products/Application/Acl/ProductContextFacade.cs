@@ -28,9 +28,11 @@ public class ProductContextFacade(
         return result.IsSuccess ? result.Value!.Id : 0;
     }
 
-    public async Task DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken)
+    public async Task<bool> DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken)
     {
-        await inventoryCommandService.Handle(new RegisterStockSaleCommand(productId, businessId, quantity), cancellationToken);
+        var result = await inventoryCommandService.Handle(new RegisterStockSaleCommand(productId, businessId, quantity),
+            cancellationToken);
+        return result.IsSuccess;
     }
 
     public async Task<int> GetAvailableStock(int productId, CancellationToken cancellationToken)
