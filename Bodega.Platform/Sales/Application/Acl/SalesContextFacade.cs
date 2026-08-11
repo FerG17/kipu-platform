@@ -1,10 +1,11 @@
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Sales.Domain.Model.Aggregates;
 using Bodega.Platform.Sales.Domain.Repositories;
 using Bodega.Platform.Sales.Interfaces.Acl;
 
 namespace Bodega.Platform.Sales.Application.Acl;
 
-public class SalesContextFacade(ISaleRepository saleRepository) : ISalesContextFacade
+public class SalesContextFacade(ISaleRepository saleRepository, IBusinessClock businessClock) : ISalesContextFacade
 {
     public async Task<decimal> GetTotalRevenue(int businessId, DateOnly? dateFrom, DateOnly? dateTo, CancellationToken cancellationToken)
     {
@@ -16,7 +17,7 @@ public class SalesContextFacade(ISaleRepository saleRepository) : ISalesContextF
     {
         var sales = await saleRepository.FindAllByBusinessIdAsync(businessId, dateFrom, dateTo, cancellationToken);
         return sales.Where(sale => sale.Status == SaleStatus.Paid)
-            .GroupBy(sale => DateOnly.FromDateTime(sale.Date.UtcDateTime))
+            .GroupBy(sale => businessClock.ToLocalDate(sale.Date))
             .Select(group => (Date: group.Key, Total: group.Sum(sale => sale.TotalAmount)))
             .OrderBy(entry => entry.Date)
             .ToList();

@@ -1,3 +1,4 @@
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
@@ -19,7 +20,8 @@ namespace Bodega.Platform.Alerts.Infrastructure.Pipeline.BackgroundServices;
 public class AlertExpirationSweepJob(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
-    ILogger<AlertExpirationSweepJob> logger)
+    ILogger<AlertExpirationSweepJob> logger,
+    IBusinessClock businessClock)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,7 +54,7 @@ public class AlertExpirationSweepJob(
         var notificationDispatcher = scope.ServiceProvider.GetRequiredService<IAlertNotificationDispatcher>();
 
         var batches = await productContextFacade.GetAllActiveBatchesForExpirationSweep(cancellationToken);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = businessClock.Today;
         var rulesByBusiness = new Dictionary<int, int>();
         var newAlerts = new List<Alert>();
 

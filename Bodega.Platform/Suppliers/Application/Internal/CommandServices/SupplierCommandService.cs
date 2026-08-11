@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Localization;
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Application.Model;
 using Bodega.Platform.Shared.Domain.Repositories;
 using Bodega.Platform.Suppliers.Application.CommandServices;
@@ -13,13 +14,14 @@ namespace Bodega.Platform.Suppliers.Application.Internal.CommandServices;
 public class SupplierCommandService(
     ISupplierRepository supplierRepository,
     IUnitOfWork unitOfWork,
-    IStringLocalizer<SuppliersMessages> localizer)
+    IStringLocalizer<SuppliersMessages> localizer,
+    IBusinessClock businessClock)
     : ISupplierCommandService
 {
     public async Task<Result<Supplier>> Handle(CreateSupplierCommand command, CancellationToken cancellationToken)
     {
         var supplier = new Supplier(command.BusinessId, command.Name, command.LastName, command.Ruc, command.Email,
-            command.Phone, command.Address, command.ContactPerson, command.Category, DateOnly.FromDateTime(DateTime.UtcNow));
+            command.Phone, command.Address, command.ContactPerson, command.Category, businessClock.Today);
         await supplierRepository.AddAsync(supplier, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<Supplier>.Success(supplier);

@@ -22,7 +22,8 @@ public class BatchesController(
     IBatchQueryService batchQueryService,
     IInventoryCommandService inventoryCommandService,
     ICurrentUserAccessor currentUserAccessor,
-    ProblemDetailsFactory problemDetailsFactory)
+    ProblemDetailsFactory problemDetailsFactory,
+    IBusinessClock businessClock)
     : ControllerBase
 {
     /// <summary>Lists all batches for the business (used to compute business-wide expiration alerts), or for a single product when ?productId= is given.</summary>
@@ -37,7 +38,7 @@ public class BatchesController(
             ? await batchQueryService.Handle(new GetAllBatchesByProductIdQuery(productId.Value), cancellationToken)
             : await batchQueryService.Handle(new GetAllBatchesByBusinessIdQuery(businessId.Value), cancellationToken);
 
-        return Ok(batches.Select(BatchResourceFromEntityAssembler.ToResourceFromEntity));
+        return Ok(batches.Select(batch => BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today)));
     }
 
     /// <summary>Creates a batch, or updates the product's existing ACTIVE batch in place — see CreateOrUpdateBatchCommand.</summary>
@@ -54,6 +55,6 @@ public class BatchesController(
         var result = await inventoryCommandService.Handle(command, cancellationToken);
 
         return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
-            batch => Ok(BatchResourceFromEntityAssembler.ToResourceFromEntity(batch)));
+            batch => Ok(BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today)));
     }
 }

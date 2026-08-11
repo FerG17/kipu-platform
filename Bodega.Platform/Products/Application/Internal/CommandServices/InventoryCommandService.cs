@@ -1,6 +1,7 @@
 using Cortex.Mediator;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Domain.Model.Commands;
 using Bodega.Platform.Products.Domain.Model.Entities;
@@ -26,7 +27,8 @@ public class InventoryCommandService(
     IUnitOfWork unitOfWork,
     IMediator mediator,
     IValidator<CreateOrUpdateBatchCommand> createOrUpdateBatchValidator,
-    IStringLocalizer<ProductMessages> localizer)
+    IStringLocalizer<ProductMessages> localizer,
+    IBusinessClock businessClock)
     : IInventoryCommandService
 {
     /// <summary>
@@ -237,7 +239,7 @@ public class InventoryCommandService(
         if (product == null)
             return Result<Batch>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
 
-        if (command.Expiration.HasValue && command.Expiration.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+        if (command.Expiration.HasValue && command.Expiration.Value < businessClock.Today)
             return Result<Batch>.Failure(ProductError.InvalidExpirationDate,
                 localizer[nameof(ProductError.InvalidExpirationDate)]);
 
