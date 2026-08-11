@@ -75,14 +75,24 @@ Ya configurado y documentado aparte en `resumen_config_lector_YHD-1100CB.md` (mi
 
 ## Pendiente / próximos pasos
 
-1. **Modelo de dominio**: ajustar `Products`/lotes para fecha de vencimiento + alertas "profesionales", y `Sales` para el manejo de cuotas de crédito (cuántas cuotas, cuántas pagadas).
-2. **Migraciones de EF Core**: generar de cero (`dotnet ef migrations add`) una vez ajustado el modelo — no se portaron las migraciones viejas a propósito.
+1. ~~**Modelo de dominio**: ajustar `Products`/lotes para fecha de vencimiento + alertas "profesionales", y `Sales` para el manejo de cuotas de crédito.~~ **Hecho** (Fases B1, B2, B3 — ver `plan_desarrollo_bodega.md`).
+2. ~~**Migraciones de EF Core**: generar de cero.~~ **Hecho** (Fase B0, más las incrementales de cada fase posterior).
 3. **Integración del lector de código de barras** en el frontend (input enfocado + listener de Enter + confirmación de producto).
-4. **Roles y permisos** (admin/usuario/operario): mapear permisos exactos por módulo — pendiente, guardado como idea.
+4. ~~**Roles y permisos** (admin/usuario/operario): mapear permisos exactos por módulo.~~ **Hecho en el backend** (Fase B4: matriz completa sobre 19 controllers, con roles reales `ADMIN`/`CASHIER`/`WAREHOUSE`). Falta reflejarlo en la UI (Fase F6).
 5. **Diseño del frontend**: hay cambios de diseño pendientes de discutir (el usuario los mencionó pero se pospuso hasta avanzar el dominio del backend).
 6. **Nombre real de la bodega**: cuando se tenga, renombrar namespaces (`Bodega.Platform` → nombre final), `package.json`, nombre de base de datos, política CORS, y — importante — reemplazar el logo (`qullqa_logo.jpeg` todavía tiene "QULLQA" incrustado en la imagen).
 7. ~~Decidir si conviene branch protection u otras reglas en los repos públicos nuevos.~~ **Hecho (2026-08-10)**: se instaló y autenticó GitHub CLI, se creó la rama `develop` en `bodega-platform` (a partir de `main`), y se activó branch protection (PR obligatorio antes de mergear, sin force-push, sin borrado) en `main` y `develop` de `bodega-platform`, y en `main` de `bodega-webapp` (su `develop` se crea cuando arranque la fase de frontend).
-8. **Seguridad**: aplicar un enfoque estricto en capas (autenticación, aislamiento multi-tenant, hardening de API, frontend) — detallado como fases dedicadas en `plan_desarrollo_bodega.md`.
+8. **Seguridad**: aplicar un enfoque estricto en capas (autenticación, aislamiento multi-tenant, hardening de API, frontend) — detallado como fases dedicadas en `plan_desarrollo_bodega.md`. **Backend hecho** (Fase B0.5 + las correcciones de la auditoría, PRs #10–#16); falta la parte del frontend (Fase F0.5).
+
+## Estado actual (2026-08-11)
+
+**Backend completo** (Fases B0 a B6) y **auditado de forma independiente** por tres agentes sin contexto previo del desarrollo, que encontraron defectos críticos reales — todos corregidos en los PRs #10 a #16. Detalle completo en la sección "2.bis Auditoría independiente" de `plan_desarrollo_bodega.md`.
+
+Lo más grave que encontró la auditoría: el secreto JWT nunca se expandía desde su variable de entorno, así que en producción la clave de firma habría sido una cadena pública del repositorio — cualquiera podía haber forjado un token de administrador. No llegó a ser explotable porque el proyecto todavía no está desplegado.
+
+Hay una **red de seguridad de 21 tests de integración** (`dotnet test` con el MySQL de Docker levantado) contra la API HTTP real. Cada test que cubre un bug de la auditoría fue verificado en rojo contra el código previo antes de aceptarse.
+
+**Frontend sin empezar** — Fases F0 a F7 pendientes.
 
 ## Flujo de trabajo Git (bodega-platform)
 
