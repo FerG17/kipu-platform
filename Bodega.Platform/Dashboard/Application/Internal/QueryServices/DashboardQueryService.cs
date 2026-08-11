@@ -1,3 +1,4 @@
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Dashboard.Application.QueryServices;
 using Bodega.Platform.Dashboard.Domain.Model.Queries;
 using Bodega.Platform.Products.Interfaces.Acl;
@@ -11,7 +12,8 @@ namespace Bodega.Platform.Dashboard.Application.Internal.QueryServices;
 ///     Never reads from a stored `metrics`/snapshot table — the mock's
 ///     `/metrics` endpoint is dead and must not be replicated.
 /// </summary>
-public class DashboardQueryService(IProductContextFacade productContextFacade, ISalesContextFacade salesContextFacade)
+public class DashboardQueryService(IProductContextFacade productContextFacade, ISalesContextFacade salesContextFacade,
+    IBusinessClock businessClock)
     : IDashboardQueryService
 {
     public async Task<BusinessKpisResult> Handle(GetBusinessKpisQuery query, CancellationToken cancellationToken)
@@ -35,7 +37,7 @@ public class DashboardQueryService(IProductContextFacade productContextFacade, I
 
     public async Task<IReadOnlyCollection<SalesByDayResult>> Handle(GetSalesByDayQuery query, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = businessClock.Today;
         var dateFrom = query.DateFrom ?? today.AddDays(-6);
         var dateTo = query.DateTo ?? today;
 

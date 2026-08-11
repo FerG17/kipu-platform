@@ -3,6 +3,7 @@ using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
 using Bodega.Platform.Alerts.Domain.Model.Aggregates;
 using Bodega.Platform.Alerts.Domain.Repositories;
 using Bodega.Platform.Products.Domain.Model.Events;
+using Bodega.Platform.Shared.Application;
 using Bodega.Platform.Shared.Application.Internal.EventHandlers;
 using Bodega.Platform.Shared.Domain.Model.Services;
 using Bodega.Platform.Shared.Domain.Repositories;
@@ -20,7 +21,8 @@ public class BatchRegisteredEventHandler(
     IAlertRuleRepository alertRuleRepository,
     IUnitOfWork unitOfWork,
     IAlertNotificationDispatcher notificationDispatcher,
-    ILogger<BatchRegisteredEventHandler> logger)
+    ILogger<BatchRegisteredEventHandler> logger,
+    IBusinessClock businessClock)
     : IEventHandler<BatchRegisteredEvent>
 {
     public async Task Handle(BatchRegisteredEvent domainEvent, CancellationToken cancellationToken)
@@ -30,7 +32,7 @@ public class BatchRegisteredEventHandler(
         if (rule is { Enabled: false }) return;
 
         var thresholdDays = rule?.ThresholdValue ?? ExpirationRules.ExpiringSoonThresholdDays;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = businessClock.Today;
 
         var existingExpired = await alertRepository.FindActiveByProductAndTypeAsync(domainEvent.ProductId, AlertType.Expired,
             domainEvent.BatchId, null, cancellationToken);
