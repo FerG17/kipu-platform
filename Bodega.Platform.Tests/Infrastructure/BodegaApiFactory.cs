@@ -17,15 +17,20 @@ namespace Bodega.Platform.Tests.Infrastructure;
 /// </summary>
 public class BodegaApiFactory : WebApplicationFactory<Program>
 {
-    private const string TestConnectionString =
-        "server=localhost;port=3307;user=root;password=dev_password;database=bodega_platform_test";
-
-    /// <summary>Any value ≥ 32 bytes gets past JwtSecretGuard; it never leaves the test process.</summary>
+    /// <summary>Any value ≥ 32 bytes gets past JwtSecretGuard; generated for the suite, it never leaves the test process.</summary>
     private const string TestJwtSecret = "integration-test-signing-key-not-used-anywhere-else-0123456789";
 
     static BodegaApiFactory()
     {
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", TestConnectionString);
+        // The database password used to be a literal in this file, in a public
+        // repository. It comes from the same untracked .env Docker Compose
+        // reads, so the container and the suite cannot drift apart —
+        // see LocalEnvironment.
+        var databasePassword = LocalEnvironment.Require("BODEGA_DB_PASSWORD");
+        var testConnectionString =
+            $"server=localhost;port=3307;user=root;password={databasePassword};database=bodega_platform_test";
+
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", testConnectionString);
         Environment.SetEnvironmentVariable("TokenSettings__Secret", TestJwtSecret);
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 

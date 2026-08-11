@@ -270,7 +270,7 @@ builder.Services.AddSingleton<IBusinessClock, BusinessClock>();
 // publicly known key.
 var tokenSettings = builder.Configuration.GetSection("TokenSettings").Get<TokenSettings>() ?? new TokenSettings();
 tokenSettings.Secret = Environment.ExpandEnvironmentVariables(tokenSettings.Secret);
-JwtSecretGuard.EnsureUsable(tokenSettings.Secret, builder.Environment.IsDevelopment());
+JwtSecretGuard.EnsureUsable(tokenSettings.Secret);
 
 builder.Services.Configure<TokenSettings>(settings =>
 {
