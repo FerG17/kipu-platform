@@ -126,6 +126,15 @@ public class SaleCommandService(
         var sale = await saleRepository.FindByIdAsync(command.SaleId, cancellationToken);
         if (sale == null) return Result<Sale>.Failure(SalesError.SaleNotFound, localizer[nameof(SalesError.SaleNotFound)]);
 
+        // The requested status used to be ignored entirely: every call fell
+        // through to Cancel(), so asking to mark a sale PAID silently
+        // cancelled it and answered 200. Cancelling is still the only
+        // transition with any meaning (a sale is born PAID), but now the API
+        // says so instead of quietly doing something else.
+        if (command.Status != SaleStatus.Cancelled)
+            return Result<Sale>.Failure(SalesError.InvalidStatusTransition,
+                localizer[nameof(SalesError.InvalidStatusTransition)]);
+
         if (sale.Status == SaleStatus.Cancelled)
             return Result<Sale>.Failure(SalesError.SaleAlreadyCancelled, localizer[nameof(SalesError.SaleAlreadyCancelled)]);
 
