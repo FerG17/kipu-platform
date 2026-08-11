@@ -35,6 +35,7 @@ using Bodega.Platform.Dashboard.Application.QueryServices;
 using Bodega.Platform.Dashboard.Domain.Repositories;
 using Bodega.Platform.Dashboard.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Bodega.Platform.Dashboard.Resources;
+using Bodega.Platform.Alerts.Application.Acl;
 using Bodega.Platform.Alerts.Application.CommandServices;
 using Bodega.Platform.Alerts.Application.Internal.CommandServices;
 using Bodega.Platform.Alerts.Application.Internal.OutboundServices;
@@ -44,6 +45,7 @@ using Bodega.Platform.Alerts.Domain.Repositories;
 using Bodega.Platform.Alerts.Infrastructure.Notifications;
 using Bodega.Platform.Alerts.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Bodega.Platform.Alerts.Infrastructure.Pipeline.BackgroundServices;
+using Bodega.Platform.Alerts.Interfaces.Acl;
 using Bodega.Platform.Alerts.Resources;
 using Bodega.Platform.Sales.Application.CommandServices;
 using Bodega.Platform.Sales.Application.Internal.CommandServices;
@@ -118,6 +120,14 @@ builder.Services.AddCors(options =>
 // Rate limiting — a global per-IP budget for the whole API, plus a much
 // stricter policy for authentication endpoints specifically (sign-in/sign-up
 // are the classic brute-force/credential-stuffing target).
+//
+// Configurable rather than hardcoded so the integration suite can raise
+// them: every test signs up its own business from the same address, so the
+// production auth budget ends up throttling the test run itself once the
+// suite grows past a handful of tests. Defaults are the production values.
+var globalPermitsPerMinute = builder.Configuration.GetValue("RateLimiting:GlobalPermitsPerMinute", 120);
+var authPermitsPerMinute = builder.Configuration.GetValue("RateLimiting:AuthPermitsPerMinute", 10);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -128,7 +138,7 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 120,
+                PermitLimit = globalPermitsPerMinute,
                 QueueLimit = 0
             }));
 
@@ -138,7 +148,7 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 10,
+                PermitLimit = authPermitsPerMinute,
                 QueueLimit = 0
             }));
 });
@@ -300,6 +310,8 @@ builder.Services.AddScoped<IAlertCommandService, AlertCommandService>();
 builder.Services.AddScoped<IAlertRuleCommandService, AlertRuleCommandService>();
 builder.Services.AddScoped<IAlertQueryService, AlertQueryService>();
 builder.Services.AddScoped<IAlertRuleQueryService, AlertRuleQueryService>();
+
+builder.Services.AddScoped<IAlertsContextFacade, AlertsContextFacade>();
 
 // Placeholder until a real email/push implementation exists — swapping it
 // in later is a one-line change here, no changes needed anywhere alerts

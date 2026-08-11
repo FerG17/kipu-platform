@@ -38,4 +38,20 @@ public class AlertRepository(AppDbContext context) : BaseRepository<Alert>(conte
                      && alert.WarehouseId == warehouseId && alert.Status != AlertStatus.Resolved,
             cancellationToken);
     }
+
+    /// <summary>Tenant-filtered, unlike the upsert lookup above — this only ever runs inside an authenticated request.</summary>
+    public async Task<IEnumerable<Alert>> FindActiveByBatchIdAsync(int batchId, CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Alert>()
+            .Where(alert => alert.BatchId == batchId && alert.Status != AlertStatus.Resolved)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>Tenant-filtered, same reasoning as FindActiveByBatchIdAsync.</summary>
+    public async Task<IEnumerable<Alert>> FindActiveByProductIdAsync(int productId, CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Alert>()
+            .Where(alert => alert.ProductId == productId && alert.Status != AlertStatus.Resolved)
+            .ToListAsync(cancellationToken);
+    }
 }

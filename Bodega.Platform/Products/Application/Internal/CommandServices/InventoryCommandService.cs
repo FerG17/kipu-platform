@@ -268,6 +268,32 @@ public class InventoryCommandService(
         return Result<Batch>.Success(batch);
     }
 
+    /// <summary>
+    ///     Retires a batch whose goods left the shelf. This is what finally
+    ///     lets an expired batch stop alerting: it stayed ACTIVE forever, so
+    ///     the sweep re-raised the same "venció" alert hours after every time
+    ///     it was resolved, and the shop had no way out. Publishing the event
+    ///     also closes the alerts it left behind, so this is a single action.
+    /// </summary>
+    public async Task<Result<Batch>> Handle(DiscardBatchCommand command, CancellationToken cancellationToken)
+    {
+        var batch = await batchRepository.FindByIdAsync(command.BatchId, cancellationToken);
+        if (batch == null)
+            return Result<Batch>.Failure(ProductError.BatchNotFound, localizer[nameof(ProductError.BatchNotFound)]);
+
+        if (batch.Status == BatchStatus.Inactive)
+            return Result<Batch>.Failure(ProductError.BatchAlreadyDiscarded,
+                localizer[nameof(ProductError.BatchAlreadyDiscarded)]);
+
+        batch.Discard();
+        batchRepository.Update(batch);
+        await unitOfWork.CompleteAsync(cancellationToken);
+
+        await mediator.PublishAsync(new BatchDiscardedEvent(batch.Id, batch.ProductId, batch.BusinessId), cancellationToken);
+
+        return Result<Batch>.Success(batch);
+    }
+
     private async Task PublishStockLevelChangedEvent(InventoryItem item, CancellationToken cancellationToken)
     {
         var product = await productRepository.FindByIdAsync(item.ProductId, cancellationToken);
