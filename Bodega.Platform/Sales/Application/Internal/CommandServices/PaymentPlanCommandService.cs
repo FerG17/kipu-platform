@@ -60,6 +60,10 @@ public class PaymentPlanCommandService(
             return Result<PaymentPlan>.Failure(SalesError.PaymentPlanNotFound,
                 localizer[nameof(SalesError.PaymentPlanNotFound)]);
 
+        if (plan.IsCancelled)
+            return Result<PaymentPlan>.Failure(SalesError.PaymentPlanCancelled,
+                localizer[nameof(SalesError.PaymentPlanCancelled)]);
+
         if (plan.IsFullyPaid)
             return Result<PaymentPlan>.Failure(SalesError.InstallmentsFullyPaid,
                 localizer[nameof(SalesError.InstallmentsFullyPaid)]);
