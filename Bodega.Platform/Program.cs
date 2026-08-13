@@ -116,7 +116,12 @@ builder.Services.AddCors(options =>
     options.AddPolicy("BodegaFrontend",
         policy => policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
-            .AllowAnyHeader());
+            .AllowAnyHeader()
+            // Needed so the browser actually sends the httpOnly session
+            // cookie (see AuthenticationController) on cross-origin requests.
+            // Only safe because allowedOrigins is always an exact origin list,
+            // never "*" — the browser refuses AllowCredentials with a wildcard.
+            .AllowCredentials());
 });
 
 // Behind a reverse proxy or load balancer every request arrives from the

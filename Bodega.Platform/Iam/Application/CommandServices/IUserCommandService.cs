@@ -14,4 +14,7 @@ public interface IUserCommandService
     Task<Result<User>> Handle(UpdateUserProfileCommand command, CancellationToken cancellationToken);
     Task<Result> Handle(ChangePasswordCommand command, CancellationToken cancellationToken);
     Task<Result> Handle(DeleteUserCommand command, CancellationToken cancellationToken);
+
+    /// <summary>Invalidates every token issued for this user so far — see User.RevokeAllSessions.</summary>
+    Task<Result> Handle(SignOutCommand command, CancellationToken cancellationToken);
 }
