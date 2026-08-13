@@ -32,8 +32,13 @@ public class ProductCommandService(
             return Result<Product>.Failure(ProductError.InvalidProductData,
                 localizer[nameof(ProductError.InvalidProductData)]);
 
+        if (!string.IsNullOrEmpty(command.Barcode) &&
+            await productRepository.FindByBarcodeAsync(command.BusinessId, command.Barcode, cancellationToken) != null)
+            return Result<Product>.Failure(ProductError.DuplicateBarcode,
+                localizer[nameof(ProductError.DuplicateBarcode)]);
+
         var product = new Product(command.BusinessId, command.Name, command.Description, command.Category,
-            command.BasePrice);
+            command.BasePrice, command.Barcode);
         await productRepository.AddAsync(product, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
 
@@ -53,7 +58,15 @@ public class ProductCommandService(
         if (product == null)
             return Result<Product>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
 
-        product.UpdateDetails(command.Name, command.Description, command.Category, command.BasePrice);
+        if (!string.IsNullOrEmpty(command.Barcode))
+        {
+            var existing = await productRepository.FindByBarcodeAsync(product.BusinessId, command.Barcode, cancellationToken);
+            if (existing != null && existing.Id != product.Id)
+                return Result<Product>.Failure(ProductError.DuplicateBarcode,
+                    localizer[nameof(ProductError.DuplicateBarcode)]);
+        }
+
+        product.UpdateDetails(command.Name, command.Description, command.Category, command.BasePrice, command.Barcode);
         productRepository.Update(product);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<Product>.Success(product);
