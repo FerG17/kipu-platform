@@ -86,4 +86,7 @@
   <data name="InvalidWarehouseData" xml:space="preserve">
     <value>Warehouse name is required and must fit its field lengths.</value>
   </data>
+  <data name="DuplicateBarcode" xml:space="preserve">
+    <value>This barcode is already registered on another product.</value>
+  </data>
 </root>

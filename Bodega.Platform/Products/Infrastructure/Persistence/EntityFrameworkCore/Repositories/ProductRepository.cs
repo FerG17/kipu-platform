@@ -27,4 +27,11 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
     {
         return await Context.Set<Product>().IgnoreQueryFilters().ToListAsync(cancellationToken);
     }
+
+    public async Task<Product?> FindByBarcodeAsync(int businessId, string barcode, CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Product>().FirstOrDefaultAsync(
+            product => product.BusinessId == businessId && product.Status == ProductStatus.Active && product.Barcode == barcode,
+            cancellationToken);
+    }
 }

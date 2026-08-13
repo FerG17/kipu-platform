@@ -14,5 +14,8 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
         // A negative price feeds straight into the dashboard's "valor de
         // inventario" KPI and into every sale line defaulted from it.
         RuleFor(command => command.BasePrice).MustBeAMoneyAmount();
+
+        RuleFor(command => command.Barcode).MaximumLength(ProductRuleExtensions.MaxBarcodeLength)
+            .When(command => !string.IsNullOrEmpty(command.Barcode));
     }
 }
