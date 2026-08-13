@@ -39,7 +39,12 @@ public class RequestAuthorizationMiddleware(RequestDelegate next)
             return;
         }
 
-        var token = context.Request.Headers.Authorization.FirstOrDefault()?.Split(' ').LastOrDefault();
+        // The cookie is what the real SPA relies on (see AuthenticationController,
+        // which sets it httpOnly on sign-in/sign-up) — the header stays accepted
+        // as a fallback for Swagger, the integration test suite, and any future
+        // non-browser API consumer that would rather manage a token itself.
+        var token = context.Request.Cookies["bodega_session"]
+                    ?? context.Request.Headers.Authorization.FirstOrDefault()?.Split(' ').LastOrDefault();
         var principal = token != null ? tokenService.ValidateToken(token) : null;
 
         if (principal == null || !await IsSessionStillValidAsync(principal, userRepository, context.RequestAborted))
