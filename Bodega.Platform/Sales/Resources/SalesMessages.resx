@@ -77,6 +77,9 @@
   <data name="InvalidInstallmentCount" xml:space="preserve">
     <value>Total installments must be at least 1.</value>
   </data>
+  <data name="PaymentPlanCancelled" xml:space="preserve">
+    <value>This payment plan was cancelled along with its sale.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>

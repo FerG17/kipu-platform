@@ -77,6 +77,9 @@
   <data name="InvalidInstallmentCount" xml:space="preserve">
     <value>El número de cuotas debe ser al menos 1.</value>
   </data>
+  <data name="PaymentPlanCancelled" xml:space="preserve">
+    <value>Este plan de pago fue cancelado junto con su venta.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

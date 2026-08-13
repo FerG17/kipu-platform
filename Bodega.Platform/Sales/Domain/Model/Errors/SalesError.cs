@@ -14,6 +14,7 @@ public enum SalesError
     PaymentPlanAlreadyExists,
     InstallmentsFullyPaid,
     InvalidInstallmentCount,
+    PaymentPlanCancelled,
 
     /// <summary>Customer name/document/phone/email outside what its columns accept.</summary>
     InvalidCustomerData,

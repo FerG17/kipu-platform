@@ -19,6 +19,7 @@ namespace Bodega.Platform.Sales.Application.Internal.CommandServices;
 public class SaleCommandService(
     ISaleRepository saleRepository,
     ICustomerRepository customerRepository,
+    IPaymentPlanRepository paymentPlanRepository,
     IProductContextFacade productContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
@@ -181,6 +182,17 @@ public class SaleCommandService(
                     "Cancellation of sale {SaleId} rolled back: stock for product {ProductId} could not be restored",
                     sale.Id, line.ProductId);
                 return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
+            }
+
+            // A credit sale being cancelled means the debt it created is gone
+            // too — otherwise the plan keeps showing as pending against a
+            // sale that no longer exists, and can still take payments.
+            var paymentPlan = await paymentPlanRepository.FindBySaleIdAsync(sale.Id, cancellationToken);
+            if (paymentPlan != null)
+            {
+                paymentPlan.Cancel();
+                paymentPlanRepository.Update(paymentPlan);
+                await unitOfWork.CompleteAsync(cancellationToken);
             }
 
             await transaction.CommitAsync(cancellationToken);

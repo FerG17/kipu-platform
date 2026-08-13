@@ -8,6 +8,6 @@ public static class PaymentPlanResourceFromEntityAssembler
     public static PaymentPlanResource ToResourceFromEntity(PaymentPlan plan)
     {
         return new PaymentPlanResource(plan.Id, plan.SaleId, plan.BusinessId, plan.TotalInstallments,
-            plan.PaidInstallments, plan.IsFullyPaid);
+            plan.PaidInstallments, plan.IsFullyPaid, plan.IsCancelled);
     }
 }
