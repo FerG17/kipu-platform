@@ -23,6 +23,13 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
     public int PaidInstallments { get; private set; }
 
     /// <summary>
+    ///     Set when the sale this plan belongs to gets cancelled — the plan
+    ///     itself is never deleted (it stays as a record of what was owed),
+    ///     it just stops counting as pending and stops accepting payments.
+    /// </summary>
+    public bool IsCancelled { get; private set; }
+
+    /// <summary>
     ///     Optimistic-concurrency token — keeps two payments registered at the
     ///     same instant from both counting against the same installment.
     ///     See <see cref="IVersionedEntity" />.
@@ -31,10 +38,17 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
 
     public bool IsFullyPaid => PaidInstallments >= TotalInstallments;
 
-    /// <summary>Caller (PaymentPlanCommandService) is responsible for rejecting this when already fully paid.</summary>
+    /// <summary>Caller (PaymentPlanCommandService) is responsible for rejecting this when already fully paid or cancelled.</summary>
     public PaymentPlan RegisterPayment()
     {
         PaidInstallments++;
+        return this;
+    }
+
+    /// <summary>Caller (SaleCommandService, on sale cancellation) is responsible for not calling this twice.</summary>
+    public PaymentPlan Cancel()
+    {
+        IsCancelled = true;
         return this;
     }
 }

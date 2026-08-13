@@ -18,7 +18,8 @@ public class PaymentPlanRepository(AppDbContext context) : BaseRepository<Paymen
         CancellationToken cancellationToken = default)
     {
         return await Context.Set<PaymentPlan>()
-            .Where(plan => plan.BusinessId == businessId && plan.PaidInstallments < plan.TotalInstallments)
+            .Where(plan => plan.BusinessId == businessId && !plan.IsCancelled
+                                                           && plan.PaidInstallments < plan.TotalInstallments)
             .ToListAsync(cancellationToken);
     }
 
@@ -28,7 +29,8 @@ public class PaymentPlanRepository(AppDbContext context) : BaseRepository<Paymen
         var query =
             from plan in Context.Set<PaymentPlan>()
             join sale in Context.Set<Sale>() on plan.SaleId equals sale.Id
-            where sale.CustomerId == customerId && plan.PaidInstallments < plan.TotalInstallments
+            where sale.CustomerId == customerId && !plan.IsCancelled
+                                                 && plan.PaidInstallments < plan.TotalInstallments
             select plan;
 
         return await query.ToListAsync(cancellationToken);
