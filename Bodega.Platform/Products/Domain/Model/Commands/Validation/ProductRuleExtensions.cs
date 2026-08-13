@@ -23,6 +23,7 @@ public static class ProductRuleExtensions
     public const int MaxNameLength = 150;
     public const int MaxDescriptionLength = 500;
     public const int MaxCategoryLength = 50;
+    public const int MaxBarcodeLength = 64;
 
     public static IRuleBuilderOptions<T, string> MustBeAProductName<T>(this IRuleBuilder<T, string> ruleBuilder)
     {
