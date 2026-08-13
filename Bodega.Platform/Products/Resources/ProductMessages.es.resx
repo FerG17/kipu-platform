@@ -86,4 +86,7 @@
   <data name="InvalidWarehouseData" xml:space="preserve">
     <value>El nombre del almacén es obligatorio y debe respetar el largo permitido.</value>
   </data>
+  <data name="DuplicateBarcode" xml:space="preserve">
+    <value>Este código de barras ya está registrado en otro producto.</value>
+  </data>
 </root>

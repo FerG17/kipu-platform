@@ -26,6 +26,7 @@ public static class ModelBuilderExtensions
             entity.Property(product => product.Category).IsRequired().HasMaxLength(50);
             entity.Property(product => product.BasePrice).HasColumnType("decimal(10,2)");
             entity.Property(product => product.Status).IsRequired().HasMaxLength(20);
+            entity.Property(product => product.Barcode).HasMaxLength(64);
 
             entity.HasOne<Business>().WithMany().HasForeignKey(product => product.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);

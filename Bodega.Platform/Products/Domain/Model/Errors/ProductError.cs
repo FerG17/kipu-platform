@@ -17,6 +17,9 @@ public enum ProductError
     /// <summary>Name/description/category/price outside what the catalog (and its columns) accept.</summary>
     InvalidProductData,
 
+    /// <summary>Barcode already registered on another active product of the same business.</summary>
+    DuplicateBarcode,
+
     /// <summary>Name/code/address outside what the warehouse's columns accept.</summary>
     InvalidWarehouseData,
 

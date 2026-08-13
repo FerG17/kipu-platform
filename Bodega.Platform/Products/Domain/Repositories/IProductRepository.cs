@@ -9,6 +9,13 @@ public interface IProductRepository : IBaseRepository<Product>
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Scoped to the business (not global) — the same barcode could
+    ///     legitimately be registered by two unrelated bodegas. Used to
+    ///     reject duplicates on create/update (see ProductCommandService).
+    /// </summary>
+    Task<Product?> FindByBarcodeAsync(int businessId, string barcode, CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     For the alerts expiration sweep only (AlertExpirationSweepJob, via
     ///     ProductContextFacade.GetAllActiveBatchesForExpirationSweep), which
     ///     runs outside any authenticated business and needs every business's
