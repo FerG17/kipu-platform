@@ -184,6 +184,24 @@ public class UserCommandService(
     }
 
     /// <summary>
+    ///     Signing out used to be purely client-side (clear local storage,
+    ///     nothing server-side ever ran) — a token leaked before this point
+    ///     stayed valid until it naturally expired even after the user "logged
+    ///     out". Bumping TokenVersion here makes the session that just ended
+    ///     stop working immediately, everywhere, not just in this browser.
+    /// </summary>
+    public async Task<Result> Handle(SignOutCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
+        if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+
+        user.RevokeAllSessions();
+        userRepository.Update(user);
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    /// <summary>
     ///     Removing the business's only administrator is refused. Nothing
     ///     stopped it before, and it is unrecoverable: there is no password
     ///     reset and no support path, so an owner deleting their own account —
