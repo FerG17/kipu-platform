@@ -1,0 +1,45 @@
+using FluentValidation;
+using Microsoft.Extensions.Localization;
+using Kipu.Platform.Alerts.Application.CommandServices;
+using Kipu.Platform.Alerts.Domain.Model.Commands;
+using Kipu.Platform.Alerts.Domain.Model.Entities;
+using Kipu.Platform.Alerts.Domain.Model.Errors;
+using Kipu.Platform.Alerts.Domain.Repositories;
+using Kipu.Platform.Alerts.Resources;
+using Kipu.Platform.Shared.Application.Model;
+using Kipu.Platform.Shared.Domain.Repositories;
+
+namespace Kipu.Platform.Alerts.Application.Internal.CommandServices;
+
+public class AlertRuleCommandService(
+    IAlertRuleRepository alertRuleRepository,
+    IUnitOfWork unitOfWork,
+    IValidator<CreateOrUpdateAlertRuleCommand> createOrUpdateAlertRuleValidator,
+    IStringLocalizer<AlertsMessages> localizer)
+    : IAlertRuleCommandService
+{
+    public async Task<Result<AlertRule>> Handle(CreateOrUpdateAlertRuleCommand command, CancellationToken cancellationToken)
+    {
+        if (!(await createOrUpdateAlertRuleValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<AlertRule>.Failure(AlertsError.InvalidThreshold, localizer[nameof(AlertsError.InvalidThreshold)]);
+
+        var existing = await alertRuleRepository.FindByBusinessIdAndTypeAsync(command.BusinessId, command.AlertType,
+            cancellationToken);
+
+        AlertRule rule;
+        if (existing != null)
+        {
+            existing.UpdateDetails(command.ThresholdValue, command.Enabled);
+            alertRuleRepository.Update(existing);
+            rule = existing;
+        }
+        else
+        {
+            rule = new AlertRule(command.BusinessId, command.AlertType, command.ThresholdValue, command.Enabled);
+            await alertRuleRepository.AddAsync(rule, cancellationToken);
+        }
+
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result<AlertRule>.Success(rule);
+    }
+}
