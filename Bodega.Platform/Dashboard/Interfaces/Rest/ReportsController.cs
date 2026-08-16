@@ -1,5 +1,4 @@
 using System.Net.Mime;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Bodega.Platform.Dashboard.Application.CommandServices;
 using Bodega.Platform.Dashboard.Application.QueryServices;
@@ -58,15 +57,16 @@ public class ReportsController(
             report => Ok(ReportResourceFromEntityAssembler.ToResourceFromEntity(report)));
     }
 
-    [HttpGet("{id:int}/export")]
-    [SwaggerOperation(Summary = "Export a report as CSV, re-running its live query", OperationId = "ExportReport")]
+    /// <summary>The old CSV export was replaced with a real formatted .xlsx workbook — see ExcelReportGenerator.</summary>
+    [HttpGet("{id:int}/export/excel")]
+    [SwaggerOperation(Summary = "Export a report as a formatted .xlsx workbook, re-running its live query", OperationId = "ExportReportAsExcel")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "The report was not found")]
-    public async Task<IActionResult> ExportReport([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> ExportReportAsExcel([FromRoute] int id, CancellationToken cancellationToken)
     {
-        var result = await reportQueryService.ExportReportAsCsv(id, cancellationToken);
+        var result = await reportQueryService.ExportReportAsExcel(id, cancellationToken);
 
         return DashboardActionResultAssembler.ToActionResult(result, problemDetailsFactory,
-            csv => File(Encoding.UTF8.GetBytes(csv), "text/csv", $"report-{id}.csv"));
+            excel => File(excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"report-{id}.xlsx"));
     }
 
     /// <summary>Only STOCK_MOVEMENTS ("entradas/salidas") reports support PDF today — see ReportQueryService.ExportReportAsPdf.</summary>
