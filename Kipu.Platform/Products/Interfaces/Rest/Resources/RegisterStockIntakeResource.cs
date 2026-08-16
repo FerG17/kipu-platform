@@ -8,4 +8,5 @@ public record RegisterStockIntakeResource(
     DateOnly? Expiration,
     string? Supplier,
     string? Note,
-    int? MinimumStock);
+    int? MinimumStock,
+    int? SupplierId = null);
