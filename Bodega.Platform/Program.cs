@@ -15,6 +15,7 @@ using Bodega.Platform.Iam.Application.Internal.OutboundServices;
 using Bodega.Platform.Iam.Application.Internal.QueryServices;
 using Bodega.Platform.Iam.Application.QueryServices;
 using Bodega.Platform.Iam.Domain.Repositories;
+using Bodega.Platform.Iam.Infrastructure.Bootstrap;
 using Bodega.Platform.Iam.Infrastructure.Hashing.BCrypt.Services;
 using Bodega.Platform.Iam.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Extensions;
@@ -282,6 +283,17 @@ builder.Services.Configure<TokenSettings>(settings =>
     settings.Secret = tokenSettings.Secret;
     settings.ExpirationDays = tokenSettings.ExpirationDays;
 });
+
+// Public sign-up is closed (see AuthenticationController.SignUp) — the
+// endpoint stays capable of creating a business (the integration suite
+// still relies on that for tenant-isolation-based test setup, and the
+// domain isn't hard-coded to a single tenant forever), but calling it now
+// requires this shared secret, which only the platform administrator holds.
+var bootstrapSettings = builder.Configuration.GetSection("Bootstrap").Get<BootstrapSettings>() ?? new BootstrapSettings();
+bootstrapSettings.Key = Environment.ExpandEnvironmentVariables(bootstrapSettings.Key);
+BootstrapKeyGuard.EnsureUsable(bootstrapSettings.Key);
+
+builder.Services.Configure<BootstrapSettings>(settings => settings.Key = bootstrapSettings.Key);
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IBusinessRepository, BusinessRepository>();

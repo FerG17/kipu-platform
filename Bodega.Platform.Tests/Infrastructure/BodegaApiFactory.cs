@@ -20,6 +20,9 @@ public class BodegaApiFactory : WebApplicationFactory<Program>
     /// <summary>Any value ≥ 32 bytes gets past JwtSecretGuard; generated for the suite, it never leaves the test process.</summary>
     private const string TestJwtSecret = "integration-test-signing-key-not-used-anywhere-else-0123456789";
 
+    /// <summary>Any value ≥ 20 bytes gets past BootstrapKeyGuard; see IntegrationTestBase.CreateBusinessWithOwnerAsync, which sends it as X-Bootstrap-Key.</summary>
+    public const string TestBootstrapKey = "integration-test-bootstrap-key-not-used-anywhere-else";
+
     static BodegaApiFactory()
     {
         // The database password used to be a literal in this file, in a public
@@ -32,6 +35,7 @@ public class BodegaApiFactory : WebApplicationFactory<Program>
 
         Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", testConnectionString);
         Environment.SetEnvironmentVariable("TokenSettings__Secret", TestJwtSecret);
+        Environment.SetEnvironmentVariable("Bootstrap__Key", TestBootstrapKey);
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 
         // The alerts sweep runs once on startup and then on this interval —

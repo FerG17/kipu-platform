@@ -42,7 +42,7 @@ public abstract class IntegrationTestBase(BodegaApiFactory factory)
     {
         var email = $"owner-{Guid.NewGuid():N}@test.local";
 
-        var response = await Client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        var response = await PostSignUpAsync(Client, new
         {
             email,
             password = ValidPassword,
@@ -58,6 +58,22 @@ public abstract class IntegrationTestBase(BodegaApiFactory factory)
 
         return (AuthenticatedClient(token), email, body.GetProperty("id").GetInt32(),
             body.GetProperty("businessId").GetInt32(), token);
+    }
+
+    /// <summary>
+    ///     Sign-up requires the platform-admin bootstrap key (see
+    ///     AuthenticationController.SignUp) — every call site in the suite
+    ///     goes through here instead of a bare PostAsJsonAsync so that header
+    ///     lives in one place.
+    /// </summary>
+    protected static async Task<HttpResponseMessage> PostSignUpAsync(HttpClient client, object payload)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/authentication/sign-up")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        request.Headers.Add("X-Bootstrap-Key", BodegaApiFactory.TestBootstrapKey);
+        return await client.SendAsync(request);
     }
 
     /// <summary>Invites a team member with the given role into the admin's business, and signs in as them.</summary>
