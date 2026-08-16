@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using ClosedXML.Excel;
 using Bodega.Platform.Tests.Infrastructure;
 
 namespace Bodega.Platform.Tests;
@@ -40,10 +41,9 @@ public class ReportFilterTests(BodegaApiFactory factory) : IntegrationTestBase(f
             category = "ABARROTES"
         })).EnsureSuccessStatusCode();
 
-        var csv = await GenerateAndExportStockMovementReportAsync(client, supplierId);
+        var rows = await GetStockMovementRowsAsync(client, supplierId);
 
-        Assert.Contains("INTAKE", csv);
-        Assert.Contains("15", csv);
+        Assert.Contains(rows, row => row.Type == "Entrada" && row.Quantity == 15);
     }
 
     /// <summary>The filter still has to exclude other suppliers' movements.</summary>
@@ -63,16 +63,14 @@ public class ReportFilterTests(BodegaApiFactory factory) : IntegrationTestBase(f
         (await client.PatchAsJsonAsync($"/api/v1/purchases/{wantedOrder}", new { status = "RECEIVED" })).EnsureSuccessStatusCode();
         (await client.PatchAsJsonAsync($"/api/v1/purchases/{otherOrder}", new { status = "RECEIVED" })).EnsureSuccessStatusCode();
 
-        var csv = await GenerateAndExportStockMovementReportAsync(client, wantedSupplierId);
+        var rows = await GetStockMovementRowsAsync(client, wantedSupplierId);
 
-        // Quantities are quoted now that every exported field is (see
-        // CsvWriter — an unquoted field let a comma or a formula in a product
-        // name rewrite the sheet), so the quantity column reads "7", not ,7,.
-        Assert.Contains("\"7\"", csv);
-        Assert.DoesNotContain("\"99\"", csv);
+        Assert.Contains(rows, row => row.Quantity == 7);
+        Assert.DoesNotContain(rows, row => row.Quantity == 99);
     }
 
-    private static async Task<string> GenerateAndExportStockMovementReportAsync(HttpClient client, int supplierId)
+    /// <summary>Generates and exports a STOCK_MOVEMENTS report as .xlsx, then reads back its data rows (below the title/header rows — see ExcelReportGenerator).</summary>
+    private static async Task<List<(string Type, int Quantity)>> GetStockMovementRowsAsync(HttpClient client, int supplierId)
     {
         var reportResponse = await client.PostAsJsonAsync("/api/v1/reports", new
         {
@@ -85,9 +83,27 @@ public class ReportFilterTests(BodegaApiFactory factory) : IntegrationTestBase(f
         reportResponse.EnsureSuccessStatusCode();
         var reportId = (await ReadJsonAsync(reportResponse)).GetProperty("id").GetInt32();
 
-        var exportResponse = await client.GetAsync($"/api/v1/reports/{reportId}/export");
+        var exportResponse = await client.GetAsync($"/api/v1/reports/{reportId}/export/excel");
         exportResponse.EnsureSuccessStatusCode();
-        return await exportResponse.Content.ReadAsStringAsync();
+        var bytes = await exportResponse.Content.ReadAsByteArrayAsync();
+
+        using var workbook = new XLWorkbook(new MemoryStream(bytes));
+        var sheet = workbook.Worksheet("Entradas y salidas");
+
+        // Row 4 is the header ("Fecha", "Producto", "Tipo", "Cantidad", ...);
+        // data starts at row 5. Column 3 = Tipo, column 4 = Cantidad.
+        const int headerRow = 4;
+        var lastRow = sheet.LastRowUsed()?.RowNumber() ?? headerRow;
+
+        var rows = new List<(string Type, int Quantity)>();
+        for (var row = headerRow + 1; row <= lastRow; row++)
+        {
+            var quantityCell = sheet.Cell(row, 4);
+            if (quantityCell.IsEmpty()) continue;
+            rows.Add((sheet.Cell(row, 3).GetString(), quantityCell.GetValue<int>()));
+        }
+
+        return rows;
     }
 
     private static async Task<int> CreateSupplierAsync(HttpClient client, string name, string lastName)

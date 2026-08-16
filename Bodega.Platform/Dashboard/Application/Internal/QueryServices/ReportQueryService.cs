@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Bodega.Platform.Dashboard.Application.QueryServices;
@@ -40,22 +39,22 @@ public class ReportQueryService(
     ///     (bug fixed per the handoff); inventory figures are always
     ///     "current state" (no historical snapshot exists to filter by date).
     /// </summary>
-    public async Task<Result<string>> ExportReportAsCsv(int reportId, CancellationToken cancellationToken)
+    public async Task<Result<byte[]>> ExportReportAsExcel(int reportId, CancellationToken cancellationToken)
     {
         var report = await reportRepository.FindByIdAsync(reportId, cancellationToken);
-        if (report == null) return Result<string>.Failure(DashboardError.ReportNotFound, localizer[nameof(DashboardError.ReportNotFound)]);
+        if (report == null) return Result<byte[]>.Failure(DashboardError.ReportNotFound, localizer[nameof(DashboardError.ReportNotFound)]);
 
-        var csv = report.Type switch
+        var excel = report.Type switch
         {
-            ReportType.Inventory => await BuildInventoryCsv(report, cancellationToken),
-            ReportType.StockMovements => await BuildStockMovementsCsv(report, cancellationToken),
-            _ => await BuildSalesCsv(report, cancellationToken)
+            ReportType.Inventory => await BuildInventoryExcel(report, cancellationToken),
+            ReportType.StockMovements => await BuildStockMovementsExcel(report, cancellationToken),
+            _ => await BuildSalesExcel(report, cancellationToken)
         };
 
-        logger.LogInformation("Report {ReportId} ({ReportType}) exported as CSV for business {BusinessId}",
+        logger.LogInformation("Report {ReportId} ({ReportType}) exported as Excel for business {BusinessId}",
             report.Id, report.Type, report.BusinessId);
 
-        return Result<string>.Success(csv);
+        return Result<byte[]>.Success(excel);
     }
 
     /// <summary>PDF is only implemented for STOCK_MOVEMENTS ("entradas/salidas") — the report type this was actually requested for.</summary>
@@ -78,46 +77,23 @@ public class ReportQueryService(
         return Result<byte[]>.Success(pdf);
     }
 
-    // Every row below goes through CsvWriter rather than string interpolation:
-    // product names, supplier names and notes are free text typed by staff,
-    // and this file is opened in a spreadsheet by the owner. See CsvWriter.
-
-    private async Task<string> BuildSalesCsv(Report report, CancellationToken cancellationToken)
+    private async Task<byte[]> BuildSalesExcel(Report report, CancellationToken cancellationToken)
     {
         var rows = await salesContextFacade.GetSalesForExport(report.BusinessId, report.DateFrom, report.DateTo, cancellationToken);
-
-        var builder = new StringBuilder();
-        builder.AppendLine(CsvWriter.Row("SaleId", "Date", "PaymentMethod", "TotalAmount", "Currency"));
-        foreach (var row in rows)
-            builder.AppendLine(CsvWriter.Row(row.SaleId, row.Date.ToString("O"), row.PaymentMethod, row.TotalAmount,
-                row.Currency));
-
-        return builder.ToString();
+        return ExcelReportGenerator.GenerateSales(report.Id, report.DateFrom, report.DateTo, rows);
     }
 
-    private async Task<string> BuildInventoryCsv(Report report, CancellationToken cancellationToken)
+    private async Task<byte[]> BuildInventoryExcel(Report report, CancellationToken cancellationToken)
     {
         var rows = await productContextFacade.GetTopStockProducts(report.BusinessId, int.MaxValue, cancellationToken);
-
-        var builder = new StringBuilder();
-        builder.AppendLine(CsvWriter.Row("ProductId", "ProductName", "CurrentStock"));
-        foreach (var row in rows)
-            builder.AppendLine(CsvWriter.Row(row.ProductId, row.ProductName, row.TotalStock));
-
-        return builder.ToString();
+        return ExcelReportGenerator.GenerateInventory(report.Id, rows);
     }
 
-    private async Task<string> BuildStockMovementsCsv(Report report, CancellationToken cancellationToken)
+    private async Task<byte[]> BuildStockMovementsExcel(Report report, CancellationToken cancellationToken)
     {
-        var (rows, _, _) = await GetStockMovementLines(report, cancellationToken);
-
-        var builder = new StringBuilder();
-        builder.AppendLine(CsvWriter.Row("Date", "ProductId", "ProductName", "Type", "Quantity", "Supplier", "Note"));
-        foreach (var row in rows)
-            builder.AppendLine(CsvWriter.Row(row.RegisteredAt.ToString("O"), row.ProductId, row.ProductName, row.Type,
-                row.Quantity, row.Supplier, row.Note));
-
-        return builder.ToString();
+        var (rows, productName, supplierName) = await GetStockMovementLines(report, cancellationToken);
+        return ExcelReportGenerator.GenerateStockMovements(report.Id, report.DateFrom, report.DateTo, productName,
+            supplierName, rows);
     }
 
     /// <summary>

