@@ -36,7 +36,7 @@ public class SessionCookieTests : IntegrationTestBase
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
 
-        var signUpResponse = await client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        var signUpResponse = await PostSignUpAsync(client, new
         {
             email = $"cookie-{Guid.NewGuid():N}@test.local",
             password = ValidPassword,
@@ -80,7 +80,7 @@ public class SessionCookieTests : IntegrationTestBase
     {
         var client = _factory.CreateClient();
 
-        var signUpResponse = await client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        var signUpResponse = await PostSignUpAsync(client, new
         {
             email = $"cookie-{Guid.NewGuid():N}@test.local",
             password = ValidPassword,

@@ -70,7 +70,7 @@ public class TimeZoneBehaviourTests(BodegaApiFactory factory) : IntegrationTestB
     private static async Task<HttpClient> CreateBusinessOnAsync(WebApplicationFactory<Program> apiFactory)
     {
         var client = apiFactory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        var response = await PostSignUpAsync(client, new
         {
             email = $"owner-{Guid.NewGuid():N}@test.local",
             password = "Passw0rd!test",

@@ -1,9 +1,12 @@
 using System.Net.Mime;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Bodega.Platform.Iam.Application.CommandServices;
 using Bodega.Platform.Iam.Domain.Model.Commands;
+using Bodega.Platform.Iam.Infrastructure.Bootstrap;
 using Bodega.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Bodega.Platform.Iam.Infrastructure.Tokens.Jwt.Configuration;
 using Bodega.Platform.Iam.Interfaces.Rest.Resources;
@@ -23,11 +26,13 @@ public class AuthenticationController(
     IUserCommandService userCommandService,
     ICurrentUserAccessor currentUserAccessor,
     IOptions<TokenSettings> tokenSettings,
+    IOptions<BootstrapSettings> bootstrapSettings,
     IWebHostEnvironment environment,
     ProblemDetailsFactory problemDetailsFactory)
     : ControllerBase
 {
     private const string SessionCookieName = "bodega_session";
+    private const string BootstrapKeyHeader = "X-Bootstrap-Key";
 
     /// <summary>
     ///     Also sets the token as an httpOnly cookie so the frontend never has
@@ -71,14 +76,26 @@ public class AuthenticationController(
     /// <summary>
     ///     Creates a User and its Business atomically, and returns a JWT —
     ///     the frontend auto-logs the user in right after registering.
+    ///
+    ///     Public self-service sign-up is closed: this is now how the
+    ///     platform administrator provisions a new client's account by hand
+    ///     (via the bootstrap key, never through the app's UI), who then
+    ///     hands the credentials to the client. The client's own team members
+    ///     are created afterward through POST /api/v1/users instead, which is
+    ///     always scoped to the caller's existing business.
     /// </summary>
     [HttpPost("sign-up")]
     [AllowAnonymous]
-    [SwaggerOperation(Summary = "Sign up", OperationId = "SignUp")]
+    [SwaggerOperation(Summary = "Sign up (platform-admin only, requires X-Bootstrap-Key)", OperationId = "SignUp")]
     [SwaggerResponse(StatusCodes.Status200OK, "Account created", typeof(AuthenticatedUserResource))]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Missing or invalid bootstrap key")]
     [SwaggerResponse(StatusCodes.Status409Conflict, "Email already registered")]
     public async Task<IActionResult> SignUp([FromBody] SignUpResource resource, CancellationToken cancellationToken)
     {
+        if (!HasValidBootstrapKey())
+            return problemDetailsFactory.ToActionResult(StatusCodes.Status403Forbidden, "SignUpForbidden",
+                "Public sign-up is closed. Contact the platform administrator for an account.");
+
         var command = SignUpCommandFromResourceAssembler.ToCommandFromResource(resource);
         var result = await userCommandService.Handle(command, cancellationToken);
 
@@ -112,5 +129,23 @@ public class AuthenticationController(
             Response.Cookies.Delete(SessionCookieName, new CookieOptions { Path = "/" });
             return NoContent();
         });
+    }
+
+    /// <summary>
+    ///     Constant-time comparison — this header is a bearer secret, so a
+    ///     length-dependent early-exit compare would let an attacker recover
+    ///     it byte by byte via response timing, the same class of bug the JWT
+    ///     signing key takes seriously elsewhere in this codebase.
+    /// </summary>
+    private bool HasValidBootstrapKey()
+    {
+        var provided = Request.Headers[BootstrapKeyHeader].ToString();
+        var expected = bootstrapSettings.Value.Key;
+        if (string.IsNullOrEmpty(provided) || string.IsNullOrEmpty(expected)) return false;
+
+        var providedBytes = Encoding.UTF8.GetBytes(provided);
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        return providedBytes.Length == expectedBytes.Length &&
+               CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
     }
 }
