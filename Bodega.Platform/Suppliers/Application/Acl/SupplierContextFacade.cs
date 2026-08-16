@@ -24,4 +24,11 @@ public class SupplierContextFacade(IPurchaseOrderRepository purchaseOrderReposit
         var supplier = await supplierRepository.FindByIdAsync(supplierId, cancellationToken);
         return supplier == null ? null : $"{supplier.Name} {supplier.LastName}".Trim();
     }
+
+    public async Task<IReadOnlyCollection<int>> FilterExistingSupplierIds(int businessId, IReadOnlyCollection<int> supplierIds,
+        CancellationToken cancellationToken)
+    {
+        if (supplierIds.Count == 0) return [];
+        return await supplierRepository.FindExistingIdsAsync(businessId, supplierIds, cancellationToken);
+    }
 }

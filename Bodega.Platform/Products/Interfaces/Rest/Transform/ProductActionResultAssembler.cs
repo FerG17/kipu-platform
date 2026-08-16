@@ -58,6 +58,7 @@ public static class ProductActionResultAssembler
             ProductError.BatchAlreadyDiscarded => StatusCodes.Status409Conflict,
             ProductError.InvalidProductData => StatusCodes.Status400BadRequest,
             ProductError.DuplicateBarcode => StatusCodes.Status409Conflict,
+            ProductError.SupplierNotFound => StatusCodes.Status400BadRequest,
             ProductError.InvalidWarehouseData => StatusCodes.Status400BadRequest,
             ProductError.ConcurrentModification => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError

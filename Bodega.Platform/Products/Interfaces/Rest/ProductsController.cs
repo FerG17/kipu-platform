@@ -36,7 +36,11 @@ public class ProductsController(
 
         var products = await productQueryService.Handle(new GetAllProductsByBusinessIdQuery(businessId.Value, category),
             cancellationToken);
-        return Ok(products.Select(ProductResourceFromEntityAssembler.ToResourceFromEntity));
+        var supplierIdsByProduct = await productQueryService.Handle(
+            new GetProductSupplierIdsByBusinessIdQuery(businessId.Value), cancellationToken);
+
+        return Ok(products.Select(product => ProductResourceFromEntityAssembler.ToResourceFromEntity(product,
+            supplierIdsByProduct.GetValueOrDefault(product.Id, []))));
     }
 
     [HttpGet("{id:int}")]
@@ -47,7 +51,8 @@ public class ProductsController(
         var product = await productQueryService.Handle(new GetProductByIdQuery(id), cancellationToken);
         if (product == null || product.BusinessId != currentUserAccessor.CurrentBusinessId) return NotFound();
 
-        return Ok(ProductResourceFromEntityAssembler.ToResourceFromEntity(product));
+        var supplierIds = await productQueryService.Handle(new GetProductSupplierIdsQuery(id), cancellationToken);
+        return Ok(ProductResourceFromEntityAssembler.ToResourceFromEntity(product, supplierIds));
     }
 
     [HttpPost]
@@ -64,7 +69,7 @@ public class ProductsController(
 
         return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             product => CreatedAtAction(nameof(GetProductById), new { id = product.Id },
-                ProductResourceFromEntityAssembler.ToResourceFromEntity(product)));
+                ProductResourceFromEntityAssembler.ToResourceFromEntity(product, resource.SupplierIds ?? [])));
     }
 
     [HttpPatch("{id:int}")]
@@ -77,7 +82,7 @@ public class ProductsController(
         var result = await productCommandService.Handle(command, cancellationToken);
 
         return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
-            product => Ok(ProductResourceFromEntityAssembler.ToResourceFromEntity(product)));
+            product => Ok(ProductResourceFromEntityAssembler.ToResourceFromEntity(product, resource.SupplierIds ?? [])));
     }
 
     /// <summary>Business rule: blocked (409) if the product still has stock in any warehouse.</summary>

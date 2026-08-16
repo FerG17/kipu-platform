@@ -89,4 +89,7 @@
   <data name="DuplicateBarcode" xml:space="preserve">
     <value>This barcode is already registered on another product.</value>
   </data>
+  <data name="SupplierNotFound" xml:space="preserve">
+    <value>One of the supplier tags does not exist for this business.</value>
+  </data>
 </root>

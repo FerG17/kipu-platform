@@ -5,7 +5,8 @@ using Bodega.Platform.Products.Domain.Repositories;
 
 namespace Bodega.Platform.Products.Application.Internal.QueryServices;
 
-public class ProductQueryService(IProductRepository productRepository) : IProductQueryService
+public class ProductQueryService(IProductRepository productRepository, IProductSupplierRepository productSupplierRepository)
+    : IProductQueryService
 {
     public async Task<IEnumerable<Product>> Handle(GetAllProductsByBusinessIdQuery query, CancellationToken cancellationToken)
     {
@@ -15,5 +16,17 @@ public class ProductQueryService(IProductRepository productRepository) : IProduc
     public async Task<Product?> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)
     {
         return await productRepository.FindByIdAsync(query.ProductId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<int>> Handle(GetProductSupplierIdsQuery query, CancellationToken cancellationToken)
+    {
+        var links = await productSupplierRepository.FindByProductIdAsync(query.ProductId, cancellationToken);
+        return links.Select(link => link.SupplierId).ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyCollection<int>>> Handle(GetProductSupplierIdsByBusinessIdQuery query,
+        CancellationToken cancellationToken)
+    {
+        return await productSupplierRepository.FindSupplierIdsGroupedByProductAsync(query.BusinessId, cancellationToken);
     }
 }

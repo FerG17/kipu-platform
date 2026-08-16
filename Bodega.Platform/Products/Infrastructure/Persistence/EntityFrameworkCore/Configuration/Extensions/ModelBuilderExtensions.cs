@@ -104,5 +104,24 @@ public static class ModelBuilderExtensions
             entity.HasOne<Business>().WithMany().HasForeignKey(movement => movement.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        builder.Entity<ProductSupplier>(entity =>
+        {
+            entity.HasKey(link => link.Id);
+            entity.Property(link => link.Id).ValueGeneratedOnAdd();
+
+            // A product tags the same supplier at most once.
+            entity.HasIndex(link => new { link.ProductId, link.SupplierId }).IsUnique();
+
+            entity.HasOne<Product>().WithMany().HasForeignKey(link => link.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Business>().WithMany().HasForeignKey(link => link.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // SupplierId intentionally has no FK constraint — same
+            // cross-bounded-context soft reference as StockMovement.SupplierId;
+            // Suppliers is a separate bounded context, and existence/tenant
+            // ownership is validated in ProductCommandService before a link
+            // is ever created, via ISupplierContextFacade.
+        });
     }
 }

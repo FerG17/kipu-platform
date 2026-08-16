@@ -22,4 +22,15 @@ public interface ISupplierContextFacade
     ///     here first, then matching it against that text field.
     /// </summary>
     Task<string?> GetSupplierName(int supplierId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Filters supplierIds down to the ones that are real and belong to
+    ///     this business — used by Products to validate a product's supplier
+    ///     tags before linking them (ProductSupplier.SupplierId has no
+    ///     database FK to Supplier, since Suppliers is a separate bounded
+    ///     context, so this existence/ownership check is the only thing
+    ///     standing between "tagged" and "tagged with someone else's id").
+    /// </summary>
+    Task<IReadOnlyCollection<int>> FilterExistingSupplierIds(int businessId, IReadOnlyCollection<int> supplierIds,
+        CancellationToken cancellationToken);
 }

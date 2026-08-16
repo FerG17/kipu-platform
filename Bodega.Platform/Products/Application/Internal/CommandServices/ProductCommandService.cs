@@ -4,18 +4,22 @@ using Microsoft.Extensions.Localization;
 using Bodega.Platform.Products.Application.CommandServices;
 using Bodega.Platform.Products.Domain.Model.Aggregates;
 using Bodega.Platform.Products.Domain.Model.Commands;
+using Bodega.Platform.Products.Domain.Model.Entities;
 using Bodega.Platform.Products.Domain.Model.Errors;
 using Bodega.Platform.Products.Domain.Model.Events;
 using Bodega.Platform.Products.Domain.Repositories;
 using Bodega.Platform.Products.Resources;
 using Bodega.Platform.Shared.Application.Model;
 using Bodega.Platform.Shared.Domain.Repositories;
+using Bodega.Platform.Suppliers.Interfaces.Acl;
 
 namespace Bodega.Platform.Products.Application.Internal.CommandServices;
 
 public class ProductCommandService(
     IProductRepository productRepository,
     IInventoryItemRepository inventoryItemRepository,
+    IProductSupplierRepository productSupplierRepository,
+    ISupplierContextFacade supplierContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
     IValidator<CreateProductCommand> createProductValidator,
@@ -37,10 +41,19 @@ public class ProductCommandService(
             return Result<Product>.Failure(ProductError.DuplicateBarcode,
                 localizer[nameof(ProductError.DuplicateBarcode)]);
 
+        var supplierIds = (command.SupplierIds ?? []).Distinct().ToList();
+        if (!await AllSuppliersExist(command.BusinessId, supplierIds, cancellationToken))
+            return Result<Product>.Failure(ProductError.SupplierNotFound, localizer[nameof(ProductError.SupplierNotFound)]);
+
         var product = new Product(command.BusinessId, command.Name, command.Description, command.Category,
             command.BasePrice, command.Barcode);
         await productRepository.AddAsync(product, cancellationToken);
-        await unitOfWork.CompleteAsync(cancellationToken);
+        await unitOfWork.CompleteAsync(cancellationToken); // product.Id is now populated.
+
+        foreach (var supplierId in supplierIds)
+            await productSupplierRepository.AddAsync(new ProductSupplier(product.Id, supplierId, command.BusinessId),
+                cancellationToken);
+        if (supplierIds.Count > 0) await unitOfWork.CompleteAsync(cancellationToken);
 
         await mediator.PublishAsync(new ProductCreatedEvent(product.Id, product.BusinessId, product.Name),
             cancellationToken);
@@ -66,10 +79,43 @@ public class ProductCommandService(
                     localizer[nameof(ProductError.DuplicateBarcode)]);
         }
 
+        var supplierIds = (command.SupplierIds ?? []).Distinct().ToList();
+        if (!await AllSuppliersExist(product.BusinessId, supplierIds, cancellationToken))
+            return Result<Product>.Failure(ProductError.SupplierNotFound, localizer[nameof(ProductError.SupplierNotFound)]);
+
         product.UpdateDetails(command.Name, command.Description, command.Category, command.BasePrice, command.Barcode);
         productRepository.Update(product);
+        await SyncProductSuppliers(product.Id, product.BusinessId, supplierIds, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<Product>.Success(product);
+    }
+
+    /// <summary>Empty is trivially valid — a product may legitimately have no supplier tagged yet.</summary>
+    private async Task<bool> AllSuppliersExist(int businessId, IReadOnlyCollection<int> supplierIds,
+        CancellationToken cancellationToken)
+    {
+        if (supplierIds.Count == 0) return true;
+        var existing = await supplierContextFacade.FilterExistingSupplierIds(businessId, supplierIds, cancellationToken);
+        return existing.Count == supplierIds.Count;
+    }
+
+    /// <summary>
+    ///     Replaces a product's supplier tags with the given set — removes
+    ///     links no longer wanted, adds new ones, leaves unchanged ones alone.
+    ///     Queues changes on the change tracker only; the caller commits.
+    /// </summary>
+    private async Task SyncProductSuppliers(int productId, int businessId, IReadOnlyCollection<int> supplierIds,
+        CancellationToken cancellationToken)
+    {
+        var wanted = supplierIds.ToHashSet();
+        var existingLinks = await productSupplierRepository.FindByProductIdAsync(productId, cancellationToken);
+        var existingIds = existingLinks.Select(link => link.SupplierId).ToHashSet();
+
+        foreach (var link in existingLinks.Where(link => !wanted.Contains(link.SupplierId)))
+            productSupplierRepository.Remove(link);
+
+        foreach (var supplierId in wanted.Where(id => !existingIds.Contains(id)))
+            await productSupplierRepository.AddAsync(new ProductSupplier(productId, supplierId, businessId), cancellationToken);
     }
 
     /// <summary>

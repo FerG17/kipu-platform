@@ -89,4 +89,7 @@
   <data name="DuplicateBarcode" xml:space="preserve">
     <value>Este código de barras ya está registrado en otro producto.</value>
   </data>
+  <data name="SupplierNotFound" xml:space="preserve">
+    <value>Uno de los proveedores indicados no existe para este negocio.</value>
+  </data>
 </root>
