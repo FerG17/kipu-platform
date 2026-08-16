@@ -12,4 +12,13 @@ public class SupplierRepository(AppDbContext context) : BaseRepository<Supplier>
     {
         return await Context.Set<Supplier>().Where(supplier => supplier.BusinessId == businessId).ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyCollection<int>> FindExistingIdsAsync(int businessId, IReadOnlyCollection<int> supplierIds,
+        CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Supplier>()
+            .Where(supplier => supplier.BusinessId == businessId && supplierIds.Contains(supplier.Id))
+            .Select(supplier => supplier.Id)
+            .ToListAsync(cancellationToken);
+    }
 }

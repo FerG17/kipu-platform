@@ -1,3 +1,5 @@
 namespace Bodega.Platform.Products.Domain.Model.Commands;
 
-public record CreateProductCommand(int BusinessId, string Name, string Description, string Category, decimal BasePrice, string? Barcode = null);
+/// <summary>SupplierIds: the suppliers this product can be sourced from — zero or more, defaults to none.</summary>
+public record CreateProductCommand(int BusinessId, string Name, string Description, string Category, decimal BasePrice,
+    string? Barcode = null, IReadOnlyCollection<int>? SupplierIds = null);

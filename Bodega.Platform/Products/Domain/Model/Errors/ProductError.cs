@@ -20,6 +20,9 @@ public enum ProductError
     /// <summary>Barcode already registered on another active product of the same business.</summary>
     DuplicateBarcode,
 
+    /// <summary>A SupplierId tag doesn't exist, or belongs to another business.</summary>
+    SupplierNotFound,
+
     /// <summary>Name/code/address outside what the warehouse's columns accept.</summary>
     InvalidWarehouseData,
 
