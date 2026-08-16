@@ -55,6 +55,21 @@ public class InventoryCommandService(
         if (command.Quantity < 0)
             return Result<InventoryItem>.Failure(ProductError.InvalidQuantity, localizer[nameof(ProductError.InvalidQuantity)]);
 
+        // Validated here too (not just inside the delegated CreateOrUpdateBatch
+        // call below) so an invalid expiration/price is rejected before this
+        // method's own unitOfWork.CompleteAsync() commits the InventoryItem
+        // and StockMovement — otherwise a product's stock intake persists
+        // successfully while its batch (cost + expiration) silently fails,
+        // leaving a confusing partial write with no way to tell from the
+        // error alone that the rest already saved.
+        if (command.Expiration.HasValue && command.Expiration.Value < businessClock.Today)
+            return Result<InventoryItem>.Failure(ProductError.InvalidExpirationDate,
+                localizer[nameof(ProductError.InvalidExpirationDate)]);
+
+        if (command.PurchasePrice.HasValue && command.PurchasePrice.Value < 0)
+            return Result<InventoryItem>.Failure(ProductError.InvalidPurchasePrice,
+                localizer[nameof(ProductError.InvalidPurchasePrice)]);
+
         // Both reads go through the tenant-scoped repositories (AppDbContext's
         // BusinessId query filter), so a ProductId/WarehouseId belonging to
         // another business resolves to null here — without this check
