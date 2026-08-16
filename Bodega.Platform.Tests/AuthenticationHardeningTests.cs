@@ -254,13 +254,58 @@ public class AuthenticationHardeningTests(BodegaApiFactory factory) : Integratio
         Assert.Equal(await unknownEmail.Content.ReadAsStringAsync(), await wrongPassword.Content.ReadAsStringAsync());
     }
 
+    /// <summary>
+    ///     Public sign-up is closed — see AuthenticationController.SignUp.
+    ///     Without the platform-admin bootstrap key, nobody can create a
+    ///     second business through this endpoint at all, key or no key on the
+    ///     rest of the payload.
+    /// </summary>
+    [Fact]
+    public async Task SignUp_WithoutTheBootstrapKey_IsRejected()
+    {
+        var response = await Client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        {
+            email = $"nokey-{Guid.NewGuid():N}@test.local",
+            password = ValidPassword,
+            name = "Test",
+            lastName = "NoKey",
+            businessName = "Bodega sin llave",
+            businessType = "RETAIL"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>A guessed or stale key must fail exactly like no key at all.</summary>
+    [Fact]
+    public async Task SignUp_WithTheWrongBootstrapKey_IsRejected()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/authentication/sign-up")
+        {
+            Content = JsonContent.Create(new
+            {
+                email = $"wrongkey-{Guid.NewGuid():N}@test.local",
+                password = ValidPassword,
+                name = "Test",
+                lastName = "WrongKey",
+                businessName = "Bodega llave equivocada",
+                businessType = "RETAIL"
+            })
+        };
+        request.Headers.Add("X-Bootstrap-Key", "not-the-real-bootstrap-key-at-all");
+
+        var response = await Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     /// <summary>Sign-up must not become an account-enumeration or account-takeover path for an existing email.</summary>
     [Fact]
     public async Task SignUp_WithAnAlreadyRegisteredEmail_DoesNotOverwriteTheExistingAccount()
     {
         var owner = await CreateBusinessWithOwnerAsync();
 
-        var response = await Client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        var response = await PostSignUpAsync(Client, new
         {
             email = owner.Email,
             password = "Attack3rPassword!",
@@ -285,7 +330,7 @@ public class AuthenticationHardeningTests(BodegaApiFactory factory) : Integratio
     [InlineData("12345678")]
     public async Task SignUp_WithAWeakPassword_IsRejected(string password)
     {
-        var response = await Client.PostAsJsonAsync("/api/v1/authentication/sign-up", new
+        var response = await PostSignUpAsync(Client, new
         {
             email = $"weak-{Guid.NewGuid():N}@test.local",
             password,
