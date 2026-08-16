@@ -8,7 +8,7 @@ riderModule.iml
 # committed — only the *.example templates next to these paths, which document
 # which keys are needed without carrying their values.
 .env
-Bodega.Platform/appsettings.Development.json
+Kipu.Platform/appsettings.Development.json
 
 # Planning/handover notes are kept outside the repository on purpose: they are
 # an up-to-date inventory of what this system does and where it is still weak,

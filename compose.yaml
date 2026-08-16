@@ -1,9 +1,15 @@
+# Explicit project name — Compose otherwise derives it from the checkout
+# folder's name, which would silently drift from "kipu-platform" (and from
+# the "kipu-platform_kipu-mysql-data" volume this rebrand already
+# populated by cloning the old data) if the folder itself is never renamed.
+name: kipu-platform
+
 services:
-  bodega.platform:
-    image: bodega.platform
+  kipu.platform:
+    image: kipu.platform
     build:
       context: .
-      dockerfile: Bodega.Platform/Dockerfile
+      dockerfile: Kipu.Platform/Dockerfile
     depends_on:
       mysql:
         condition: service_healthy
@@ -16,11 +22,11 @@ services:
       # automatically) — see .env.example. The value used to sit here in
       # plain text, in a public repository.
       MYSQL_ROOT_PASSWORD: ${BODEGA_DB_PASSWORD:?set BODEGA_DB_PASSWORD in .env, see .env.example}
-      MYSQL_DATABASE: bodega_platform
+      MYSQL_DATABASE: kipu_platform
     ports:
       - "3307:3306"
     volumes:
-      - bodega-mysql-data:/var/lib/mysql
+      - kipu-mysql-data:/var/lib/mysql
     healthcheck:
       # $$ escapes the $ so Compose passes it through and the shell inside the
       # container expands it, keeping the password out of the compose file.
@@ -30,4 +36,4 @@ services:
       retries: 10
 
 volumes:
-  bodega-mysql-data:
+  kipu-mysql-data:
