@@ -21,6 +21,15 @@ public interface IUserCommandService
     /// <summary>Restores sign-in access for a previously suspended user.</summary>
     Task<Result> Handle(ReactivateUserCommand command, CancellationToken cancellationToken);
 
+    /// <summary>Emails a 6-digit code if the address belongs to an active user — always succeeds either way, so the response can't be used to test which emails are registered.</summary>
+    Task<Result> Handle(RequestPasswordResetCommand command, CancellationToken cancellationToken);
+
+    /// <summary>Checks a code without consuming it — lets the UI confirm it before asking for a new password.</summary>
+    Task<Result> Handle(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken);
+
+    /// <summary>Only succeeds against a code already confirmed via VerifyPasswordResetCodeCommand — sets the new password and signs out every other session.</summary>
+    Task<Result> Handle(ResetPasswordCommand command, CancellationToken cancellationToken);
+
     /// <summary>Invalidates every token issued for this user so far — see User.RevokeAllSessions.</summary>
     Task<Result> Handle(SignOutCommand command, CancellationToken cancellationToken);
 }

@@ -19,6 +19,14 @@ public enum IamError
     ///     need to undo it with. Another admin has to do it instead.
     /// </summary>
     CannotRemoveOwnAccess,
+
+    /// <summary>
+    ///     The submitted 6-digit reset code is wrong, expired, already used,
+    ///     or has been guessed too many times — deliberately one generic
+    ///     error for all of those, so a wrong guess can't be distinguished
+    ///     from "you waited too long" or "someone already used it".
+    /// </summary>
+    InvalidResetCode,
     OperationCancelled,
     DatabaseError,
     InternalServerError

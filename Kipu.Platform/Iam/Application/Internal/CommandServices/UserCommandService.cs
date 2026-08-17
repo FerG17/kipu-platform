@@ -1,9 +1,11 @@
+using System.Security.Cryptography;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Kipu.Platform.Iam.Application.CommandServices;
 using Kipu.Platform.Iam.Application.Internal.OutboundServices;
 using Kipu.Platform.Iam.Domain.Model.Aggregates;
 using Kipu.Platform.Iam.Domain.Model.Commands;
+using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Domain.Model.Errors;
 using Kipu.Platform.Iam.Domain.Repositories;
 using Kipu.Platform.Iam.Resources;
@@ -21,17 +23,21 @@ public class UserCommandService(
     IUserRepository userRepository,
     IBusinessRepository businessRepository,
     IRoleRepository roleRepository,
+    IPasswordResetCodeRepository passwordResetCodeRepository,
     ITokenService tokenService,
     IHashingService hashingService,
+    IEmailService emailService,
     IUnitOfWork unitOfWork,
     IProductContextFacade productContextFacade,
     IValidator<SignUpCommand> signUpValidator,
     IValidator<InviteUserCommand> inviteUserValidator,
     IValidator<ChangePasswordCommand> changePasswordValidator,
+    IValidator<ResetPasswordCommand> resetPasswordValidator,
     IStringLocalizer<IamMessages> localizer)
     : IUserCommandService
 {
     private const int DefaultOwnerRoleId = 1; // ADMIN — matches the frontend's hardcoded sign-up roleId.
+    private static readonly TimeSpan ResetCodeLifetime = TimeSpan.FromMinutes(5);
 
     public async Task<Result<(User user, string token)>> Handle(SignInCommand command, CancellationToken cancellationToken)
     {
@@ -265,6 +271,97 @@ public class UserCommandService(
         userRepository.Update(user);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result.Success();
+    }
+
+    /// <summary>
+    ///     Always succeeds, whether or not the email belongs to a real,
+    ///     active account — answering differently would let an attacker use
+    ///     this endpoint to test which emails are registered. If it does
+    ///     match, any code already on file for that user is replaced (never
+    ///     more than one valid code to guess at a time) and the new one is
+    ///     emailed.
+    /// </summary>
+    public async Task<Result> Handle(RequestPasswordResetCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
+        if (user == null || user.Status != UserStatus.Active) return Result.Success();
+
+        var code = GenerateSixDigitCode();
+        await passwordResetCodeRepository.RemoveAllForUserAsync(user.Id, cancellationToken);
+        await passwordResetCodeRepository.AddAsync(
+            new PasswordResetCode(user.Id, hashingService.HashPassword(code), DateTimeOffset.UtcNow + ResetCodeLifetime),
+            cancellationToken);
+        await unitOfWork.CompleteAsync(cancellationToken);
+
+        await emailService.SendPasswordResetCodeAsync(user.Email, user.Name, code, cancellationToken);
+        return Result.Success();
+    }
+
+    /// <summary>
+    ///     Checks the code without resetting anything yet — lets the UI move
+    ///     to the "choose a new password" screen only once the code itself is
+    ///     confirmed right, instead of finding out after typing a new
+    ///     password too. Every wrong guess counts against the attempt limit,
+    ///     matching ResetPasswordCommand's own re-check of the same code.
+    /// </summary>
+    public async Task<Result> Handle(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
+        if (user == null)
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
+        if (resetCode == null || !resetCode.CanBeAttempted(DateTimeOffset.UtcNow))
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        if (!hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+        {
+            resetCode.RegisterFailedAttempt();
+            passwordResetCodeRepository.Update(resetCode);
+            await unitOfWork.CompleteAsync(cancellationToken);
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+        }
+
+        resetCode.MarkVerified();
+        passwordResetCodeRepository.Update(resetCode);
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    /// <summary>
+    ///     Only succeeds against a code already verified by
+    ///     VerifyPasswordResetCodeCommand — this deliberately re-checks the
+    ///     code (not just the IsVerified flag) so a code that expired in the
+    ///     gap between the two calls is still rejected. Bumps TokenVersion via
+    ///     UpdatePasswordHash, so every session this user had open anywhere —
+    ///     including whatever leaked/guessed credential led to needing a reset
+    ///     in the first place — stops working immediately.
+    /// </summary>
+    public async Task<Result> Handle(ResetPasswordCommand command, CancellationToken cancellationToken)
+    {
+        if (!(await resetPasswordValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
+
+        var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
+        if (user == null)
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
+        if (resetCode == null || !resetCode.IsVerified || resetCode.IsExpired(DateTimeOffset.UtcNow) ||
+            !hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        user.UpdatePasswordHash(hashingService.HashPassword(command.NewPassword));
+        userRepository.Update(user);
+        passwordResetCodeRepository.Remove(resetCode);
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    /// <summary>Cryptographically random, not Random — this is a secret that grants account access, same bar as the password itself.</summary>
+    private static string GenerateSixDigitCode()
+    {
+        return RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
     }
 
     /// <summary>Shared by DeleteUserCommand and DeactivateUserCommand — both take away an admin's access permanently enough to need this guard.</summary>

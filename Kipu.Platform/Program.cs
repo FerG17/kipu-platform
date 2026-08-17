@@ -16,6 +16,9 @@ using Kipu.Platform.Iam.Application.Internal.QueryServices;
 using Kipu.Platform.Iam.Application.QueryServices;
 using Kipu.Platform.Iam.Domain.Repositories;
 using Kipu.Platform.Iam.Infrastructure.Bootstrap;
+using Kipu.Platform.Iam.Infrastructure.Email.Logging.Services;
+using Kipu.Platform.Iam.Infrastructure.Email.Resend.Configuration;
+using Kipu.Platform.Iam.Infrastructure.Email.Resend.Services;
 using Kipu.Platform.Iam.Infrastructure.Hashing.BCrypt.Services;
 using Kipu.Platform.Iam.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Extensions;
@@ -298,9 +301,27 @@ builder.Services.Configure<BootstrapSettings>(settings => settings.Key = bootstr
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IBusinessRepository, BusinessRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IPasswordResetCodeRepository, PasswordResetCodeRepository>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IHashingService, HashingService>();
+
+// Falls back to logging the code instead of emailing it whenever no API key
+// is configured — every automated test, and local dev before the owner sets
+// one up — so the reset flow is fully exercisable without a real Resend account.
+builder.Services.AddHttpClient();
+var resendSettings = builder.Configuration.GetSection("Resend").Get<ResendSettings>() ?? new ResendSettings();
+resendSettings.ApiKey = Environment.ExpandEnvironmentVariables(resendSettings.ApiKey);
+builder.Services.Configure<ResendSettings>(settings =>
+{
+    settings.ApiKey = resendSettings.ApiKey;
+    settings.FromEmail = resendSettings.FromEmail;
+    settings.FromName = resendSettings.FromName;
+});
+if (!string.IsNullOrWhiteSpace(resendSettings.ApiKey))
+    builder.Services.AddScoped<IEmailService, ResendEmailService>();
+else
+    builder.Services.AddScoped<IEmailService, LoggingEmailService>();
 
 builder.Services.AddScoped<IUserCommandService, UserCommandService>();
 builder.Services.AddScoped<IBusinessCommandService, BusinessCommandService>();

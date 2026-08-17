@@ -132,6 +132,46 @@ public class AuthenticationController(
     }
 
     /// <summary>
+    ///     Always 200, whether or not the email belongs to a real account —
+    ///     answering differently would let this endpoint be used to test
+    ///     which emails are registered.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "Request a password-reset code by email", OperationId = "ForgotPassword")]
+    [SwaggerResponse(StatusCodes.Status200OK, "A code was sent, if that email belongs to an active account")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordResource resource, CancellationToken cancellationToken)
+    {
+        var command = RequestPasswordResetCommandFromResourceAssembler.ToCommandFromResource(resource);
+        var result = await userCommandService.Handle(command, cancellationToken);
+        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => Ok());
+    }
+
+    /// <summary>Checks a code without resetting anything — lets the UI confirm it before showing the new-password step.</summary>
+    [HttpPost("verify-reset-code")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "Verify a password-reset code", OperationId = "VerifyResetCode")]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid or expired code")]
+    public async Task<IActionResult> VerifyResetCode([FromBody] VerifyResetCodeResource resource, CancellationToken cancellationToken)
+    {
+        var command = VerifyPasswordResetCodeCommandFromResourceAssembler.ToCommandFromResource(resource);
+        var result = await userCommandService.Handle(command, cancellationToken);
+        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => Ok());
+    }
+
+    /// <summary>Sets a new password against a code already confirmed via VerifyResetCode — also signs the user out of every other session.</summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "Reset a password using a verified code", OperationId = "ResetPassword")]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid/expired/unverified code, or a weak new password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordResource resource, CancellationToken cancellationToken)
+    {
+        var command = ResetPasswordCommandFromResourceAssembler.ToCommandFromResource(resource);
+        var result = await userCommandService.Handle(command, cancellationToken);
+        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
+    }
+
+    /// <summary>
     ///     Constant-time comparison — this header is a bearer secret, so a
     ///     length-dependent early-exit compare would let an attacker recover
     ///     it byte by byte via response timing, the same class of bug the JWT
