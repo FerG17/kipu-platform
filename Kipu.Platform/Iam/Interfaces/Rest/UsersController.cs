@@ -127,6 +127,33 @@ public class UsersController(
         return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
     }
 
+    /// <summary>Suspends a team member's access without deleting the account — keeps their audit trail (past sales, movements) intact.</summary>
+    [HttpPatch("{id:int}/deactivate")]
+    [Authorize(RoleNames.Admin)]
+    [SwaggerOperation(Summary = "Suspend a team member's access", OperationId = "DeactivateUser")]
+    [SwaggerResponse(StatusCodes.Status409Conflict, "This is the business's last active administrator")]
+    public async Task<IActionResult> DeactivateUser([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var existing = await userQueryService.Handle(new GetUserByIdQuery(id), cancellationToken);
+        if (existing == null || !BelongsToCurrentBusiness(existing.BusinessId)) return NotFound();
+
+        var result = await userCommandService.Handle(new DeactivateUserCommand(id), cancellationToken);
+        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
+    }
+
+    /// <summary>Restores a previously suspended team member's access.</summary>
+    [HttpPatch("{id:int}/reactivate")]
+    [Authorize(RoleNames.Admin)]
+    [SwaggerOperation(Summary = "Restore a suspended team member's access", OperationId = "ReactivateUser")]
+    public async Task<IActionResult> ReactivateUser([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var existing = await userQueryService.Handle(new GetUserByIdQuery(id), cancellationToken);
+        if (existing == null || !BelongsToCurrentBusiness(existing.BusinessId)) return NotFound();
+
+        var result = await userCommandService.Handle(new ReactivateUserCommand(id), cancellationToken);
+        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
+    }
+
     /// <summary>
     ///     Tenant-isolation guard: a user from one business can't act on a
     ///     user from another business, even by guessing an id. AppDbContext's

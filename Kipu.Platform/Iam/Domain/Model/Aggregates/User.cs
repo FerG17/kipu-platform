@@ -94,4 +94,11 @@ public class User(
         TokenVersion++;
         return this;
     }
+
+    /// <summary>Restores sign-in access for a previously suspended user — does not touch TokenVersion, since there are no sessions of theirs left to invalidate.</summary>
+    public User Reactivate()
+    {
+        Status = UserStatus.Active;
+        return this;
+    }
 }
