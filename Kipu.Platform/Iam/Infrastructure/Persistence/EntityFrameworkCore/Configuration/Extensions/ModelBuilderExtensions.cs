@@ -46,6 +46,19 @@ public static class ModelBuilderExtensions
             // Business.cs for why (circular reference with User.BusinessId).
         });
 
+        builder.Entity<PasswordResetCode>(entity =>
+        {
+            entity.HasKey(code => code.Id);
+            entity.Property(code => code.Id).ValueGeneratedOnAdd();
+            entity.Property(code => code.CodeHash).IsRequired();
+
+            // No enforced FK to User on purpose — same reasoning as everywhere
+            // else a lookup happens before a tenant/auth context exists
+            // (compare Business.UserId): losing a code row if its user is ever
+            // hard-deleted is harmless, the row just becomes unreachable.
+            entity.HasIndex(code => code.UserId);
+        });
+
         builder.Entity<Role>(entity =>
         {
             entity.HasKey(role => role.Id);

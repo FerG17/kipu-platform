@@ -1,4 +1,9 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Kipu.Platform.Iam.Application.Internal.OutboundServices;
 
 namespace Kipu.Platform.Tests.Infrastructure;
 
@@ -50,5 +55,16 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         // correctly, not a bug, so the tests raise the ceiling instead.
         Environment.SetEnvironmentVariable("RateLimiting__AuthPermitsPerMinute", "10000");
         Environment.SetEnvironmentVariable("RateLimiting__GlobalPermitsPerMinute", "10000");
+    }
+
+    /// <summary>Swaps the real (SendGrid or logging) email service for one tests can read the sent code back from.</summary>
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IEmailService>();
+            services.AddSingleton<CapturingEmailService>();
+            services.AddSingleton<IEmailService>(sp => sp.GetRequiredService<CapturingEmailService>());
+        });
     }
 }

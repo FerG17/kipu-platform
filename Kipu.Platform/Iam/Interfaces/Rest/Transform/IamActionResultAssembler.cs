@@ -47,6 +47,7 @@ public static class IamActionResultAssembler
             IamError.CurrentPasswordInvalid => StatusCodes.Status401Unauthorized,
             IamError.WeakPassword => StatusCodes.Status400BadRequest,
             IamError.RoleNotFound => StatusCodes.Status400BadRequest,
+            IamError.InvalidResetCode => StatusCodes.Status400BadRequest,
             IamError.EmailAlreadyTaken => StatusCodes.Status409Conflict,
             IamError.CannotRemoveLastAdmin => StatusCodes.Status409Conflict,
             IamError.CannotRemoveOwnAccess => StatusCodes.Status409Conflict,

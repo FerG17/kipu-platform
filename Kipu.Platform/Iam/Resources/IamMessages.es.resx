@@ -77,4 +77,7 @@
   <data name="CannotRemoveOwnAccess" xml:space="preserve">
     <value>No puedes eliminar ni suspender tu propia cuenta. Pide a otro administrador que lo haga.</value>
   </data>
+  <data name="InvalidResetCode" xml:space="preserve">
+    <value>Código inválido o expirado. Solicita uno nuevo.</value>
+  </data>
 </root>
