@@ -57,7 +57,7 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("RateLimiting__GlobalPermitsPerMinute", "10000");
     }
 
-    /// <summary>Swaps the real (SendGrid or logging) email service for one tests can read the sent code back from.</summary>
+    /// <summary>Swaps the real (Resend or logging) email service for one tests can read the sent code back from.</summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureTestServices(services =>

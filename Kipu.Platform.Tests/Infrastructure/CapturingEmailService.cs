@@ -6,7 +6,7 @@ namespace Kipu.Platform.Tests.Infrastructure;
 /// <summary>
 ///     Replaces the real email service in the test host (see
 ///     KipuApiFactory) so password-reset tests can read the code that
-///     "arrived" without ever touching SendGrid.
+///     "arrived" without ever touching Resend.
 /// </summary>
 public class CapturingEmailService : IEmailService
 {

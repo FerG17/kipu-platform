@@ -8,7 +8,7 @@ namespace Kipu.Platform.Tests;
 /// <summary>
 ///     Forgot-password: email → 6-digit code → verify → set a new password.
 ///     The email itself is captured by CapturingEmailService (see
-///     KipuApiFactory) instead of actually going to SendGrid.
+///     KipuApiFactory) instead of actually going to Resend.
 /// </summary>
 [Collection(KipuApiCollection.Name)]
 public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(factory)

@@ -17,8 +17,8 @@ using Kipu.Platform.Iam.Application.QueryServices;
 using Kipu.Platform.Iam.Domain.Repositories;
 using Kipu.Platform.Iam.Infrastructure.Bootstrap;
 using Kipu.Platform.Iam.Infrastructure.Email.Logging.Services;
-using Kipu.Platform.Iam.Infrastructure.Email.SendGrid.Configuration;
-using Kipu.Platform.Iam.Infrastructure.Email.SendGrid.Services;
+using Kipu.Platform.Iam.Infrastructure.Email.Resend.Configuration;
+using Kipu.Platform.Iam.Infrastructure.Email.Resend.Services;
 using Kipu.Platform.Iam.Infrastructure.Hashing.BCrypt.Services;
 using Kipu.Platform.Iam.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Extensions;
@@ -308,17 +308,18 @@ builder.Services.AddScoped<IHashingService, HashingService>();
 
 // Falls back to logging the code instead of emailing it whenever no API key
 // is configured — every automated test, and local dev before the owner sets
-// one up — so the reset flow is fully exercisable without a real SendGrid account.
-var sendGridSettings = builder.Configuration.GetSection("SendGrid").Get<SendGridSettings>() ?? new SendGridSettings();
-sendGridSettings.ApiKey = Environment.ExpandEnvironmentVariables(sendGridSettings.ApiKey);
-builder.Services.Configure<SendGridSettings>(settings =>
+// one up — so the reset flow is fully exercisable without a real Resend account.
+builder.Services.AddHttpClient();
+var resendSettings = builder.Configuration.GetSection("Resend").Get<ResendSettings>() ?? new ResendSettings();
+resendSettings.ApiKey = Environment.ExpandEnvironmentVariables(resendSettings.ApiKey);
+builder.Services.Configure<ResendSettings>(settings =>
 {
-    settings.ApiKey = sendGridSettings.ApiKey;
-    settings.FromEmail = sendGridSettings.FromEmail;
-    settings.FromName = sendGridSettings.FromName;
+    settings.ApiKey = resendSettings.ApiKey;
+    settings.FromEmail = resendSettings.FromEmail;
+    settings.FromName = resendSettings.FromName;
 });
-if (!string.IsNullOrWhiteSpace(sendGridSettings.ApiKey))
-    builder.Services.AddScoped<IEmailService, SendGridEmailService>();
+if (!string.IsNullOrWhiteSpace(resendSettings.ApiKey))
+    builder.Services.AddScoped<IEmailService, ResendEmailService>();
 else
     builder.Services.AddScoped<IEmailService, LoggingEmailService>();
 
