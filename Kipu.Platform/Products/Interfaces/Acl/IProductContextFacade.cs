@@ -53,6 +53,16 @@ public interface IProductContextFacade
     Task<bool> ProductExists(int productId, CancellationToken cancellationToken);
 
     /// <summary>
+    ///     The admin-set sale price for a product, straight from the product
+    ///     record — used by Sales &amp; POS to price every sale line
+    ///     server-side instead of trusting whatever price the client
+    ///     submitted (a cashier's device can only ever display this price,
+    ///     never edit it, but the API itself must not take that on faith).
+    ///     Null if the product doesn't exist.
+    /// </summary>
+    Task<decimal?> GetBasePrice(int productId, CancellationToken cancellationToken);
+
+    /// <summary>
     ///     Every ACTIVE batch across every business — used by Alerts'
     ///     AlertExpirationSweepJob to detect products that crossed the
     ///     "about to expire"/"expired" threshold purely by the passage of

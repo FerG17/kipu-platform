@@ -54,14 +54,22 @@ public class SaleCommandService(
         // twice produces two lines for one product, and checking each line
         // independently against the same total stock lets their combined
         // quantity exceed what actually exists.
+        //
+        // The admin-set BasePrice is also captured here, per product, and used
+        // below instead of whatever UnitPrice the client submitted — the UI
+        // never lets a cashier edit it, but the API must not take a client-sent
+        // price on faith either.
+        var basePriceByProductId = new Dictionary<int, decimal>();
         foreach (var productLines in command.Lines.GroupBy(line => line.ProductId))
         {
             // Explicit existence check first (not just relying on the stock
             // check below): a product outside this business would otherwise
             // be caught only by "stock >= quantity" and report the wrong
             // reason, and could let a Sale reference a ProductId it doesn't own.
-            if (!await productContextFacade.ProductExists(productLines.Key, cancellationToken))
+            var basePrice = await productContextFacade.GetBasePrice(productLines.Key, cancellationToken);
+            if (basePrice is null)
                 return Result<Sale>.Failure(SalesError.ProductNotFound, localizer[nameof(SalesError.ProductNotFound)]);
+            basePriceByProductId[productLines.Key] = basePrice.Value;
 
             var requestedQuantity = productLines.Sum(line => line.Quantity);
             var availableStock = await productContextFacade.GetAvailableStock(productLines.Key, cancellationToken);
@@ -77,7 +85,7 @@ public class SaleCommandService(
                 sale = new Sale(command.BusinessId, command.CustomerId, command.PaymentMethod, command.Currency,
                     command.Description);
                 foreach (var line in command.Lines)
-                    sale.AddLine(line.ProductId, line.Quantity, line.UnitPrice, line.Discount);
+                    sale.AddLine(line.ProductId, line.Quantity, basePriceByProductId[line.ProductId], line.Discount);
 
                 await saleRepository.AddAsync(sale, cancellationToken);
                 await unitOfWork.CompleteAsync(cancellationToken);

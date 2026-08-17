@@ -73,6 +73,12 @@ public class ProductContextFacade(
         return product != null;
     }
 
+    public async Task<decimal?> GetBasePrice(int productId, CancellationToken cancellationToken)
+    {
+        var product = await productQueryService.Handle(new GetProductByIdQuery(productId), cancellationToken);
+        return product?.BasePrice;
+    }
+
     public async Task<IReadOnlyCollection<ActiveBatchInfo>> GetAllActiveBatchesForExpirationSweep(CancellationToken cancellationToken)
     {
         var batches = await batchRepository.FindAllActiveAsync(cancellationToken);
