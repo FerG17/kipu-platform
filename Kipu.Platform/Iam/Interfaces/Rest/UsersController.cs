@@ -123,7 +123,7 @@ public class UsersController(
         var existing = await userQueryService.Handle(new GetUserByIdQuery(id), cancellationToken);
         if (existing == null || !BelongsToCurrentBusiness(existing.BusinessId)) return NotFound();
 
-        var result = await userCommandService.Handle(new DeleteUserCommand(id), cancellationToken);
+        var result = await userCommandService.Handle(new DeleteUserCommand(id, currentUserAccessor.CurrentUserId ?? 0), cancellationToken);
         return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
     }
 
@@ -131,13 +131,13 @@ public class UsersController(
     [HttpPatch("{id:int}/deactivate")]
     [Authorize(RoleNames.Admin)]
     [SwaggerOperation(Summary = "Suspend a team member's access", OperationId = "DeactivateUser")]
-    [SwaggerResponse(StatusCodes.Status409Conflict, "This is the business's last active administrator")]
+    [SwaggerResponse(StatusCodes.Status409Conflict, "This is the business's last active administrator, or the caller's own account")]
     public async Task<IActionResult> DeactivateUser([FromRoute] int id, CancellationToken cancellationToken)
     {
         var existing = await userQueryService.Handle(new GetUserByIdQuery(id), cancellationToken);
         if (existing == null || !BelongsToCurrentBusiness(existing.BusinessId)) return NotFound();
 
-        var result = await userCommandService.Handle(new DeactivateUserCommand(id), cancellationToken);
+        var result = await userCommandService.Handle(new DeactivateUserCommand(id, currentUserAccessor.CurrentUserId ?? 0), cancellationToken);
         return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
     }
 

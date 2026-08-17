@@ -74,4 +74,7 @@
   <data name="CannotRemoveLastAdmin" xml:space="preserve">
     <value>Un negocio debe conservar al menos un administrador activo; este es el último.</value>
   </data>
+  <data name="CannotRemoveOwnAccess" xml:space="preserve">
+    <value>No puedes eliminar ni suspender tu propia cuenta. Pide a otro administrador que lo haga.</value>
+  </data>
 </root>

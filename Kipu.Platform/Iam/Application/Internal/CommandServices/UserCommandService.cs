@@ -214,6 +214,9 @@ public class UserCommandService(
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
         if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 
+        if (command.UserId == command.ActingUserId)
+            return Result.Failure(IamError.CannotRemoveOwnAccess, localizer[nameof(IamError.CannotRemoveOwnAccess)]);
+
         if (await IsLastActiveAdminAsync(user, cancellationToken))
             return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
 
@@ -228,11 +231,21 @@ public class UserCommandService(
     ///     access exactly like deleting them, so a business could otherwise
     ///     be left with nobody able to sign in and administer it, with every
     ///     account still sitting in the database and no way back in.
+    ///
+    ///     The self-check matters even more here than on delete: deactivating
+    ///     bumps TokenVersion, which kills the caller's own session the
+    ///     instant it runs — an admin who suspends themselves has no token
+    ///     left to call ReactivateUserCommand with, and (unlike delete) no
+    ///     other admin needs to exist for this to happen, so it's reachable
+    ///     any time a business has 2+ admins.
     /// </summary>
     public async Task<Result> Handle(DeactivateUserCommand command, CancellationToken cancellationToken)
     {
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
         if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+
+        if (command.UserId == command.ActingUserId)
+            return Result.Failure(IamError.CannotRemoveOwnAccess, localizer[nameof(IamError.CannotRemoveOwnAccess)]);
 
         if (await IsLastActiveAdminAsync(user, cancellationToken))
             return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
