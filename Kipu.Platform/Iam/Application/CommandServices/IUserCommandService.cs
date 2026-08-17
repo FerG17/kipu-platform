@@ -15,6 +15,12 @@ public interface IUserCommandService
     Task<Result> Handle(ChangePasswordCommand command, CancellationToken cancellationToken);
     Task<Result> Handle(DeleteUserCommand command, CancellationToken cancellationToken);
 
+    /// <summary>Suspends sign-in access without deleting the account, preserving its audit trail (past sales, movements, etc).</summary>
+    Task<Result> Handle(DeactivateUserCommand command, CancellationToken cancellationToken);
+
+    /// <summary>Restores sign-in access for a previously suspended user.</summary>
+    Task<Result> Handle(ReactivateUserCommand command, CancellationToken cancellationToken);
+
     /// <summary>Invalidates every token issued for this user so far — see User.RevokeAllSessions.</summary>
     Task<Result> Handle(SignOutCommand command, CancellationToken cancellationToken);
 }

@@ -214,19 +214,56 @@ public class UserCommandService(
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
         if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 
-        if (user.RoleId == DefaultOwnerRoleId)
-        {
-            var team = await userRepository.FindAllByBusinessIdAsync(user.BusinessId, cancellationToken);
-            var remainingAdmins = team.Count(member =>
-                member.Id != user.Id && member.RoleId == DefaultOwnerRoleId && member.Status == UserStatus.Active);
-
-            if (remainingAdmins == 0)
-                return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
-        }
+        if (await IsLastActiveAdminAsync(user, cancellationToken))
+            return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
 
         userRepository.Remove(user);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result.Success();
+    }
+
+    /// <summary>
+    ///     The "can't remove the last admin" rule from DeleteUserCommand
+    ///     applies just as much here: suspending a user takes away their
+    ///     access exactly like deleting them, so a business could otherwise
+    ///     be left with nobody able to sign in and administer it, with every
+    ///     account still sitting in the database and no way back in.
+    /// </summary>
+    public async Task<Result> Handle(DeactivateUserCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
+        if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+
+        if (await IsLastActiveAdminAsync(user, cancellationToken))
+            return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
+
+        user.Deactivate();
+        userRepository.Update(user);
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> Handle(ReactivateUserCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
+        if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+
+        user.Reactivate();
+        userRepository.Update(user);
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    /// <summary>Shared by DeleteUserCommand and DeactivateUserCommand — both take away an admin's access permanently enough to need this guard.</summary>
+    private async Task<bool> IsLastActiveAdminAsync(User user, CancellationToken cancellationToken)
+    {
+        if (user.RoleId != DefaultOwnerRoleId) return false;
+
+        var team = await userRepository.FindAllByBusinessIdAsync(user.BusinessId, cancellationToken);
+        var remainingAdmins = team.Count(member =>
+            member.Id != user.Id && member.RoleId == DefaultOwnerRoleId && member.Status == UserStatus.Active);
+
+        return remainingAdmins == 0;
     }
 
     /// <summary>Role has no BusinessId (fixed platform-wide catalog), so this lookup is never tenant-filtered.</summary>
