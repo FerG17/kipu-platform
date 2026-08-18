@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Kipu.Platform.Shared.Domain.Model.Entities;
 
 namespace Kipu.Platform.Iam.Domain.Model.Aggregates;
 
@@ -28,6 +29,7 @@ public class User(
     int businessId,
     int roleId,
     string phone = "")
+    : IVersionedEntity
 {
     public User() : this(string.Empty, string.Empty, string.Empty, string.Empty, 0, 0)
     {
@@ -55,6 +57,17 @@ public class User(
     ///     on their own.
     /// </summary>
     public int TokenVersion { get; private set; }
+
+    /// <summary>
+    ///     Optimistic-concurrency token (see IVersionedEntity /
+    ///     ConcurrencyVersionInterceptor, same mechanism InventoryItem/Sale/
+    ///     PurchaseOrder/PaymentPlan already use). Closes a real race: two
+    ///     concurrent requests against the business's last two admins
+    ///     (deactivate/delete) could each read "at least one other admin
+    ///     survives" before either write committed, leaving zero — the
+    ///     second write now fails with a 409 instead of silently succeeding.
+    /// </summary>
+    public int Version { get; set; }
 
     public User UpdateProfile(string name, string lastName, string phone)
     {

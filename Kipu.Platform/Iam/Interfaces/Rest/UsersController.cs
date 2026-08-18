@@ -6,6 +6,7 @@ using Kipu.Platform.Iam.Domain.Model.Commands;
 using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Domain.Model.Queries;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
+using Kipu.Platform.Iam.Infrastructure.Sessions;
 using Kipu.Platform.Iam.Interfaces.Rest.Resources;
 using Kipu.Platform.Iam.Interfaces.Rest.Transform;
 using Kipu.Platform.Shared.Application;
@@ -31,6 +32,7 @@ public class UsersController(
     IUserCommandService userCommandService,
     IUserQueryService userQueryService,
     ICurrentUserAccessor currentUserAccessor,
+    ISessionCookieService sessionCookieService,
     ProblemDetailsFactory problemDetailsFactory)
     : ControllerBase
 {
@@ -97,7 +99,21 @@ public class UsersController(
             user => Ok(UserResourceFromEntityAssembler.ToResourceFromEntity(user)));
     }
 
-    /// <summary>Changes the user's password — requires the current password, separate from UpdateProfile so it can never be silently wiped.</summary>
+    /// <summary>
+    ///     Changes the user's password — requires the current password,
+    ///     separate from UpdateProfile so it can never be silently wiped.
+    ///
+    ///     When the caller is changing their own password (the overwhelmingly
+    ///     common case — an admin changing a teammate's password from here is
+    ///     the exception IsSelfOrAdmin still allows), the change bumps their
+    ///     own TokenVersion, which instantly stales their existing session
+    ///     cookie. Reissuing it here is what keeps them signed in through
+    ///     their own password change instead of getting logged out by the
+    ///     very next request. Deliberately scoped to self-change only: if an
+    ///     admin is changing someone *else's* password, it's the admin's
+    ///     browser holding the cookie, and reissuing it with the target
+    ///     user's fresh token would sign the admin in as that other user.
+    /// </summary>
     [HttpPost("{id:int}/change-password")]
     [SwaggerOperation(Summary = "Change a user's password", OperationId = "ChangePassword")]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Current password is incorrect")]
@@ -112,7 +128,12 @@ public class UsersController(
         var command = ChangePasswordCommandFromResourceAssembler.ToCommandFromResource(resource, id);
         var result = await userCommandService.Handle(command, cancellationToken);
 
-        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
+        return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, token =>
+        {
+            if (id == currentUserAccessor.CurrentUserId)
+                sessionCookieService.SetSessionCookie(Response, token);
+            return NoContent();
+        });
     }
 
     [HttpDelete("{id:int}")]

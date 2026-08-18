@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Kipu.Platform.Iam.Application.Internal.CommandServices;
 using Kipu.Platform.Tests.Infrastructure;
 
 namespace Kipu.Platform.Tests;
@@ -13,9 +15,8 @@ namespace Kipu.Platform.Tests;
 [Collection(KipuApiCollection.Name)]
 public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(factory)
 {
-    private string CodeSentTo(string email) =>
-        factory.Services.GetRequiredService<CapturingEmailService>().LastCodeFor(email)
-        ?? throw new InvalidOperationException($"No reset code was captured for {email}");
+    private Task<string> CodeSentTo(string email) =>
+        factory.Services.GetRequiredService<CapturingEmailService>().WaitForCodeAsync(email);
 
     [Fact]
     public async Task FullFlow_RequestVerifyReset_SignsInWithTheNewPassword()
@@ -25,7 +26,7 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
             .EnsureSuccessStatusCode();
 
-        var code = CodeSentTo(admin.Email);
+        var code = await CodeSentTo(admin.Email);
 
         var verify = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
             new { email = admin.Email, code });
@@ -85,7 +86,7 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
             .EnsureSuccessStatusCode();
 
-        var code = CodeSentTo(admin.Email);
+        var code = await CodeSentTo(admin.Email);
 
         var reset = await Client.PostAsJsonAsync("/api/v1/authentication/reset-password",
             new { email = admin.Email, code, newPassword = "BrandNewPassw0rd!" });
@@ -100,7 +101,7 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
             .EnsureSuccessStatusCode();
 
-        var code = CodeSentTo(admin.Email);
+        var code = await CodeSentTo(admin.Email);
 
         for (var attempt = 0; attempt < 5; attempt++)
         {
@@ -123,7 +124,7 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
 
         (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
             .EnsureSuccessStatusCode();
-        var firstCode = CodeSentTo(admin.Email);
+        var firstCode = await CodeSentTo(admin.Email);
 
         (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
             .EnsureSuccessStatusCode();
@@ -148,5 +149,120 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
             .EnsureSuccessStatusCode();
 
         Assert.Null(factory.Services.GetRequiredService<CapturingEmailService>().LastCodeFor(email));
+    }
+
+    /// <summary>
+    ///     A code requested, then verified, before the account got suspended
+    ///     must stop working the moment the account is — otherwise suspending
+    ///     someone doesn't actually cut off their access if they grabbed a
+    ///     reset code on the way out.
+    /// </summary>
+    [Fact]
+    public async Task SuspendedUser_CannotVerifyAnAlreadyIssuedCode()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        var email = await InviteMemberAsync(admin.Client, CashierRoleId);
+        var memberId = await MemberIdByEmailAsync(admin.Client, email);
+
+        (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email }))
+            .EnsureSuccessStatusCode();
+        var code = await CodeSentTo(email);
+
+        (await admin.Client.PatchAsync($"/api/v1/users/{memberId}/deactivate", null)).EnsureSuccessStatusCode();
+
+        var verify = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code", new { email, code });
+        Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
+    }
+
+    /// <summary>Same as VerifyingAnAlreadyIssuedCode, but for a code that made it all the way to "verified" before the suspension.</summary>
+    [Fact]
+    public async Task SuspendedUser_CannotResetWithAnAlreadyVerifiedCode()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        var email = await InviteMemberAsync(admin.Client, CashierRoleId);
+        var memberId = await MemberIdByEmailAsync(admin.Client, email);
+
+        (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email }))
+            .EnsureSuccessStatusCode();
+        var code = await CodeSentTo(email);
+        (await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code", new { email, code }))
+            .EnsureSuccessStatusCode();
+
+        (await admin.Client.PatchAsync($"/api/v1/users/{memberId}/deactivate", null)).EnsureSuccessStatusCode();
+
+        var reset = await Client.PostAsJsonAsync("/api/v1/authentication/reset-password",
+            new { email, code, newPassword = "BrandNewPassw0rd!" });
+        Assert.Equal(HttpStatusCode.BadRequest, reset.StatusCode);
+    }
+
+    /// <summary>
+    ///     Without this, "5 wrong guesses" really meant "5 wrong guesses per
+    ///     resend" — nothing stopped requesting a fresh code specifically to
+    ///     reset the attempt counter back to 0.
+    /// </summary>
+    [Fact]
+    public async Task AttemptCount_CarriesOverToARegeneratedCode()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
+            .EnsureSuccessStatusCode();
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var wrong = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+                new { email = admin.Email, code = "000000" });
+            Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        }
+
+        // Request a brand-new code — its attempt budget should already be spent.
+        (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
+            .EnsureSuccessStatusCode();
+        var freshCode = await CodeSentTo(admin.Email);
+
+        var verify = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+            new { email = admin.Email, code = freshCode });
+        Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
+    }
+
+    /// <summary>Requesting a code for the same account twice in quick succession must not invalidate the first one — the resend cooldown no-ops instead.</summary>
+    [Fact]
+    public async Task RequestingACodeTwiceWithinTheCooldown_KeepsTheFirstCodeValid()
+    {
+        await using var cooldownFactory = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+                services.Configure<PasswordResetSettings>(settings => settings.RequestCooldownSeconds = 30)));
+        var client = cooldownFactory.CreateClient();
+
+        var email = $"cooldown-{Guid.NewGuid():N}@test.local";
+        var signUp = await PostSignUpAsync(client, new
+        {
+            email,
+            password = ValidPassword,
+            name = "Cooldown",
+            lastName = "Test",
+            businessName = "Kipu cooldown test",
+            businessType = "RETAIL"
+        });
+        signUp.EnsureSuccessStatusCode();
+
+        (await client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email }))
+            .EnsureSuccessStatusCode();
+        var firstCode = await cooldownFactory.Services.GetRequiredService<CapturingEmailService>()
+            .WaitForCodeAsync(email);
+
+        // Immediately asking again, well within the 30s cooldown — must not replace the code.
+        (await client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email }))
+            .EnsureSuccessStatusCode();
+
+        var verify = await client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+            new { email, code = firstCode });
+        Assert.True(verify.IsSuccessStatusCode);
+    }
+
+    private static async Task<int> MemberIdByEmailAsync(HttpClient adminClient, string email)
+    {
+        var users = await ReadJsonAsync(await adminClient.GetAsync("/api/v1/users"));
+        return users.EnumerateArray().First(u => u.GetProperty("email").GetString() == email)
+            .GetProperty("id").GetInt32();
     }
 }

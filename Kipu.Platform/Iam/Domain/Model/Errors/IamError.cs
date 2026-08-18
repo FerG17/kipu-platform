@@ -27,6 +27,17 @@ public enum IamError
     ///     from "you waited too long" or "someone already used it".
     /// </summary>
     InvalidResetCode,
+
+    /// <summary>
+    ///     Another request modified this same row (User or PasswordResetCode)
+    ///     in the gap between this request's read and its write — e.g. two
+    ///     concurrent attempts to deactivate the business's last two admins,
+    ///     or two concurrent resets against the same verified code. Whoever
+    ///     loses the race should retry with fresh data rather than the write
+    ///     silently overwriting a change it never saw.
+    /// </summary>
+    ConcurrentModification,
+
     OperationCancelled,
     DatabaseError,
     InternalServerError

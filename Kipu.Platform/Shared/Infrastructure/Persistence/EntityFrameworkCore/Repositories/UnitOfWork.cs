@@ -1,3 +1,5 @@
+using System.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Kipu.Platform.Shared.Domain.Repositories;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
@@ -17,6 +19,12 @@ public class UnitOfWork(AppDbContext context) : IUnitOfWork
     public async Task<ITransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        return new EfTransaction(transaction);
+    }
+
+    public async Task<ITransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
+    {
+        var transaction = await context.Database.BeginTransactionAsync(isolationLevel, cancellationToken);
         return new EfTransaction(transaction);
     }
 

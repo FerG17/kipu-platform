@@ -55,6 +55,13 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         // correctly, not a bug, so the tests raise the ceiling instead.
         Environment.SetEnvironmentVariable("RateLimiting__AuthPermitsPerMinute", "10000");
         Environment.SetEnvironmentVariable("RateLimiting__GlobalPermitsPerMinute", "10000");
+
+        // Production's real cooldown (appsettings.json) would make every test
+        // that requests two codes back-to-back collide with it, since the
+        // suite has no injectable clock to fast-forward past it yet. Zeroed
+        // here; CooldownTests spins up its own factory with a real value to
+        // verify the cooldown actually works.
+        Environment.SetEnvironmentVariable("PasswordReset__RequestCooldownSeconds", "0");
     }
 
     /// <summary>Swaps the real (Resend or logging) email service for one tests can read the sent code back from.</summary>

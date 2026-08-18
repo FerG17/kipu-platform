@@ -109,4 +109,114 @@ public class SessionCookieTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/products")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await headerClient.GetAsync("/api/v1/products")).StatusCode);
     }
+
+    /// <summary>
+    ///     ChangePassword bumps TokenVersion (see User.UpdatePasswordHash),
+    ///     which would otherwise stale the caller's own session cookie the
+    ///     instant the request that just changed it returns — a real "logged
+    ///     out by changing your own password" bug. UsersController now
+    ///     reissues the cookie for a self-change, so the same browser session
+    ///     keeps working through it.
+    /// </summary>
+    [Fact]
+    public async Task ChangingOwnPassword_ReissuesTheSessionCookie_SoTheSessionSurvives()
+    {
+        var client = _factory.CreateClient();
+
+        var signUpResponse = await PostSignUpAsync(client, new
+        {
+            email = $"cookie-{Guid.NewGuid():N}@test.local",
+            password = ValidPassword,
+            name = "Test",
+            lastName = "Cookie",
+            businessName = "Kipu cookie test 3",
+            businessType = "RETAIL"
+        });
+        signUpResponse.EnsureSuccessStatusCode();
+        var body = await ReadJsonAsync(signUpResponse);
+        var userId = body.GetProperty("id").GetInt32();
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/products")).StatusCode);
+
+        const string newPassword = "BrandNewPassw0rd!";
+        var changeRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/users/{userId}/change-password")
+        {
+            Content = JsonContent.Create(new { currentPassword = ValidPassword, newPassword })
+        };
+        changeRequest.Headers.Add("Origin", "http://localhost:5173");
+        var changeResponse = await client.SendAsync(changeRequest);
+        Assert.Equal(HttpStatusCode.NoContent, changeResponse.StatusCode);
+
+        // Same cookie jar, no re-login in between — the request right after
+        // the password change must still be authenticated.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/products")).StatusCode);
+    }
+
+    /// <summary>
+    ///     The mirror case: an admin changing a *teammate's* password must
+    ///     not touch the admin's own cookie — that cookie belongs to the
+    ///     admin's browser, and reissuing it with the target user's fresh
+    ///     token would sign the admin in as that other user.
+    /// </summary>
+    [Fact]
+    public async Task AdminChangingSomeoneElsesPassword_DoesNotTouchTheAdminsOwnCookie()
+    {
+        // HandleCookies=false throughout — with it on, the client's own jar
+        // would silently swallow a second Set-Cookie if one arrived, hiding
+        // exactly the bug this test exists to catch. The cookie is instead
+        // forwarded by hand on every request, so an unwanted second
+        // Set-Cookie is directly observable.
+        var adminClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var signUpResponse = await PostSignUpAsync(adminClient, new
+        {
+            email = $"admin-{Guid.NewGuid():N}@test.local",
+            password = ValidPassword,
+            name = "Admin",
+            lastName = "Cookie",
+            businessName = "Kipu cookie test 4",
+            businessType = "RETAIL"
+        });
+        signUpResponse.EnsureSuccessStatusCode();
+        var adminCookie = ExtractSessionCookie(signUpResponse);
+
+        var memberEmail = $"member-{Guid.NewGuid():N}@test.local";
+        var inviteRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/users")
+        {
+            Content = JsonContent.Create(new
+            {
+                email = memberEmail, password = ValidPassword, name = "Team", lastName = "Member",
+                roleId = CashierRoleId, phone = ""
+            })
+        };
+        inviteRequest.Headers.Add("Cookie", adminCookie);
+        inviteRequest.Headers.Add("Origin", "http://localhost:5173");
+        var inviteResponse = await adminClient.SendAsync(inviteRequest);
+        inviteResponse.EnsureSuccessStatusCode();
+        var memberId = (await ReadJsonAsync(inviteResponse)).GetProperty("id").GetInt32();
+
+        var changeRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/users/{memberId}/change-password")
+        {
+            Content = JsonContent.Create(new { currentPassword = ValidPassword, newPassword = "BrandNewPassw0rd!" })
+        };
+        changeRequest.Headers.Add("Cookie", adminCookie);
+        changeRequest.Headers.Add("Origin", "http://localhost:5173");
+        var changeResponse = await adminClient.SendAsync(changeRequest);
+        Assert.Equal(HttpStatusCode.NoContent, changeResponse.StatusCode);
+
+        // The admin changed someone else's password — no cookie should have
+        // been reissued at all for this request.
+        Assert.False(changeResponse.Headers.TryGetValues("Set-Cookie", out _));
+
+        // The admin's original cookie is still exactly as valid as before.
+        var stillWorksRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/products");
+        stillWorksRequest.Headers.Add("Cookie", adminCookie);
+        Assert.Equal(HttpStatusCode.OK, (await adminClient.SendAsync(stillWorksRequest)).StatusCode);
+    }
+
+    private static string ExtractSessionCookie(HttpResponseMessage response)
+    {
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var cookieHeaders));
+        var sessionCookie = Assert.Single(cookieHeaders!, header => header.StartsWith("bodega_session="));
+        return sessionCookie[..sessionCookie.IndexOf(';')];
+    }
 }

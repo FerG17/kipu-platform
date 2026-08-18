@@ -8,7 +8,7 @@ using Kipu.Platform.Iam.Application.CommandServices;
 using Kipu.Platform.Iam.Domain.Model.Commands;
 using Kipu.Platform.Iam.Infrastructure.Bootstrap;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
-using Kipu.Platform.Iam.Infrastructure.Tokens.Jwt.Configuration;
+using Kipu.Platform.Iam.Infrastructure.Sessions;
 using Kipu.Platform.Iam.Interfaces.Rest.Resources;
 using Kipu.Platform.Iam.Interfaces.Rest.Transform;
 using Kipu.Platform.Shared.Application;
@@ -25,47 +25,12 @@ namespace Kipu.Platform.Iam.Interfaces.Rest;
 public class AuthenticationController(
     IUserCommandService userCommandService,
     ICurrentUserAccessor currentUserAccessor,
-    IOptions<TokenSettings> tokenSettings,
+    ISessionCookieService sessionCookieService,
     IOptions<BootstrapSettings> bootstrapSettings,
-    IWebHostEnvironment environment,
     ProblemDetailsFactory problemDetailsFactory)
     : ControllerBase
 {
-    private const string SessionCookieName = "bodega_session";
     private const string BootstrapKeyHeader = "X-Bootstrap-Key";
-
-    /// <summary>
-    ///     Also sets the token as an httpOnly cookie so the frontend never has
-    ///     to store the raw JWT itself (see RequestAuthorizationMiddleware,
-    ///     which accepts either this cookie or the classic Authorization
-    ///     header — the header stays for Swagger/tests/API consumers, the
-    ///     cookie is what the real SPA relies on).
-    ///
-    ///     SameSite=Strict only works when the frontend and API share a site
-    ///     (same registrable domain). The chosen hosting — Railway for the API,
-    ///     Cloudflare Pages for the frontend, no shared custom domain yet — puts
-    ///     them on two different sites by the Public Suffix List, so a Strict
-    ///     cookie would simply never be sent and login would loop forever.
-    ///     None is scoped to non-Development only: the dev cookie stays Strict
-    ///     (see SessionCookieTests) because frontend and API are both
-    ///     http://localhost there, same-site by definition, and a None cookie
-    ///     requires Secure — which plain http can't satisfy anyway. Downgrading
-    ///     to None removes the browser's own CSRF defense for this cookie, so
-    ///     RequestAuthorizationMiddleware compensates with an Origin/Referer
-    ///     check on every cookie-authenticated state-changing request.
-    /// </summary>
-    private void SetSessionCookie(string token)
-    {
-        var isProduction = !environment.IsDevelopment();
-        Response.Cookies.Append(SessionCookieName, token, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = isProduction,
-            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Strict,
-            Path = "/",
-            Expires = DateTimeOffset.UtcNow.AddDays(tokenSettings.Value.ExpirationDays)
-        });
-    }
 
     /// <summary>Authenticates a user with email/password and returns a JWT.</summary>
     [HttpPost("sign-in")]
@@ -81,7 +46,7 @@ public class AuthenticationController(
         return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             authenticated =>
             {
-                SetSessionCookie(authenticated.token);
+                sessionCookieService.SetSessionCookie(Response, authenticated.token);
                 return Ok(AuthenticatedUserResourceFromEntityAssembler.ToResourceFromEntity(
                     authenticated.user, authenticated.token));
             });
@@ -116,7 +81,7 @@ public class AuthenticationController(
         return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             authenticated =>
             {
-                SetSessionCookie(authenticated.token);
+                sessionCookieService.SetSessionCookie(Response, authenticated.token);
                 return Ok(AuthenticatedUserResourceFromEntityAssembler.ToResourceFromEntity(
                     authenticated.user, authenticated.token));
             });
@@ -140,7 +105,7 @@ public class AuthenticationController(
 
         return IamActionResultAssembler.ToActionResult(result, problemDetailsFactory, () =>
         {
-            Response.Cookies.Delete(SessionCookieName, new CookieOptions { Path = "/" });
+            sessionCookieService.ClearSessionCookie(Response);
             return NoContent();
         });
     }

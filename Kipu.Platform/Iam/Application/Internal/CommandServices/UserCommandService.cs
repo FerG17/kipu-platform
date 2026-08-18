@@ -1,6 +1,11 @@
+using System.Data;
 using System.Security.Cryptography;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Kipu.Platform.Iam.Application.CommandServices;
 using Kipu.Platform.Iam.Application.Internal.OutboundServices;
 using Kipu.Platform.Iam.Domain.Model.Aggregates;
@@ -26,24 +31,39 @@ public class UserCommandService(
     IPasswordResetCodeRepository passwordResetCodeRepository,
     ITokenService tokenService,
     IHashingService hashingService,
-    IEmailService emailService,
     IUnitOfWork unitOfWork,
     IProductContextFacade productContextFacade,
     IValidator<SignUpCommand> signUpValidator,
     IValidator<InviteUserCommand> inviteUserValidator,
     IValidator<ChangePasswordCommand> changePasswordValidator,
     IValidator<ResetPasswordCommand> resetPasswordValidator,
+    IOptions<PasswordResetSettings> passwordResetSettings,
+    IServiceScopeFactory serviceScopeFactory,
+    ILogger<UserCommandService> logger,
     IStringLocalizer<IamMessages> localizer)
     : IUserCommandService
 {
     private const int DefaultOwnerRoleId = 1; // ADMIN — matches the frontend's hardcoded sign-up roleId.
     private static readonly TimeSpan ResetCodeLifetime = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    ///     A real BCrypt hash of a value nobody could ever type as a password
+    ///     (it's not tied to any account) — computed once, not per request.
+    ///     Verifying against this when the email doesn't exist keeps sign-in's
+    ///     response time the same either way. Without it, `user == null`
+    ///     short-circuits past VerifyPassword entirely, and a real account's
+    ///     measurably slower BCrypt comparison becomes a timing oracle an
+    ///     attacker can use to enumerate which emails are registered.
+    /// </summary>
+    private static readonly string DummyPasswordHash =
+        global::BCrypt.Net.BCrypt.HashPassword("kipu-constant-time-decoy-9f3a2c7e-not-a-real-password");
+
     public async Task<Result<(User user, string token)>> Handle(SignInCommand command, CancellationToken cancellationToken)
     {
         var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
+        var passwordMatches = hashingService.VerifyPassword(command.Password, user?.PasswordHash ?? DummyPasswordHash);
 
-        if (user == null || !hashingService.VerifyPassword(command.Password, user.PasswordHash))
+        if (user == null || !passwordMatches)
             return Result<(User user, string token)>.Failure(IamError.InvalidCredentials,
                 localizer[nameof(IamError.InvalidCredentials)]);
 
@@ -168,25 +188,48 @@ public class UserCommandService(
 
         user.UpdateProfile(command.Name, command.LastName, command.Phone);
         userRepository.Update(user);
-        await unitOfWork.CompleteAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<User>.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
         return Result<User>.Success(user);
     }
 
-    public async Task<Result> Handle(ChangePasswordCommand command, CancellationToken cancellationToken)
+    /// <summary>
+    ///     Returns a fresh token: UpdatePasswordHash bumps TokenVersion, which
+    ///     RequestAuthorizationMiddleware checks on every request — without a
+    ///     new token to replace the caller's own session cookie with, their
+    ///     very next request would 401 them out of the account they just
+    ///     changed the password for.
+    /// </summary>
+    public async Task<Result<string>> Handle(ChangePasswordCommand command, CancellationToken cancellationToken)
     {
         if (!(await changePasswordValidator.ValidateAsync(command, cancellationToken)).IsValid)
-            return Result.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
+            return Result<string>.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
 
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
-        if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+        if (user == null) return Result<string>.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 
         if (!hashingService.VerifyPassword(command.CurrentPassword, user.PasswordHash))
-            return Result.Failure(IamError.CurrentPasswordInvalid, localizer[nameof(IamError.CurrentPasswordInvalid)]);
+            return Result<string>.Failure(IamError.CurrentPasswordInvalid, localizer[nameof(IamError.CurrentPasswordInvalid)]);
 
         user.UpdatePasswordHash(hashingService.HashPassword(command.NewPassword));
         userRepository.Update(user);
-        await unitOfWork.CompleteAsync(cancellationToken);
-        return Result.Success();
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<string>.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
+
+        var roleName = await ResolveRoleNameAsync(user.RoleId, cancellationToken);
+        return Result<string>.Success(tokenService.GenerateToken(user, roleName));
     }
 
     /// <summary>
@@ -203,8 +246,7 @@ public class UserCommandService(
 
         user.RevokeAllSessions();
         userRepository.Update(user);
-        await unitOfWork.CompleteAsync(cancellationToken);
-        return Result.Success();
+        return await CompleteWithConcurrencyGuardAsync(cancellationToken);
     }
 
     /// <summary>
@@ -214,21 +256,44 @@ public class UserCommandService(
     ///     which the endpoint happily allowed — left the bodega's products,
     ///     sales and credit permanently unreachable, with the rows still in the
     ///     database and no one able to log in and administer them.
+    ///
+    ///     Wrapped in a Serializable transaction (see IsLastActiveAdminAsync's
+    ///     doc comment for why a plain read-then-write isn't enough): two
+    ///     concurrent calls against the business's last two admins now
+    ///     genuinely conflict at the database level instead of each reading
+    ///     "at least one other admin survives" before either write commits.
     /// </summary>
     public async Task<Result> Handle(DeleteUserCommand command, CancellationToken cancellationToken)
     {
-        var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
-        if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+        await using var transaction =
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        try
+        {
+            var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
+            if (user == null)
+                return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 
-        if (command.UserId == command.ActingUserId)
-            return Result.Failure(IamError.CannotRemoveOwnAccess, localizer[nameof(IamError.CannotRemoveOwnAccess)]);
+            if (command.UserId == command.ActingUserId)
+                return Result.Failure(IamError.CannotRemoveOwnAccess, localizer[nameof(IamError.CannotRemoveOwnAccess)]);
 
-        if (await IsLastActiveAdminAsync(user, cancellationToken))
-            return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
+            if (await IsLastActiveAdminAsync(user, cancellationToken))
+                return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
 
-        userRepository.Remove(user);
-        await unitOfWork.CompleteAsync(cancellationToken);
-        return Result.Success();
+            userRepository.Remove(user);
+            await unitOfWork.CompleteAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Result.Success();
+        }
+        catch (DbUpdateException)
+        {
+            // Covers both an EF concurrency-token mismatch and a raw MySQL
+            // deadlock/lock-wait-timeout — Serializable isolation makes the
+            // last-admin race in the doc comment above resolve as exactly
+            // one of the two concurrent calls failing this way, never both
+            // silently succeeding.
+            await transaction.RollbackAsync(cancellationToken);
+            return Result.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
     }
 
     /// <summary>
@@ -244,22 +309,37 @@ public class UserCommandService(
     ///     left to call ReactivateUserCommand with, and (unlike delete) no
     ///     other admin needs to exist for this to happen, so it's reachable
     ///     any time a business has 2+ admins.
+    ///
+    ///     See Handle(DeleteUserCommand) for why this runs inside a
+    ///     Serializable transaction.
     /// </summary>
     public async Task<Result> Handle(DeactivateUserCommand command, CancellationToken cancellationToken)
     {
-        var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
-        if (user == null) return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
+        await using var transaction =
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        try
+        {
+            var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
+            if (user == null)
+                return Result.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 
-        if (command.UserId == command.ActingUserId)
-            return Result.Failure(IamError.CannotRemoveOwnAccess, localizer[nameof(IamError.CannotRemoveOwnAccess)]);
+            if (command.UserId == command.ActingUserId)
+                return Result.Failure(IamError.CannotRemoveOwnAccess, localizer[nameof(IamError.CannotRemoveOwnAccess)]);
 
-        if (await IsLastActiveAdminAsync(user, cancellationToken))
-            return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
+            if (await IsLastActiveAdminAsync(user, cancellationToken))
+                return Result.Failure(IamError.CannotRemoveLastAdmin, localizer[nameof(IamError.CannotRemoveLastAdmin)]);
 
-        user.Deactivate();
-        userRepository.Update(user);
-        await unitOfWork.CompleteAsync(cancellationToken);
-        return Result.Success();
+            user.Deactivate();
+            userRepository.Update(user);
+            await unitOfWork.CompleteAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Result.Success();
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Result.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
     }
 
     public async Task<Result> Handle(ReactivateUserCommand command, CancellationToken cancellationToken)
@@ -269,32 +349,84 @@ public class UserCommandService(
 
         user.Reactivate();
         userRepository.Update(user);
-        await unitOfWork.CompleteAsync(cancellationToken);
-        return Result.Success();
+        return await CompleteWithConcurrencyGuardAsync(cancellationToken);
     }
 
     /// <summary>
     ///     Always succeeds, whether or not the email belongs to a real,
     ///     active account — answering differently would let an attacker use
-    ///     this endpoint to test which emails are registered. If it does
-    ///     match, any code already on file for that user is replaced (never
-    ///     more than one valid code to guess at a time) and the new one is
-    ///     emailed.
+    ///     this endpoint to test which emails are registered. Same reasoning
+    ///     applies to a request that arrives within the cooldown, or against
+    ///     an account whose current code is already fully guessed: both
+    ///     still 200, they just don't do anything new.
+    ///
+    ///     A code's AttemptCount carries over to its replacement instead of
+    ///     resetting to 0 (see PasswordResetCode) unless the previous code
+    ///     had already expired on its own — otherwise "5 wrong guesses" would
+    ///     really mean "5 wrong guesses per resend", since nothing stopped
+    ///     requesting a fresh code specifically to reset the counter.
+    ///
+    ///     The email itself is sent in the background, not awaited before
+    ///     returning: awaiting it would make a real, active account's
+    ///     response measurably slower than a nonexistent/inactive one's
+    ///     (network round-trip to Resend vs. an instant no-op) — exactly the
+    ///     kind of timing side-channel this endpoint's constant "always 200"
+    ///     response is supposed to prevent. It runs in its own DI scope
+    ///     (IServiceScopeFactory) since the request's own scope — and
+    ///     whatever it holds, like the DbContext — is gone by the time a
+    ///     background task actually runs.
     /// </summary>
     public async Task<Result> Handle(RequestPasswordResetCommand command, CancellationToken cancellationToken)
     {
         var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
         if (user == null || user.Status != UserStatus.Active) return Result.Success();
 
+        var now = DateTimeOffset.UtcNow;
+        var existingCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
+
+        if (existingCode != null)
+        {
+            var cooldown = TimeSpan.FromSeconds(passwordResetSettings.Value.RequestCooldownSeconds);
+            if (existingCode.IsWithinCooldown(now, cooldown)) return Result.Success();
+
+            if (!existingCode.IsExpired(now) && existingCode.HasExceededAttempts()) return Result.Success();
+        }
+
+        var carriedOverAttempts = existingCode != null && !existingCode.IsExpired(now) ? existingCode.AttemptCount : 0;
         var code = GenerateSixDigitCode();
         await passwordResetCodeRepository.RemoveAllForUserAsync(user.Id, cancellationToken);
         await passwordResetCodeRepository.AddAsync(
-            new PasswordResetCode(user.Id, hashingService.HashPassword(code), DateTimeOffset.UtcNow + ResetCodeLifetime),
+            new PasswordResetCode(user.Id, hashingService.HashPassword(code), now, now + ResetCodeLifetime,
+                carriedOverAttempts),
             cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
 
-        await emailService.SendPasswordResetCodeAsync(user.Email, user.Name, code, cancellationToken);
+        SendPasswordResetEmailInBackground(user.Email, user.Name, code);
         return Result.Success();
+    }
+
+    /// <summary>
+    ///     Fire-and-forget on purpose (see Handle(RequestPasswordResetCommand)
+    ///     for why) — resolves IEmailService from a brand-new scope rather
+    ///     than the captured one, since the request's scope (and its
+    ///     DbContext) is disposed the moment the HTTP response finishes,
+    ///     which can race with or outright precede this task actually running.
+    /// </summary>
+    private void SendPasswordResetEmailInBackground(string toEmail, string toName, string code)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await using var scope = serviceScopeFactory.CreateAsyncScope();
+                var scopedEmailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                await scopedEmailService.SendPasswordResetCodeAsync(toEmail, toName, code, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Failed to send the background password-reset email to {Email}", toEmail);
+            }
+        });
     }
 
     /// <summary>
@@ -303,29 +435,43 @@ public class UserCommandService(
     ///     confirmed right, instead of finding out after typing a new
     ///     password too. Every wrong guess counts against the attempt limit,
     ///     matching ResetPasswordCommand's own re-check of the same code.
+    ///
+    ///     Status is re-checked here too (RequestPasswordResetCommand already
+    ///     refuses to issue a code to a suspended account, but a still-valid
+    ///     code from before a suspension shouldn't keep working either).
     /// </summary>
     public async Task<Result> Handle(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken)
     {
         var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
-        if (user == null)
+        if (user == null || user.Status != UserStatus.Active)
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
         if (resetCode == null || !resetCode.CanBeAttempted(DateTimeOffset.UtcNow))
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
-        if (!hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+        try
         {
-            resetCode.RegisterFailedAttempt();
+            if (!hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+            {
+                resetCode.RegisterFailedAttempt();
+                passwordResetCodeRepository.Update(resetCode);
+                await unitOfWork.CompleteAsync(cancellationToken);
+                return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+            }
+
+            resetCode.MarkVerified();
             passwordResetCodeRepository.Update(resetCode);
             await unitOfWork.CompleteAsync(cancellationToken);
-            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+            return Result.Success();
         }
-
-        resetCode.MarkVerified();
-        passwordResetCodeRepository.Update(resetCode);
-        await unitOfWork.CompleteAsync(cancellationToken);
-        return Result.Success();
+        catch (DbUpdateConcurrencyException)
+        {
+            // Two guesses against the same code landed at once — whichever
+            // loses the race should retry against the code's now-current
+            // state rather than this write silently clobbering the other one.
+            return Result.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
     }
 
     /// <summary>
@@ -335,7 +481,8 @@ public class UserCommandService(
     ///     gap between the two calls is still rejected. Bumps TokenVersion via
     ///     UpdatePasswordHash, so every session this user had open anywhere —
     ///     including whatever leaked/guessed credential led to needing a reset
-    ///     in the first place — stops working immediately.
+    ///     in the first place — stops working immediately. Status is
+    ///     re-checked too, same reasoning as VerifyPasswordResetCodeCommand.
     /// </summary>
     public async Task<Result> Handle(ResetPasswordCommand command, CancellationToken cancellationToken)
     {
@@ -343,7 +490,7 @@ public class UserCommandService(
             return Result.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
 
         var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
-        if (user == null)
+        if (user == null || user.Status != UserStatus.Active)
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
@@ -354,7 +501,18 @@ public class UserCommandService(
         user.UpdatePasswordHash(hashingService.HashPassword(command.NewPassword));
         userRepository.Update(user);
         passwordResetCodeRepository.Remove(resetCode);
-        await unitOfWork.CompleteAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Two concurrent resets against the same verified code — without
+            // PasswordResetCode's own concurrency token this could otherwise
+            // let both succeed (Remove only marks for deletion; the actual
+            // DELETE only happens here, at CompleteAsync).
+            return Result.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
         return Result.Success();
     }
 
@@ -362,6 +520,19 @@ public class UserCommandService(
     private static string GenerateSixDigitCode()
     {
         return RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    }
+
+    private async Task<Result> CompleteWithConcurrencyGuardAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+            return Result.Success();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
+        }
     }
 
     /// <summary>Shared by DeleteUserCommand and DeactivateUserCommand — both take away an admin's access permanently enough to need this guard.</summary>

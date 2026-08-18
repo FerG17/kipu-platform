@@ -80,4 +80,7 @@
   <data name="InvalidResetCode" xml:space="preserve">
     <value>Código inválido o expirado. Solicita uno nuevo.</value>
   </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>Esto cambió en otro lugar recién. Actualiza e intenta de nuevo.</value>
+  </data>
 </root>
