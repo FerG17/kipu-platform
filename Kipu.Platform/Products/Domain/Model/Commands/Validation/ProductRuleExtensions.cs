@@ -32,6 +32,6 @@ public static class ProductRuleExtensions
 
     public static IRuleBuilderOptions<T, decimal> MustBeAMoneyAmount<T>(this IRuleBuilder<T, decimal> ruleBuilder)
     {
-        return ruleBuilder.InclusiveBetween(0m, MaxMoney);
+        return ruleBuilder.GreaterThan(0m).LessThanOrEqualTo(MaxMoney);
     }
 }

@@ -7,9 +7,11 @@ namespace Kipu.Platform.Sales.Domain.Model.Commands.Validation;
 ///
 ///     Without this, the only check a line ever faced was "is there enough
 ///     stock", which a negative quantity trivially passes. Since Subtotal is
-///     Quantity × UnitPrice × (1 - Discount), a negative quantity, a negative
-///     price, or a discount above 100% all produce a negative sale total that
-///     is then counted as revenue in the dashboard.
+///     Quantity × UnitPrice, a negative quantity or a negative price would
+///     otherwise produce a negative sale total that is then counted as
+///     revenue in the dashboard. Discount is no longer part of this input
+///     contract at all (see SaleLineCommand) — the UI never offered it, so
+///     the only real fix was to remove the lever, not cap it.
 /// </summary>
 public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
 {
@@ -21,10 +23,6 @@ public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
         {
             line.RuleFor(l => l.Quantity).GreaterThan(0);
             line.RuleFor(l => l.UnitPrice).GreaterThanOrEqualTo(0);
-
-            // Stored as decimal(5,4), i.e. a 0..1 fraction — anything above 1
-            // flips the subtotal negative.
-            line.RuleFor(l => l.Discount).InclusiveBetween(0m, 1m);
         });
     }
 }

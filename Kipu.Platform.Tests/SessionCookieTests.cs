@@ -97,7 +97,13 @@ public class SessionCookieTests : IntegrationTestBase
         var headerClient = AuthenticatedClient(token);
         Assert.Equal(HttpStatusCode.OK, (await headerClient.GetAsync("/api/v1/products")).StatusCode);
 
-        var signOutResponse = await client.PostAsync("/api/v1/authentication/sign-out", null);
+        // A real browser always sends Origin on a same-site fetch POST too —
+        // set explicitly here since HttpClient doesn't add it on its own, and
+        // the cookie path now requires a trusted one (see
+        // RequestAuthorizationMiddleware.HasTrustedOrigin / CsrfProtectionTests).
+        var signOutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/authentication/sign-out");
+        signOutRequest.Headers.Add("Origin", "http://localhost:5173");
+        var signOutResponse = await client.SendAsync(signOutRequest);
         Assert.Equal(HttpStatusCode.NoContent, signOutResponse.StatusCode);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/products")).StatusCode);

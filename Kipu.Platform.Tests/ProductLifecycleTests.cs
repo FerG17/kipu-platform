@@ -37,6 +37,51 @@ public class ProductLifecycleTests(KipuApiFactory factory) : IntegrationTestBase
     }
 
     /// <summary>
+    ///     Batch.UpdateDetails used to overwrite Expiration unconditionally
+    ///     while InventoryId already used `?? existing` to stay put when null
+    ///     — an asymmetry found in the 2026-08-18 audit. In practice: a second
+    ///     stock intake for the same product that only sets a purchase price
+    ///     (the normal shape of receiving a purchase order, which doesn't
+    ///     re-send the expiration) silently wiped the date the first intake
+    ///     had already recorded.
+    /// </summary>
+    [Fact]
+    public async Task StockIntake_WithOnlyAPurchasePrice_DoesNotClearAnAlreadyRecordedExpiration()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        var expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 20, expiration: expiration,
+            purchasePrice: 4.5m)).EnsureSuccessStatusCode();
+
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10, purchasePrice: 5.0m))
+            .EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync($"/api/v1/batches?productId={productId}");
+        response.EnsureSuccessStatusCode();
+        var batches = await ReadJsonAsync(response);
+
+        Assert.Equal(expiration.ToString("yyyy-MM-dd"), batches[0].GetProperty("expiration").GetString());
+    }
+
+    /// <summary>
+    ///     MustBeAMoneyAmount used InclusiveBetween(0, max) — a product could
+    ///     be registered with a sale price of exactly 0, and every sale of it
+    ///     would then count as 0 revenue while still decrementing stock.
+    /// </summary>
+    [Fact]
+    public async Task CreateProduct_WithZeroBasePrice_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+
+        var response = await CreateProductResponseAsync(client, basePrice: 0m);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>
     ///     Deleting a product is blocked while it still has stock, which means
     ///     the only deletable product is one at zero — exactly the one the
     ///     alert engine has flagged OUT_OF_STOCK. The foreign key from alerts

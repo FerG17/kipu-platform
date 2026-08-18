@@ -54,21 +54,24 @@ public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(f
     }
 
     /// <summary>
-    ///     Subtotal is quantity × unitPrice × (1 - discount), so any discount
-    ///     above 1 flips the sale negative. The column is decimal(5,4), which
-    ///     happily stores 2.0.
+    ///     Discount isn't part of the sale contract (SaleLineResource) — the
+    ///     UI never offered it, and the 2026-08-18 audit found it as a lever
+    ///     with no legitimate caller. A client sending it anyway must have no
+    ///     effect at all: the total is exactly quantity × unitPrice.
     /// </summary>
     [Fact]
-    public async Task Sale_WithDiscountGreaterThanOneHundredPercent_IsRejected()
+    public async Task Sale_WithDiscountFieldInRequestBody_IgnoresItEntirely()
     {
         var client = await CreateBusinessAsync();
         var productId = await CreateProductAsync(client);
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
-        var response = await CreateSaleAsync(client, SaleLine(productId, quantity: 1, unitPrice: 10m, discount: 2m));
+        var response = await CreateSaleAsync(client, SaleLine(productId, quantity: 1, unitPrice: 10m, discount: 0.9m));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        response.EnsureSuccessStatusCode();
+        var totalAmount = (await ReadJsonAsync(response)).GetProperty("totalAmount").GetDecimal();
+        Assert.Equal(10m, totalAmount);
     }
 
     /// <summary>
