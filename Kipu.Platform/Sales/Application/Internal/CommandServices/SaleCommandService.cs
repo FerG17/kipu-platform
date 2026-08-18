@@ -84,8 +84,13 @@ public class SaleCommandService(
             {
                 sale = new Sale(command.BusinessId, command.CustomerId, command.PaymentMethod, command.Currency,
                     command.Description);
+                // Discount isn't part of the client-facing sale contract (see
+                // SaleLineCommand/CreateSaleCommandValidator) — the UI never
+                // offered it, so it's always 0 here. SaleDetail keeps the field
+                // (Subtotal already accounts for it) in case a real discount
+                // feature gets built later; nothing outside this line sets it.
                 foreach (var line in command.Lines)
-                    sale.AddLine(line.ProductId, line.Quantity, basePriceByProductId[line.ProductId], line.Discount);
+                    sale.AddLine(line.ProductId, line.Quantity, basePriceByProductId[line.ProductId], discount: 0m);
 
                 await saleRepository.AddAsync(sale, cancellationToken);
                 await unitOfWork.CompleteAsync(cancellationToken);
