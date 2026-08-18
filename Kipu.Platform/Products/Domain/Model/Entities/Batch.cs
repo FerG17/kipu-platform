@@ -57,7 +57,7 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
 
     public Batch UpdateDetails(DateOnly? expiration, decimal purchasePrice, int? inventoryId)
     {
-        Expiration = expiration;
+        Expiration = expiration ?? Expiration;
         PurchasePrice = purchasePrice;
         InventoryId = inventoryId ?? InventoryId;
         return this;
