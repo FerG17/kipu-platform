@@ -12,7 +12,8 @@ public interface IUserCommandService
     Task<Result<(User user, string token)>> Handle(SignUpCommand command, CancellationToken cancellationToken);
     Task<Result<User>> Handle(InviteUserCommand command, CancellationToken cancellationToken);
     Task<Result<User>> Handle(UpdateUserProfileCommand command, CancellationToken cancellationToken);
-    Task<Result> Handle(ChangePasswordCommand command, CancellationToken cancellationToken);
+    /// <summary>Also returns a fresh token — changing the password bumps TokenVersion, which would otherwise instantly invalidate the caller's own still-active session cookie.</summary>
+    Task<Result<string>> Handle(ChangePasswordCommand command, CancellationToken cancellationToken);
     Task<Result> Handle(DeleteUserCommand command, CancellationToken cancellationToken);
 
     /// <summary>Suspends sign-in access without deleting the account, preserving its audit trail (past sales, movements, etc).</summary>

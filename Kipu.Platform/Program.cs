@@ -23,6 +23,7 @@ using Kipu.Platform.Iam.Infrastructure.Hashing.BCrypt.Services;
 using Kipu.Platform.Iam.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Extensions;
 using Kipu.Platform.Iam.Infrastructure.Tokens.Jwt.Configuration;
+using Kipu.Platform.Iam.Infrastructure.Sessions;
 using Kipu.Platform.Iam.Infrastructure.Tokens.Jwt.Services;
 using Kipu.Platform.Iam.Resources;
 using Kipu.Platform.Products.Application.Acl;
@@ -298,6 +299,8 @@ BootstrapKeyGuard.EnsureUsable(bootstrapSettings.Key);
 
 builder.Services.Configure<BootstrapSettings>(settings => settings.Key = bootstrapSettings.Key);
 
+builder.Services.Configure<PasswordResetSettings>(builder.Configuration.GetSection("PasswordReset"));
+
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IBusinessRepository, BusinessRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -305,6 +308,7 @@ builder.Services.AddScoped<IPasswordResetCodeRepository, PasswordResetCodeReposi
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IHashingService, HashingService>();
+builder.Services.AddScoped<ISessionCookieService, SessionCookieService>();
 
 // Falls back to logging the code instead of emailing it whenever no API key
 // is configured — every automated test, and local dev before the owner sets
