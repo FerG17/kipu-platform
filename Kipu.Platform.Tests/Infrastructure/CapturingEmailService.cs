@@ -20,4 +20,24 @@ public class CapturingEmailService : IEmailService
     }
 
     public string? LastCodeFor(string email) => lastCodeByEmail.GetValueOrDefault(email);
+
+    /// <summary>
+    ///     RequestPasswordResetCommand sends the email in the background now
+    ///     (fire-and-forget, not awaited before the HTTP response — see its
+    ///     doc comment) specifically so response timing can't reveal whether
+    ///     an account exists. That means the code isn't guaranteed captured
+    ///     the instant the request completes; tests poll briefly instead of
+    ///     assuming it is.
+    /// </summary>
+    public async Task<string> WaitForCodeAsync(string email, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(3));
+        while (DateTime.UtcNow < deadline)
+        {
+            if (lastCodeByEmail.TryGetValue(email, out var code)) return code;
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException($"No reset code arrived for {email} within the timeout.");
+    }
 }
