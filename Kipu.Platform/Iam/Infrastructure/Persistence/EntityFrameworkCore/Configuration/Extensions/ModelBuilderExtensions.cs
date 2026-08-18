@@ -31,6 +31,8 @@ public static class ModelBuilderExtensions
                 .WithMany()
                 .HasForeignKey(user => user.RoleId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(user => user.Version).IsConcurrencyToken();
         });
 
         builder.Entity<Business>(entity =>
@@ -51,6 +53,7 @@ public static class ModelBuilderExtensions
             entity.HasKey(code => code.Id);
             entity.Property(code => code.Id).ValueGeneratedOnAdd();
             entity.Property(code => code.CodeHash).IsRequired();
+            entity.Property(code => code.Version).IsConcurrencyToken();
 
             // No enforced FK to User on purpose — same reasoning as everywhere
             // else a lookup happens before a tenant/auth context exists

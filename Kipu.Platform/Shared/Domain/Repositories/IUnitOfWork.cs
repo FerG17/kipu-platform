@@ -1,3 +1,5 @@
+using System.Data;
+
 namespace Kipu.Platform.Shared.Domain.Repositories;
 
 /// <summary>
@@ -17,6 +19,18 @@ public interface IUnitOfWork
     ///     first — while still guaranteeing all-or-nothing atomicity.
     /// </summary>
     Task<ITransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Same as <see cref="BeginTransactionAsync(CancellationToken)" />,
+    ///     but at an explicit isolation level — used by check-then-write
+    ///     guards where a plain transaction isn't enough. MySQL's default
+    ///     (REPEATABLE READ) still lets two concurrent transactions each read
+    ///     "the guard passes" before either commits (e.g. two admins each
+    ///     confirming a third admin still exists, then both proceeding);
+    ///     Serializable forces the second one to fail instead of silently
+    ///     racing past the same check the first one just made.
+    /// </summary>
+    Task<ITransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
