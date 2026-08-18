@@ -40,14 +40,28 @@ public class AuthenticationController(
     ///     which accepts either this cookie or the classic Authorization
     ///     header — the header stays for Swagger/tests/API consumers, the
     ///     cookie is what the real SPA relies on).
+    ///
+    ///     SameSite=Strict only works when the frontend and API share a site
+    ///     (same registrable domain). The chosen hosting — Railway for the API,
+    ///     Cloudflare Pages for the frontend, no shared custom domain yet — puts
+    ///     them on two different sites by the Public Suffix List, so a Strict
+    ///     cookie would simply never be sent and login would loop forever.
+    ///     None is scoped to non-Development only: the dev cookie stays Strict
+    ///     (see SessionCookieTests) because frontend and API are both
+    ///     http://localhost there, same-site by definition, and a None cookie
+    ///     requires Secure — which plain http can't satisfy anyway. Downgrading
+    ///     to None removes the browser's own CSRF defense for this cookie, so
+    ///     RequestAuthorizationMiddleware compensates with an Origin/Referer
+    ///     check on every cookie-authenticated state-changing request.
     /// </summary>
     private void SetSessionCookie(string token)
     {
+        var isProduction = !environment.IsDevelopment();
         Response.Cookies.Append(SessionCookieName, token, new CookieOptions
         {
             HttpOnly = true,
-            Secure = !environment.IsDevelopment(),
-            SameSite = SameSiteMode.Strict,
+            Secure = isProduction,
+            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Strict,
             Path = "/",
             Expires = DateTimeOffset.UtcNow.AddDays(tokenSettings.Value.ExpirationDays)
         });
