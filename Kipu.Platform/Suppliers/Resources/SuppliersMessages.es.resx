@@ -71,4 +71,7 @@
   <data name="SupplierHasPendingOrders" xml:space="preserve">
     <value>Este proveedor tiene órdenes de compra pendientes o retrasadas. Recíbelas o cancélalas antes de desactivar al proveedor.</value>
   </data>
+  <data name="InvalidPurchaseOrderDate" xml:space="preserve">
+    <value>La fecha de la orden y la fecha esperada de entrega deben ser válidas, estar dentro de un rango razonable, y la fecha de entrega no puede ser anterior a la fecha de la orden.</value>
+  </data>
 </root>

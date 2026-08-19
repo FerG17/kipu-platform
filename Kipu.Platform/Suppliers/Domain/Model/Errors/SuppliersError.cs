@@ -9,6 +9,9 @@ public enum SuppliersError
     EmptyPurchaseOrderLines,
     InvalidPurchaseOrderLine,
 
+    /// <summary>Date/ExpectedDate outside a plausible calendar range, or ExpectedDate earlier than Date.</summary>
+    InvalidPurchaseOrderDate,
+
     /// <summary>Supplier name/ruc/email/phone outside what its columns accept.</summary>
     InvalidSupplierData,
 

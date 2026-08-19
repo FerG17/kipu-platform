@@ -33,6 +33,18 @@ public class PurchaseOrderCommandService(
             return Result<PurchaseOrder>.Failure(SuppliersError.EmptyPurchaseOrderLines,
                 localizer[nameof(SuppliersError.EmptyPurchaseOrderLines)]);
 
+        // Neither Date nor ExpectedDate had any range/order check — a past or
+        // out-of-range delivery date (e.g. a mistyped year) slipped straight
+        // through to the client's UI-only :min hint, and a wildly out-of-range
+        // year could hit MySQL's DATE column bounds and surface as a raw 500.
+        if (!IsPlausibleOrderDate(command.Date)
+            || (command.ExpectedDate.HasValue && !IsPlausibleOrderDate(command.ExpectedDate.Value))
+            || (command.ExpectedDate.HasValue && command.ExpectedDate.Value < command.Date))
+        {
+            return Result<PurchaseOrder>.Failure(SuppliersError.InvalidPurchaseOrderDate,
+                localizer[nameof(SuppliersError.InvalidPurchaseOrderDate)]);
+        }
+
         // Quantities and money on a purchase line were never checked at all —
         // see CreatePurchaseOrderCommandValidator.
         if (!(await createPurchaseOrderValidator.ValidateAsync(command, cancellationToken)).IsValid)
@@ -58,6 +70,9 @@ public class PurchaseOrderCommandService(
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<PurchaseOrder>.Success(purchaseOrder);
     }
+
+    /// <summary>Matches MySQL's own DATE column bounds closely enough to keep a mistyped year from ever reaching the database.</summary>
+    private static bool IsPlausibleOrderDate(DateOnly date) => date.Year is >= 2000 and <= 2100;
 
     /// <summary>
     ///     Moving to RECEIVED triggers a real stock intake per line, tagged
