@@ -42,4 +42,12 @@ public class SaleRepository(AppDbContext context, IBusinessClock businessClock)
 
         return await query.SumAsync(sale => sale.TotalAmount, cancellationToken);
     }
+
+    public async Task<Sale?> FindByBusinessIdAndIdempotencyKeyAsync(int businessId, string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Sale>().Include(sale => sale.SaleDetails)
+            .FirstOrDefaultAsync(sale => sale.BusinessId == businessId && sale.IdempotencyKey == idempotencyKey,
+                cancellationToken);
+    }
 }

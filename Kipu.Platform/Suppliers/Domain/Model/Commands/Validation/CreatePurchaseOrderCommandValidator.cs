@@ -17,6 +17,9 @@ namespace Kipu.Platform.Suppliers.Domain.Model.Commands.Validation;
 /// </summary>
 public class CreatePurchaseOrderCommandValidator : AbstractValidator<CreatePurchaseOrderCommand>
 {
+    /// <summary>The business operates in Soles only — see CreateSaleCommandValidator's identical rule.</summary>
+    private static readonly string[] AllowedCurrencies = ["PEN"];
+
     public CreatePurchaseOrderCommandValidator()
     {
         RuleFor(command => command.Lines).NotEmpty();
@@ -30,5 +33,8 @@ public class CreatePurchaseOrderCommandValidator : AbstractValidator<CreatePurch
             // flips the line total negative.
             line.RuleFor(l => l.Discount).InclusiveBetween(0m, 1m);
         });
+
+        RuleFor(command => command.Currency).Must(currency => AllowedCurrencies.Contains(currency));
+        RuleFor(command => command.Description).MaximumLength(500);
     }
 }

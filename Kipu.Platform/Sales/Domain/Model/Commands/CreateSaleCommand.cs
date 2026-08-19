@@ -6,4 +6,5 @@ public record CreateSaleCommand(
     string PaymentMethod,
     string Currency,
     string Description,
-    IReadOnlyCollection<SaleLineCommand> Lines);
+    IReadOnlyCollection<SaleLineCommand> Lines,
+    string? IdempotencyKey = null);

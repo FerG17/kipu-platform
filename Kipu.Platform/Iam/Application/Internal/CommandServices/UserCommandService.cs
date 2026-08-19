@@ -37,6 +37,7 @@ public class UserCommandService(
     IValidator<InviteUserCommand> inviteUserValidator,
     IValidator<ChangePasswordCommand> changePasswordValidator,
     IValidator<ResetPasswordCommand> resetPasswordValidator,
+    IValidator<UpdateUserProfileCommand> updateUserProfileValidator,
     IOptions<PasswordResetSettings> passwordResetSettings,
     IServiceScopeFactory serviceScopeFactory,
     ILogger<UserCommandService> logger,
@@ -99,9 +100,17 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<(User user, string token)>> Handle(SignUpCommand command, CancellationToken cancellationToken)
     {
-        if (!(await signUpValidator.ValidateAsync(command, cancellationToken)).IsValid)
-            return Result<(User user, string token)>.Failure(IamError.WeakPassword,
-                localizer[nameof(IamError.WeakPassword)]);
+        var signUpValidation = await signUpValidator.ValidateAsync(command, cancellationToken);
+        if (!signUpValidation.IsValid)
+        {
+            // Every failure used to report WeakPassword regardless of which
+            // field actually failed — a too-long name told the owner their
+            // password was the problem.
+            var error = signUpValidation.Errors.Any(failure => failure.PropertyName == nameof(SignUpCommand.Password))
+                ? IamError.WeakPassword
+                : IamError.InvalidUserData;
+            return Result<(User user, string token)>.Failure(error, localizer[error.ToString()]);
+        }
 
         if (await userRepository.ExistsByEmailAsync(command.Email, cancellationToken))
             return Result<(User user, string token)>.Failure(IamError.EmailAlreadyTaken,
@@ -153,8 +162,14 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<User>> Handle(InviteUserCommand command, CancellationToken cancellationToken)
     {
-        if (!(await inviteUserValidator.ValidateAsync(command, cancellationToken)).IsValid)
-            return Result<User>.Failure(IamError.WeakPassword, localizer[nameof(IamError.WeakPassword)]);
+        var inviteValidation = await inviteUserValidator.ValidateAsync(command, cancellationToken);
+        if (!inviteValidation.IsValid)
+        {
+            var error = inviteValidation.Errors.Any(failure => failure.PropertyName == nameof(InviteUserCommand.Password))
+                ? IamError.WeakPassword
+                : IamError.InvalidUserData;
+            return Result<User>.Failure(error, localizer[error.ToString()]);
+        }
 
         // RoleId came straight from the request body into the User row with
         // no check at all. A nonexistent role hit the foreign key and blew up
@@ -183,6 +198,9 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<User>> Handle(UpdateUserProfileCommand command, CancellationToken cancellationToken)
     {
+        if (!(await updateUserProfileValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<User>.Failure(IamError.InvalidUserData, localizer[nameof(IamError.InvalidUserData)]);
+
         var user = await userRepository.FindByIdAsync(command.UserId, cancellationToken);
         if (user == null) return Result<User>.Failure(IamError.UserNotFound, localizer[nameof(IamError.UserNotFound)]);
 

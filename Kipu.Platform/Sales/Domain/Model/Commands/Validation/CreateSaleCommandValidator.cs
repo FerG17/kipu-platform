@@ -15,6 +15,12 @@ namespace Kipu.Platform.Sales.Domain.Model.Commands.Validation;
 /// </summary>
 public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
 {
+    /// <summary>The only methods the POS actually offers (see the frontend's PaymentMethod enum) — PaymentMethod is free text on the wire, not a real enum.</summary>
+    private static readonly string[] AllowedPaymentMethods = ["CASH", "CARD", "YAPE", "PLIN"];
+
+    /// <summary>The business operates in Soles only — a stray currency here would still get summed into revenue as if it were PEN (see the Dashboard KPI query).</summary>
+    private static readonly string[] AllowedCurrencies = ["PEN"];
+
     public CreateSaleCommandValidator()
     {
         RuleFor(command => command.Lines).NotEmpty();
@@ -24,5 +30,9 @@ public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
             line.RuleFor(l => l.Quantity).GreaterThan(0);
             line.RuleFor(l => l.UnitPrice).GreaterThanOrEqualTo(0);
         });
+
+        RuleFor(command => command.PaymentMethod).Must(method => AllowedPaymentMethods.Contains(method));
+        RuleFor(command => command.Currency).Must(currency => AllowedCurrencies.Contains(currency));
+        RuleFor(command => command.Description).MaximumLength(500);
     }
 }

@@ -47,9 +47,14 @@ public class PurchaseOrderCommandService(
 
         // Quantities and money on a purchase line were never checked at all —
         // see CreatePurchaseOrderCommandValidator.
-        if (!(await createPurchaseOrderValidator.ValidateAsync(command, cancellationToken)).IsValid)
-            return Result<PurchaseOrder>.Failure(SuppliersError.InvalidPurchaseOrderLine,
-                localizer[nameof(SuppliersError.InvalidPurchaseOrderLine)]);
+        var lineValidation = await createPurchaseOrderValidator.ValidateAsync(command, cancellationToken);
+        if (!lineValidation.IsValid)
+        {
+            var error = lineValidation.Errors.All(failure => failure.PropertyName.StartsWith("Lines"))
+                ? SuppliersError.InvalidPurchaseOrderLine
+                : SuppliersError.InvalidPurchaseOrderData;
+            return Result<PurchaseOrder>.Failure(error, localizer[error.ToString()]);
+        }
 
         var supplier = await supplierRepository.FindByIdAsync(command.SupplierId, cancellationToken);
         if (supplier == null)

@@ -8,6 +8,10 @@ public enum IamError
     BusinessNotFound,
     CurrentPasswordInvalid,
     WeakPassword,
+
+    /// <summary>Name/LastName/Phone/Email outside what their columns accept, or a malformed email.</summary>
+    InvalidUserData,
+
     RoleNotFound,
 
     /// <summary>Removing this user would leave the business with nobody who can administer it, and there is no recovery path.</summary>

@@ -74,4 +74,7 @@
   <data name="InvalidPurchaseOrderDate" xml:space="preserve">
     <value>The order date and expected delivery date must be valid, within a reasonable range, and the delivery date cannot be earlier than the order date.</value>
   </data>
+  <data name="InvalidPurchaseOrderData" xml:space="preserve">
+    <value>Check the currency and description — one of them is invalid or too long.</value>
+  </data>
 </root>

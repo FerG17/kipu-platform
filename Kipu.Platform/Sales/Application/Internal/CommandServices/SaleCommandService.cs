@@ -37,11 +37,33 @@ public class SaleCommandService(
     /// </summary>
     public async Task<Result<Sale>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
     {
+        // Checked before anything else: a retry carrying the same key as a
+        // request that already succeeded (its response just never reached
+        // the client) returns that original sale untouched, rather than
+        // re-validating stock against an already-decremented count and
+        // failing, or — without this check — silently selling the same cart
+        // twice.
+        if (!string.IsNullOrEmpty(command.IdempotencyKey))
+        {
+            var existingSale = await saleRepository.FindByBusinessIdAndIdempotencyKeyAsync(command.BusinessId,
+                command.IdempotencyKey, cancellationToken);
+            if (existingSale != null) return Result<Sale>.Success(existingSale);
+        }
+
         if (command.Lines.Count == 0)
             return Result<Sale>.Failure(SalesError.EmptySaleLines, localizer[nameof(SalesError.EmptySaleLines)]);
 
-        if (!(await createSaleValidator.ValidateAsync(command, cancellationToken)).IsValid)
-            return Result<Sale>.Failure(SalesError.InvalidSaleLine, localizer[nameof(SalesError.InvalidSaleLine)]);
+        var lineValidation = await createSaleValidator.ValidateAsync(command, cancellationToken);
+        if (!lineValidation.IsValid)
+        {
+            // Distinguishes a bad line (quantity/price) from a bad header
+            // field (payment method/currency/description) — both used to
+            // report "invalid sale line" regardless of which one failed.
+            var error = lineValidation.Errors.All(failure => failure.PropertyName.StartsWith("Lines"))
+                ? SalesError.InvalidSaleLine
+                : SalesError.InvalidSaleData;
+            return Result<Sale>.Failure(error, localizer[error.ToString()]);
+        }
 
         if (command.CustomerId.HasValue)
         {
@@ -87,7 +109,7 @@ public class SaleCommandService(
             try
             {
                 sale = new Sale(command.BusinessId, command.CustomerId, command.PaymentMethod, command.Currency,
-                    command.Description);
+                    command.Description, command.IdempotencyKey);
                 // Discount isn't part of the client-facing sale contract (see
                 // SaleLineCommand/CreateSaleCommandValidator) — the UI never
                 // offered it, so it's always 0 here. SaleDetail keeps the field

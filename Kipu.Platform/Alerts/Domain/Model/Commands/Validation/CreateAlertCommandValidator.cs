@@ -7,10 +7,11 @@ public class CreateAlertCommandValidator : AbstractValidator<CreateAlertCommand>
 {
     public CreateAlertCommandValidator()
     {
-        RuleFor(command => command.ProductName).NotEmpty();
-        RuleFor(command => command.Type).NotEmpty();
-        RuleFor(command => command.Severity).NotEmpty();
-        RuleFor(command => command.Message).NotEmpty();
+        // Lengths mirror the columns in Alerts' ModelBuilderExtensions.
+        RuleFor(command => command.ProductName).NotEmpty().MaximumLength(150);
+        RuleFor(command => command.Type).NotEmpty().MaximumLength(20);
+        RuleFor(command => command.Severity).NotEmpty().MaximumLength(20);
+        RuleFor(command => command.Message).NotEmpty().MaximumLength(500);
         RuleFor(command => command.CurrentStock).GreaterThanOrEqualTo(0);
         RuleFor(command => command.MinStock).GreaterThanOrEqualTo(0);
     }

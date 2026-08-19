@@ -12,6 +12,9 @@ public enum SuppliersError
     /// <summary>Date/ExpectedDate outside a plausible calendar range, or ExpectedDate earlier than Date.</summary>
     InvalidPurchaseOrderDate,
 
+    /// <summary>Currency outside its allowed values, or Description too long.</summary>
+    InvalidPurchaseOrderData,
+
     /// <summary>Supplier name/ruc/email/phone outside what its columns accept.</summary>
     InvalidSupplierData,
 

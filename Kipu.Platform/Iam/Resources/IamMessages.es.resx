@@ -62,6 +62,9 @@
   <data name="WeakPassword" xml:space="preserve">
     <value>La contraseña debe tener al menos 8 caracteres e incluir al menos una letra y un número.</value>
   </data>
+  <data name="InvalidUserData" xml:space="preserve">
+    <value>Revisa el nombre, apellido, teléfono y correo — alguno es inválido o demasiado largo.</value>
+  </data>
   <data name="OperationCancelled" xml:space="preserve">
     <value>La operación fue cancelada.</value>
   </data>
