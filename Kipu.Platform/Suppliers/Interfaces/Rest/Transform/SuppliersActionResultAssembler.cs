@@ -37,6 +37,7 @@ public static class SuppliersActionResultAssembler
             SuppliersError.EmptyPurchaseOrderLines => StatusCodes.Status400BadRequest,
             SuppliersError.InvalidPurchaseOrderLine => StatusCodes.Status400BadRequest,
             SuppliersError.InvalidSupplierData => StatusCodes.Status400BadRequest,
+            SuppliersError.SupplierHasPendingOrders => StatusCodes.Status409Conflict,
             SuppliersError.ConcurrentModification => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };

@@ -68,4 +68,7 @@
   <data name="InvalidSupplierData" xml:space="preserve">
     <value>El nombre del proveedor es obligatorio y debe respetar el largo permitido.</value>
   </data>
+  <data name="SupplierHasPendingOrders" xml:space="preserve">
+    <value>Este proveedor tiene órdenes de compra pendientes o retrasadas. Recíbelas o cancélalas antes de desactivar al proveedor.</value>
+  </data>
 </root>

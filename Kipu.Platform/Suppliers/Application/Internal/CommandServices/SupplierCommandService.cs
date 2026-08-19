@@ -14,6 +14,7 @@ namespace Kipu.Platform.Suppliers.Application.Internal.CommandServices;
 
 public class SupplierCommandService(
     ISupplierRepository supplierRepository,
+    IPurchaseOrderRepository purchaseOrderRepository,
     IUnitOfWork unitOfWork,
     IValidator<CreateSupplierCommand> createSupplierValidator,
     IValidator<UpdateSupplierCommand> updateSupplierValidator,
@@ -56,6 +57,15 @@ public class SupplierCommandService(
         var supplier = await supplierRepository.FindByIdAsync(command.SupplierId, cancellationToken);
         if (supplier == null)
             return Result<Supplier>.Failure(SuppliersError.SupplierNotFound, localizer[nameof(SuppliersError.SupplierNotFound)]);
+
+        // The frontend already checks this against its own (possibly stale
+        // or not-yet-loaded) list of orders before even offering the confirm
+        // dialog — this is the authoritative check, since a supplier still
+        // owed a pending or delayed delivery has to stay reachable.
+        var orders = await purchaseOrderRepository.FindAllBySupplierIdAsync(command.SupplierId, cancellationToken);
+        if (orders.Any(order => order.Status is PurchaseOrderStatus.Pending or PurchaseOrderStatus.Delayed))
+            return Result<Supplier>.Failure(SuppliersError.SupplierHasPendingOrders,
+                localizer[nameof(SuppliersError.SupplierHasPendingOrders)]);
 
         supplier.Deactivate();
         supplierRepository.Update(supplier);

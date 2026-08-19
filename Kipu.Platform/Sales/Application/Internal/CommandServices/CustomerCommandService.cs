@@ -48,13 +48,19 @@ public class CustomerCommandService(
         return Result<Customer>.Success(customer);
     }
 
+    /// <summary>
+    ///     Soft delete (I31), not a physical DELETE — Sale.CustomerId is
+    ///     SetNull on delete, so a hard delete used to silently sever a real
+    ///     sale's "who bought this" attribution instead of failing loudly.
+    /// </summary>
     public async Task<Result> Handle(DeleteCustomerCommand command, CancellationToken cancellationToken)
     {
         var customer = await customerRepository.FindByIdAsync(command.CustomerId, cancellationToken);
         if (customer == null)
             return Result.Failure(SalesError.CustomerNotFound, localizer[nameof(SalesError.CustomerNotFound)]);
 
-        customerRepository.Remove(customer);
+        customer.Deactivate();
+        customerRepository.Update(customer);
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result.Success();
     }
