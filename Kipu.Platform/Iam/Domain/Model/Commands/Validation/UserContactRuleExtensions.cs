@@ -5,16 +5,20 @@ namespace Kipu.Platform.Iam.Domain.Model.Commands.Validation;
 /// <summary>
 ///     Shared contact-field rules for every command that writes a User's
 ///     Email/Name/LastName/Phone (SignUp, InviteUser, UpdateUserProfile) —
-///     kept in one place so the three entry points can't drift apart. The
-///     lengths mirror the columns declared in Iam's ModelBuilderExtensions
-///     (User entity); required-ness mirrors it too — Email and Name are
-///     NOT NULL there, LastName and Phone are not.
+///     kept in one place so the three entry points can't drift apart.
+///     Email/Phone lengths mirror the columns declared in Iam's
+///     ModelBuilderExtensions (User entity, both VARCHAR(255)/VARCHAR(30));
+///     required-ness mirrors it too — Email and Name are NOT NULL there,
+///     LastName and Phone are not. Name/LastName use a tighter business
+///     limit than their VARCHAR(100) columns — the DB max was letting
+///     through implausible values (e.g. "Fernandooooo...", 55 chars) that
+///     no real name reaches.
 /// </summary>
 public static class UserContactRuleExtensions
 {
     public const int MaxEmailLength = 255;
-    public const int MaxNameLength = 100;
-    public const int MaxLastNameLength = 100;
+    public const int MaxNameLength = 50;
+    public const int MaxLastNameLength = 50;
     public const int MaxPhoneLength = 30;
 
     public static IRuleBuilderOptions<T, string> MustBeAUserEmail<T>(this IRuleBuilder<T, string> ruleBuilder)
