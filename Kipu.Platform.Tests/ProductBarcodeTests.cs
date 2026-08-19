@@ -102,4 +102,33 @@ public class ProductBarcodeTests(KipuApiFactory factory) : IntegrationTestBase(f
 
         Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
     }
+
+    /// <summary>
+    ///     X3 minor item: barcode uniqueness now also has a DB-level unique
+    ///     index (see AddProductActiveBarcodeUniqueIndex) as a safety net
+    ///     behind the read-then-write check above — but that index is scoped
+    ///     to ACTIVE products only (a generated column, NULL while a product
+    ///     is INACTIVE), by design: deactivating a product must still free
+    ///     its barcode for reuse, exactly like before the index existed.
+    /// </summary>
+    [Fact]
+    public async Task CreateProduct_WithABarcodeFromADeactivatedProduct_IsAllowed()
+    {
+        var client = await CreateBusinessAsync();
+        var firstResponse = await client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "Producto A", description = "", category = "ABARROTES", basePrice = 5m, barcode = "4444444444444"
+        });
+        firstResponse.EnsureSuccessStatusCode();
+        var firstId = (await ReadJsonAsync(firstResponse)).GetProperty("id").GetInt32();
+
+        (await client.DeleteAsync($"/api/v1/products/{firstId}")).EnsureSuccessStatusCode();
+
+        var secondResponse = await client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "Producto B", description = "", category = "ABARROTES", basePrice = 5m, barcode = "4444444444444"
+        });
+
+        secondResponse.EnsureSuccessStatusCode();
+    }
 }

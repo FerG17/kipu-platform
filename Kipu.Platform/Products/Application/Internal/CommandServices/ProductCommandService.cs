@@ -1,5 +1,6 @@
 using Cortex.Mediator;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Kipu.Platform.Products.Application.CommandServices;
 using Kipu.Platform.Products.Domain.Model.Aggregates;
@@ -48,7 +49,20 @@ public class ProductCommandService(
         var product = new Product(command.BusinessId, command.Name, command.Description, command.Category,
             command.BasePrice, command.Barcode);
         await productRepository.AddAsync(product, cancellationToken);
-        await unitOfWork.CompleteAsync(cancellationToken); // product.Id is now populated.
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken); // product.Id is now populated.
+        }
+        catch (DbUpdateException)
+        {
+            // The read-then-write check above has a race window (two
+            // concurrent creates with the same barcode, both pass the
+            // check). The unique index on (BusinessId, ActiveBarcode) is the
+            // real guarantee — this turns a lost race into the same
+            // friendly error as the check above, not an unhandled 500.
+            return Result<Product>.Failure(ProductError.DuplicateBarcode,
+                localizer[nameof(ProductError.DuplicateBarcode)]);
+        }
 
         foreach (var supplierId in supplierIds)
             await productSupplierRepository.AddAsync(new ProductSupplier(product.Id, supplierId, command.BusinessId),
