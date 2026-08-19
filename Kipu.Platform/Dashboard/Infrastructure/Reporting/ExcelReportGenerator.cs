@@ -1,6 +1,7 @@
 using ClosedXML.Excel;
 using Kipu.Platform.Products.Interfaces.Acl;
 using Kipu.Platform.Sales.Interfaces.Acl;
+using Kipu.Platform.Shared.Application;
 
 namespace Kipu.Platform.Dashboard.Infrastructure.Reporting;
 
@@ -23,7 +24,7 @@ public static class ExcelReportGenerator
     private const string HeaderFont = "#FFFAF1";
 
     public static byte[] GenerateSales(int reportId, DateOnly? dateFrom, DateOnly? dateTo,
-        IReadOnlyCollection<SaleExportRow> rows)
+        IReadOnlyCollection<SaleExportRow> rows, IBusinessClock businessClock)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Ventas");
@@ -37,11 +38,12 @@ public static class ExcelReportGenerator
         foreach (var line in rows)
         {
             sheet.Cell(row, 1).Value = line.SaleId;
-            // .DateTime (not .LocalDateTime/.UtcDateTime): keeps the exact
-            // same wall-clock value StockMovementsPdfGenerator's ToString()
-            // already displays, whatever offset it was stored with — no new
-            // timezone conversion introduced here.
-            sheet.Cell(row, 2).Value = line.Date.DateTime;
+            // Converted to the bodega's local wall-clock time — the stored
+            // instant is UTC, and writing it as-is would show a sale made at
+            // 19:00 Lima time as belonging to the next day past 19:00 local
+            // (UTC-5 has already rolled over), the same class of bug
+            // IBusinessClock exists to close everywhere else.
+            sheet.Cell(row, 2).Value = businessClock.ToLocalDateTime(line.Date);
             sheet.Cell(row, 2).Style.DateFormat.Format = "yyyy-mm-dd HH:mm";
             WriteText(sheet.Cell(row, 3), PaymentMethodLabel(line.PaymentMethod));
             sheet.Cell(row, 4).Value = line.TotalAmount;
@@ -78,7 +80,8 @@ public static class ExcelReportGenerator
     }
 
     public static byte[] GenerateStockMovements(int reportId, DateOnly? dateFrom, DateOnly? dateTo,
-        string? productFilterName, string? supplierFilterName, IReadOnlyCollection<StockMovementReportLine> rows)
+        string? productFilterName, string? supplierFilterName, IReadOnlyCollection<StockMovementReportLine> rows,
+        IBusinessClock businessClock)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Entradas y salidas");
@@ -98,7 +101,7 @@ public static class ExcelReportGenerator
         var row = headerRow + 1;
         foreach (var line in rows)
         {
-            sheet.Cell(row, 1).Value = line.RegisteredAt.DateTime;
+            sheet.Cell(row, 1).Value = businessClock.ToLocalDateTime(line.RegisteredAt);
             sheet.Cell(row, 1).Style.DateFormat.Format = "yyyy-mm-dd HH:mm";
             WriteText(sheet.Cell(row, 2), line.ProductName);
             WriteText(sheet.Cell(row, 3), line.Type == "INTAKE" ? "Entrada" : "Salida");

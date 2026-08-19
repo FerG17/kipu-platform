@@ -7,6 +7,7 @@ using Kipu.Platform.Products.Domain.Model.Entities;
 using Kipu.Platform.Products.Domain.Model.Queries;
 using Kipu.Platform.Products.Domain.Repositories;
 using Kipu.Platform.Products.Interfaces.Acl;
+using Kipu.Platform.Shared.Domain.Model.Services;
 
 namespace Kipu.Platform.Products.Application.Acl;
 
@@ -98,18 +99,31 @@ public class ProductContextFacade(
         var priceByProductId = products.ToDictionary(product => product.Id, product => product.BasePrice);
 
         var inventoryItems = await inventoryQueryService.Handle(new GetInventoryByBusinessIdQuery(businessId), cancellationToken);
-        var inventoryItemsList = inventoryItems.ToList();
+        // Only inventory belonging to a still-active product counts toward
+        // these KPIs — TotalProducts (below) already excludes inactive
+        // products, and stock the owner can no longer sell shouldn't inflate
+        // "inventory value" or count against "catalog health".
+        var activeInventoryItems = inventoryItems.Where(item => priceByProductId.ContainsKey(item.ProductId)).ToList();
 
         var today = businessClock.Today;
         var activeBatches = await batchRepository.FindAllByBusinessIdAsync(businessId, cancellationToken);
         var expiringSoonCount = activeBatches.Count(batch => batch.Status == BatchStatus.Active && batch.IsExpiringSoon(today));
 
-        var inventoryValue = inventoryItemsList.Sum(item =>
+        var inventoryValue = activeInventoryItems.Sum(item =>
             priceByProductId.GetValueOrDefault(item.ProductId, 0m) * item.StockUnit);
+
+        // Counted per PRODUCT (same unit as TotalProducts below), not per
+        // InventoryItem — a product split across 2+ warehouses has one row
+        // per warehouse, and counting rows instead of products would inflate
+        // this number and mix units with TotalProducts in the health
+        // percentage the caller derives from these two.
+        var lowStockProductCount = activeInventoryItems
+            .GroupBy(item => item.ProductId)
+            .Count(group => StockRules.IsLowStock(group.Sum(item => item.StockUnit), group.Max(item => item.MinimumStock)));
 
         return new ProductKpisSnapshot(
             products.Count,
-            inventoryItemsList.Count(item => item.IsLowStock),
+            lowStockProductCount,
             expiringSoonCount,
             inventoryValue);
     }
@@ -124,7 +138,8 @@ public class ProductContextFacade(
 
         return inventoryItems
             .GroupBy(item => item.ProductId)
-            .Select(group => new TopStockProductInfo(group.Key, nameByProductId.GetValueOrDefault(group.Key, string.Empty),
+            .Select(group => new TopStockProductInfo(group.Key,
+                nameByProductId.GetValueOrDefault(group.Key, $"#{group.Key}"),
                 group.Sum(item => item.StockUnit)))
             .OrderByDescending(info => info.TotalStock)
             .Take(count)
