@@ -51,7 +51,7 @@
     <value>Datos de reporte inválidos — revisa el tipo y el rango de fechas.</value>
   </data>
   <data name="InvalidDateRange" xml:space="preserve">
-    <value>El rango de fechas no puede superar los 366 días.</value>
+    <value>El rango entre "desde" y "hasta" no puede superar un año (366 días). Elige un periodo más corto.</value>
   </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
