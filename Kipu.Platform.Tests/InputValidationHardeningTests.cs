@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Kipu.Platform.Tests.Infrastructure;
+using System.Linq;
 
 namespace Kipu.Platform.Tests;
 
@@ -105,6 +106,48 @@ public class InputValidationHardeningTests(KipuApiFactory factory) : Integration
             currency = "USD",
             description = "venta de prueba",
             lines = new[] { SaleLine(productId, quantity: 1, unitPrice: 10m) }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>X3 minor item: a sale had no upper bound on how many lines it could carry.</summary>
+    [Fact]
+    public async Task CreatingASale_WithMoreThanFiftyLines_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 100)).EnsureSuccessStatusCode();
+
+        var response = await client.PostAsJsonAsync("/api/v1/sales", new
+        {
+            customerId = (int?)null,
+            paymentMethod = "CASH",
+            currency = "PEN",
+            description = "venta de prueba",
+            lines = Enumerable.Range(0, 51).Select(_ => SaleLine(productId, quantity: 1, unitPrice: 10m)).ToArray()
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>X3 minor item: a single line had no upper bound on quantity either.</summary>
+    [Fact]
+    public async Task CreatingASale_WithMoreThanAThousandUnitsInOneLine_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 2000)).EnsureSuccessStatusCode();
+
+        var response = await client.PostAsJsonAsync("/api/v1/sales", new
+        {
+            customerId = (int?)null,
+            paymentMethod = "CASH",
+            currency = "PEN",
+            description = "venta de prueba",
+            lines = new[] { SaleLine(productId, quantity: 1001, unitPrice: 10m) }
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

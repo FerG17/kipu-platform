@@ -21,13 +21,19 @@ public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
     /// <summary>The business operates in Soles only — a stray currency here would still get summed into revenue as if it were PEN (see the Dashboard KPI query).</summary>
     private static readonly string[] AllowedCurrencies = ["PEN"];
 
+    /// <summary>No documented business rule caps a sale's size — these only reject absurd input (a typo, a runaway script), not a real bulk sale.</summary>
+    private const int MaxLines = 50;
+    private const int MaxQuantityPerLine = 1000;
+
     public CreateSaleCommandValidator()
     {
         RuleFor(command => command.Lines).NotEmpty();
+        RuleFor(command => command.Lines).Must(lines => lines.Count <= MaxLines)
+            .WithMessage($"A sale can have at most {MaxLines} lines.");
 
         RuleForEach(command => command.Lines).ChildRules(line =>
         {
-            line.RuleFor(l => l.Quantity).GreaterThan(0);
+            line.RuleFor(l => l.Quantity).GreaterThan(0).LessThanOrEqualTo(MaxQuantityPerLine);
             line.RuleFor(l => l.UnitPrice).GreaterThanOrEqualTo(0);
         });
 

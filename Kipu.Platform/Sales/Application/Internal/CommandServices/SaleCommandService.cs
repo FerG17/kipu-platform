@@ -206,9 +206,24 @@ public class SaleCommandService(
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            sale.Cancel();
-            saleRepository.Update(sale);
-            await unitOfWork.CompleteAsync(cancellationToken);
+            try
+            {
+                sale.Cancel();
+                saleRepository.Update(sale);
+                await unitOfWork.CompleteAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // The same sale was cancelled by a request that got there
+                // first. Without the concurrency token every simultaneous
+                // cancellation committed, and each one handed the sale's
+                // units back to stock — eight clicks on "cancelar" turned
+                // four units into thirty-two.
+                await transaction.RollbackAsync(cancellationToken);
+                logger.LogWarning("Cancellation of sale {SaleId} lost a concurrent race and was rolled back", sale.Id);
+                return Result<Sale>.Failure(SalesError.SaleAlreadyCancelled,
+                    localizer[nameof(SalesError.SaleAlreadyCancelled)]);
+            }
 
             foreach (var line in sale.SaleDetails)
             {
@@ -229,23 +244,31 @@ public class SaleCommandService(
             var paymentPlan = await paymentPlanRepository.FindBySaleIdAsync(sale.Id, cancellationToken);
             if (paymentPlan != null)
             {
-                paymentPlan.Cancel();
-                paymentPlanRepository.Update(paymentPlan);
-                await unitOfWork.CompleteAsync(cancellationToken);
+                try
+                {
+                    paymentPlan.Cancel();
+                    paymentPlanRepository.Update(paymentPlan);
+                    await unitOfWork.CompleteAsync(cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Distinct from the sale's own token above: a payment was
+                    // registered against this plan (its own IVersionedEntity
+                    // token, see RegisterInstallmentPaymentCommand) in the
+                    // same instant the sale was being cancelled. The whole
+                    // transaction rolls back either way — the sale is NOT
+                    // cancelled — so telling the caller "already cancelled"
+                    // would be false; this is a genuine conflict to retry.
+                    await transaction.RollbackAsync(cancellationToken);
+                    logger.LogWarning(
+                        "Cancellation of sale {SaleId} lost a concurrent race on its payment plan and was rolled back",
+                        sale.Id);
+                    return Result<Sale>.Failure(SalesError.ConcurrentModification,
+                        localizer[nameof(SalesError.ConcurrentModification)]);
+                }
             }
 
             await transaction.CommitAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            // The same sale was cancelled by a request that got there first.
-            // Without the concurrency token every simultaneous cancellation
-            // committed, and each one handed the sale's units back to stock —
-            // eight clicks on "cancelar" turned four units into thirty-two.
-            await transaction.RollbackAsync(cancellationToken);
-            logger.LogWarning("Cancellation of sale {SaleId} lost a concurrent race and was rolled back", sale.Id);
-            return Result<Sale>.Failure(SalesError.SaleAlreadyCancelled,
-                localizer[nameof(SalesError.SaleAlreadyCancelled)]);
         }
         catch (Exception exception)
         {
