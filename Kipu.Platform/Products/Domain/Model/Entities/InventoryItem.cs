@@ -49,6 +49,22 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
         return this;
     }
 
+    /// <summary>
+    ///     Manual stock correction (I25) — delta is signed, unlike
+    ///     AddStock/RemoveStock. The caller (InventoryCommandService) is
+    ///     responsible for rejecting a delta that would take StockUnit
+    ///     negative before calling this; unlike RemoveStock, this does not
+    ///     silently clamp, since an adjustment that goes further than the
+    ///     actual stock allows is exactly the kind of mistake it should be
+    ///     rejected for, not truncated.
+    /// </summary>
+    public InventoryItem AdjustStock(int delta)
+    {
+        StockUnit += delta;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        return this;
+    }
+
     public InventoryItem ReassignWarehouse(int warehouseId)
     {
         WarehouseId = warehouseId;

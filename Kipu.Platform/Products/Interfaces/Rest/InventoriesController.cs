@@ -52,4 +52,27 @@ public class InventoriesController(
         return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             item => Ok(InventoryItemResourceFromEntityAssembler.ToResourceFromEntity(item)));
     }
+
+    /// <summary>
+    ///     Manual stock correction not tied to a sale — shrinkage, breakage,
+    ///     theft, or fixing a physical count (I25). Delta is signed: send a
+    ///     negative number to remove units, positive to add them. Always
+    ///     records a StockMovement and a required Reason, and re-evaluates
+    ///     LOW_STOCK/OUT_OF_STOCK for the affected warehouse.
+    /// </summary>
+    [HttpPost("{productId:int}/adjustment")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
+    [SwaggerOperation(Summary = "Adjust a product's stock manually (shrinkage, breakage, count correction)", OperationId = "AdjustStock")]
+    public async Task<IActionResult> AdjustStock([FromRoute] int productId, [FromBody] AdjustStockResource resource,
+        CancellationToken cancellationToken)
+    {
+        var businessId = currentUserAccessor.CurrentBusinessId;
+        if (businessId == null) return Unauthorized();
+
+        var command = AdjustStockCommandFromResourceAssembler.ToCommandFromResource(resource, productId, businessId.Value);
+        var result = await inventoryCommandService.Handle(command, cancellationToken);
+
+        return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
+            item => Ok(InventoryItemResourceFromEntityAssembler.ToResourceFromEntity(item)));
+    }
 }

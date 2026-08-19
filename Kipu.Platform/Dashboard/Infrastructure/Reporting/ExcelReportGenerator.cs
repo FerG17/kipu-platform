@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using Kipu.Platform.Products.Domain.Model.Entities;
 using Kipu.Platform.Products.Interfaces.Acl;
 using Kipu.Platform.Sales.Interfaces.Acl;
 using Kipu.Platform.Shared.Application;
@@ -106,7 +107,7 @@ public static class ExcelReportGenerator
             sheet.Cell(row, 1).Value = businessClock.ToLocalDateTime(line.RegisteredAt);
             sheet.Cell(row, 1).Style.DateFormat.Format = "yyyy-mm-dd HH:mm";
             WriteText(sheet.Cell(row, 2), line.ProductName);
-            WriteText(sheet.Cell(row, 3), line.Type == "INTAKE" ? "Entrada" : "Salida");
+            WriteText(sheet.Cell(row, 3), StockMovementType.IsInbound(line.Type, line.Quantity) ? "Entrada" : "Salida");
             sheet.Cell(row, 4).Value = line.Quantity;
             WriteText(sheet.Cell(row, 5), line.Supplier);
             WriteText(sheet.Cell(row, 6), line.Note);

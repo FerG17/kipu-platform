@@ -95,4 +95,13 @@
   <data name="ProductInactive" xml:space="preserve">
     <value>Este producto está desactivado. Reactívalo antes de registrar un ingreso de stock.</value>
   </data>
+  <data name="InvalidAdjustmentQuantity" xml:space="preserve">
+    <value>El ajuste debe sumar o restar al menos una unidad.</value>
+  </data>
+  <data name="AdjustmentReasonRequired" xml:space="preserve">
+    <value>El ajuste de stock requiere un motivo.</value>
+  </data>
+  <data name="AdjustmentExceedsAvailableStock" xml:space="preserve">
+    <value>Este ajuste dejaría el stock por debajo de cero.</value>
+  </data>
 </root>

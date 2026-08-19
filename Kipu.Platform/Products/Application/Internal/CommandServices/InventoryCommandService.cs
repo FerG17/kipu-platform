@@ -308,6 +308,65 @@ public class InventoryCommandService(
     }
 
     /// <summary>
+    ///     Manual stock correction not tied to a sale — shrinkage, breakage,
+    ///     theft, or fixing a physical count (I25). Delta is signed: negative
+    ///     removes units, positive adds them. Records a StockMovement with the
+    ///     signed delta as its Quantity (unlike every other movement type,
+    ///     which is always positive and relies on Type alone for direction),
+    ///     and re-evaluates LOW_STOCK/OUT_OF_STOCK the same way every other
+    ///     stock mutation does.
+    /// </summary>
+    public async Task<Result<InventoryItem>> Handle(AdjustStockCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Delta == 0)
+            return Result<InventoryItem>.Failure(ProductError.InvalidAdjustmentQuantity,
+                localizer[nameof(ProductError.InvalidAdjustmentQuantity)]);
+
+        if (string.IsNullOrWhiteSpace(command.Reason))
+            return Result<InventoryItem>.Failure(ProductError.AdjustmentReasonRequired,
+                localizer[nameof(ProductError.AdjustmentReasonRequired)]);
+
+        var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
+        if (product == null)
+            return Result<InventoryItem>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
+
+        if (!product.IsActive)
+            return Result<InventoryItem>.Failure(ProductError.ProductInactive, localizer[nameof(ProductError.ProductInactive)]);
+
+        var item = await inventoryItemRepository.FindByProductAndWarehouseAsync(command.ProductId, command.WarehouseId,
+            cancellationToken);
+        if (item == null)
+            return Result<InventoryItem>.Failure(ProductError.InventoryItemNotFound,
+                localizer[nameof(ProductError.InventoryItemNotFound)]);
+
+        if (item.StockUnit + command.Delta < 0)
+            return Result<InventoryItem>.Failure(ProductError.AdjustmentExceedsAvailableStock,
+                localizer[nameof(ProductError.AdjustmentExceedsAvailableStock)]);
+
+        item.AdjustStock(command.Delta);
+        inventoryItemRepository.Update(item);
+
+        await stockMovementRepository.AddAsync(
+            new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, command.Delta,
+                StockMovementType.Adjustment, string.Empty, command.Reason),
+            cancellationToken);
+
+        try
+        {
+            await unitOfWork.CompleteAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<InventoryItem>.Failure(ProductError.ConcurrentModification,
+                localizer[nameof(ProductError.ConcurrentModification)]);
+        }
+
+        await PublishStockLevelChangedEvent(item, cancellationToken);
+
+        return Result<InventoryItem>.Success(item);
+    }
+
+    /// <summary>
     ///     The product form only captures one expiration date per product (no
     ///     batch selector UI), so if the product already has an ACTIVE batch,
     ///     it's updated in place instead of piling up batches — otherwise
