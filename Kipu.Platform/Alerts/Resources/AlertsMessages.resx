@@ -48,7 +48,7 @@
     <value>This alert was already resolved.</value>
   </data>
   <data name="InvalidThreshold" xml:space="preserve">
-    <value>Threshold value cannot be negative.</value>
+    <value>Invalid alert rule — check the type and the threshold (0-365 days).</value>
   </data>
   <data name="ProductNotFound" xml:space="preserve">
     <value>Product not found.</value>
