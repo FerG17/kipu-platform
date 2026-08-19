@@ -88,7 +88,7 @@ public class ReportQueryService(
     private async Task<byte[]> BuildInventoryExcel(Report report, CancellationToken cancellationToken)
     {
         var rows = await productContextFacade.GetTopStockProducts(report.BusinessId, int.MaxValue, cancellationToken);
-        return ExcelReportGenerator.GenerateInventory(report.Id, rows);
+        return ExcelReportGenerator.GenerateInventory(report.Id, rows, businessClock);
     }
 
     private async Task<byte[]> BuildStockMovementsExcel(Report report, CancellationToken cancellationToken)

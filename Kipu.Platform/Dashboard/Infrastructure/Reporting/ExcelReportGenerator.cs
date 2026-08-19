@@ -29,7 +29,7 @@ public static class ExcelReportGenerator
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Ventas");
 
-        WriteTitle(sheet, $"Reporte de ventas #{reportId}", BuildDateRangeSummary(dateFrom, dateTo));
+        WriteTitle(sheet, $"Reporte de ventas #{reportId}", BuildDateRangeSummary(dateFrom, dateTo), businessClock);
 
         var headerRow = 4;
         WriteHeader(sheet, headerRow, "N° venta", "Fecha", "Método de pago", "Total", "Moneda");
@@ -56,12 +56,13 @@ public static class ExcelReportGenerator
         return ToBytes(workbook);
     }
 
-    public static byte[] GenerateInventory(int reportId, IReadOnlyCollection<TopStockProductInfo> rows)
+    public static byte[] GenerateInventory(int reportId, IReadOnlyCollection<TopStockProductInfo> rows,
+        IBusinessClock businessClock)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Inventario");
 
-        WriteTitle(sheet, $"Reporte de inventario #{reportId}", "Existencias actuales (no filtra por fecha)");
+        WriteTitle(sheet, $"Reporte de inventario #{reportId}", "Existencias actuales (no filtra por fecha)", businessClock);
 
         var headerRow = 4;
         WriteHeader(sheet, headerRow, "ID producto", "Producto", "Stock actual");
@@ -93,7 +94,8 @@ public static class ExcelReportGenerator
         if (!string.IsNullOrEmpty(supplierFilterName)) summaryParts.Add($"Proveedor: {supplierFilterName}");
 
         WriteTitle(sheet, $"Reporte de entradas/salidas #{reportId}",
-            summaryParts.Count == 0 ? "Sin filtros (todas las entradas/salidas)" : string.Join("  ·  ", summaryParts));
+            summaryParts.Count == 0 ? "Sin filtros (todas las entradas/salidas)" : string.Join("  ·  ", summaryParts),
+            businessClock);
 
         var headerRow = 4;
         WriteHeader(sheet, headerRow, "Fecha", "Producto", "Tipo", "Cantidad", "Proveedor", "Nota");
@@ -115,7 +117,7 @@ public static class ExcelReportGenerator
         return ToBytes(workbook);
     }
 
-    private static void WriteTitle(IXLWorksheet sheet, string title, string? subtitle)
+    private static void WriteTitle(IXLWorksheet sheet, string title, string? subtitle, IBusinessClock businessClock)
     {
         sheet.Cell(1, 1).Value = title;
         sheet.Cell(1, 1).Style.Font.Bold = true;
@@ -125,7 +127,12 @@ public static class ExcelReportGenerator
         sheet.Cell(2, 1).Style.Font.FontSize = 9;
         sheet.Cell(2, 1).Style.Font.FontColor = XLColor.FromHtml("#7D7466");
 
-        sheet.Cell(3, 1).Value = $"Generado: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm} UTC";
+        // Local time now, not UTC — this line used to read "correct" (it was
+        // honestly labeled UTC) but still confused the one person who reads
+        // it: a bodega owner in Lima checking when a report was generated,
+        // not a server operator who thinks in UTC. Every other timestamp in
+        // this document is already local; this is the one that wasn't.
+        sheet.Cell(3, 1).Value = $"Generado: {businessClock.ToLocalDateTime(DateTimeOffset.UtcNow):yyyy-MM-dd HH:mm}";
         sheet.Cell(3, 1).Style.Font.FontSize = 8;
         sheet.Cell(3, 1).Style.Font.FontColor = XLColor.FromHtml("#B1A695");
     }

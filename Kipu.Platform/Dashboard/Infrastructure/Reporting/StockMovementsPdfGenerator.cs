@@ -31,7 +31,7 @@ public static class StockMovementsPdfGenerator
                         .Text(BuildFilterSummary(dateFrom, dateTo, productFilterName, supplierFilterName))
                         .FontSize(9).FontColor(Colors.Grey.Darken1);
                     column.Item().PaddingTop(2)
-                        .Text($"Generado: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm} UTC")
+                        .Text($"Generado: {businessClock.ToLocalDateTime(DateTimeOffset.UtcNow):yyyy-MM-dd HH:mm}")
                         .FontSize(8).FontColor(Colors.Grey.Medium);
                 });
 
