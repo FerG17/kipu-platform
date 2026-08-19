@@ -14,6 +14,9 @@ public enum ProductError
     BatchNotFound,
     BatchAlreadyDiscarded,
 
+    /// <summary>The product is deactivated — it cannot receive a stock intake until it's reactivated.</summary>
+    ProductInactive,
+
     /// <summary>Name/description/category/price outside what the catalog (and its columns) accept.</summary>
     InvalidProductData,
 

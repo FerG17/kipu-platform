@@ -81,6 +81,9 @@ public class InventoryCommandService(
         if (product == null)
             return Result<InventoryItem>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
 
+        if (!product.IsActive)
+            return Result<InventoryItem>.Failure(ProductError.ProductInactive, localizer[nameof(ProductError.ProductInactive)]);
+
         var warehouse = await warehouseRepository.FindByIdAsync(command.WarehouseId, cancellationToken);
         if (warehouse == null)
             return Result<InventoryItem>.Failure(ProductError.WarehouseNotFound, localizer[nameof(ProductError.WarehouseNotFound)]);

@@ -50,6 +50,9 @@
   <data name="ProductNotFound" xml:space="preserve">
     <value>One or more products in the sale were not found.</value>
   </data>
+  <data name="ProductInactive" xml:space="preserve">
+    <value>One or more products in the sale are deactivated and can no longer be sold.</value>
+  </data>
   <data name="InsufficientStock" xml:space="preserve">
     <value>One or more lines do not have sufficient stock.</value>
   </data>

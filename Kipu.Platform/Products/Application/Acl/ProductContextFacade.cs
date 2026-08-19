@@ -80,15 +80,30 @@ public class ProductContextFacade(
         return product?.BasePrice;
     }
 
+    public async Task<bool> IsProductActive(int productId, CancellationToken cancellationToken)
+    {
+        var product = await productQueryService.Handle(new GetProductByIdQuery(productId), cancellationToken);
+        return product?.IsActive ?? false;
+    }
+
+    /// <summary>
+    ///     Deactivated products are excluded here: their batches would
+    ///     otherwise keep re-triggering EXPIRATION/EXPIRED alerts on every
+    ///     sweep forever, even though ProductDeactivatedEventHandler already
+    ///     resolved those alerts the moment the product was deactivated — the
+    ///     next sweep would just raise them right back.
+    /// </summary>
     public async Task<IReadOnlyCollection<ActiveBatchInfo>> GetAllActiveBatchesForExpirationSweep(CancellationToken cancellationToken)
     {
         var batches = await batchRepository.FindAllActiveAsync(cancellationToken);
-        var products = await productRepository.ListIgnoringTenantAsync(cancellationToken);
-        var productNamesById = products.ToDictionary(product => product.Id, product => product.Name);
+        var activeProductsById = (await productRepository.ListIgnoringTenantAsync(cancellationToken))
+            .Where(product => product.IsActive)
+            .ToDictionary(product => product.Id);
 
         return batches
+            .Where(batch => activeProductsById.ContainsKey(batch.ProductId))
             .Select(batch => new ActiveBatchInfo(batch.Id, batch.ProductId,
-                productNamesById.GetValueOrDefault(batch.ProductId, string.Empty), batch.BusinessId, batch.Expiration))
+                activeProductsById[batch.ProductId].Name, batch.BusinessId, batch.Expiration))
             .ToList();
     }
 

@@ -116,6 +116,11 @@ public class AlertExpirationSweepJob(
 
                 existingExpired?.Resolve();
             }
+            else
+            {
+                existingExpired?.Resolve();
+                existingExpiringSoon?.Resolve();
+            }
         }
 
         await unitOfWork.CompleteAsync(cancellationToken);

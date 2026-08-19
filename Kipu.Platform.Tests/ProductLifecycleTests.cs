@@ -104,4 +104,44 @@ public class ProductLifecycleTests(KipuApiFactory factory) : IntegrationTestBase
 
         Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
     }
+
+    /// <summary>
+    ///     RegisterStockIntake never checked the product's own Status — a
+    ///     deactivated product could still receive stock (directly, or via a
+    ///     received purchase order, which goes through the same handler),
+    ///     defeating the point of deactivating it.
+    /// </summary>
+    [Fact]
+    public async Task RegisterStockIntake_ForADeactivatedProduct_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await client.DeleteAsync($"/api/v1/products/{productId}")).EnsureSuccessStatusCode();
+
+        var response = await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     POST /products/{id}/activate undoes DeleteProduct's soft delete —
+    ///     the product must disappear from the default (active-only) catalog
+    ///     immediately after deletion, and come back after reactivation.
+    /// </summary>
+    [Fact]
+    public async Task ActivateProduct_BringsADeactivatedProductBackIntoTheDefaultCatalog()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        (await client.DeleteAsync($"/api/v1/products/{productId}")).EnsureSuccessStatusCode();
+
+        Assert.DoesNotContain((await ReadJsonAsync(await client.GetAsync("/api/v1/products"))).EnumerateArray(),
+            product => product.GetProperty("id").GetInt32() == productId);
+
+        (await client.PostAsync($"/api/v1/products/{productId}/activate", null)).EnsureSuccessStatusCode();
+
+        Assert.Contains((await ReadJsonAsync(await client.GetAsync("/api/v1/products"))).EnumerateArray(),
+            product => product.GetProperty("id").GetInt32() == productId);
+    }
 }

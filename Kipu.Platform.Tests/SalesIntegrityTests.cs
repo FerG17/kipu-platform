@@ -12,6 +12,23 @@ namespace Kipu.Platform.Tests;
 public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(factory)
 {
     /// <summary>
+    ///     CreateSaleCommand checked the product existed (via GetBasePrice)
+    ///     but never that it was still active — a discontinued product could
+    ///     still be rung up at the register after being deactivated.
+    /// </summary>
+    [Fact]
+    public async Task Sale_OfADeactivatedProduct_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        (await client.DeleteAsync($"/api/v1/products/{productId}")).EnsureSuccessStatusCode();
+
+        var response = await CreateSaleAsync(client, SaleLine(productId, quantity: 1, unitPrice: 10m));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    /// <summary>
     ///     A POS that adds the same product twice produces two lines for one
     ///     product. Stock is validated per line against the *total* available,
     ///     so 2 lines × 3 units each both pass against 5 units in stock — but

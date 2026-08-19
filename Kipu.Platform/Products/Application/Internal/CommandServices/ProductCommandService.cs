@@ -156,4 +156,18 @@ public class ProductCommandService(
 
         return Result.Success();
     }
+
+    /// <summary>Undoes DeleteProductCommand's soft delete — brings a discontinued product back into the active catalog.</summary>
+    public async Task<Result> Handle(ActivateProductCommand command, CancellationToken cancellationToken)
+    {
+        var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
+        if (product == null)
+            return Result.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
+
+        product.Activate();
+        productRepository.Update(product);
+        await unitOfWork.CompleteAsync(cancellationToken);
+
+        return Result.Success();
+    }
 }

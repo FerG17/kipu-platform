@@ -9,16 +9,18 @@ namespace Kipu.Platform.Products.Infrastructure.Persistence.EntityFrameworkCore.
 public class ProductRepository(AppDbContext context) : BaseRepository<Product>(context), IProductRepository
 {
     /// <summary>
-    ///     Excludes deactivated products: DELETE is a soft delete (see
-    ///     ProductCommandService), so a "deleted" product must stop showing up
-    ///     in the catalog even though the row stays for historical sales and
-    ///     reports to resolve against. Fetching one by id still returns it.
+    ///     Excludes deactivated products by default: DELETE is a soft delete
+    ///     (see ProductCommandService), so a "deleted" product must stop
+    ///     showing up in the catalog even though the row stays for historical
+    ///     sales and reports to resolve against. Fetching one by id still
+    ///     returns it. Pass includeInactive to also surface deactivated
+    ///     products — used by the "reactivate" screen.
     /// </summary>
-    public async Task<IEnumerable<Product>> FindAllByBusinessIdAsync(int businessId, string? category,
+    public async Task<IEnumerable<Product>> FindAllByBusinessIdAsync(int businessId, string? category, bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
-        var query = Context.Set<Product>()
-            .Where(product => product.BusinessId == businessId && product.Status == ProductStatus.Active);
+        var query = Context.Set<Product>().Where(product => product.BusinessId == businessId);
+        if (!includeInactive) query = query.Where(product => product.Status == ProductStatus.Active);
         if (!string.IsNullOrEmpty(category)) query = query.Where(product => product.Category == category);
         return await query.ToListAsync(cancellationToken);
     }

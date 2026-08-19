@@ -52,6 +52,9 @@ public interface IProductContextFacade
 
     Task<bool> ProductExists(int productId, CancellationToken cancellationToken);
 
+    /// <summary>False for both a deactivated product and one that doesn't exist — used by Sales &amp; POS to reject selling a discontinued product.</summary>
+    Task<bool> IsProductActive(int productId, CancellationToken cancellationToken);
+
     /// <summary>
     ///     The admin-set sale price for a product, straight from the product
     ///     record — used by Sales &amp; POS to price every sale line

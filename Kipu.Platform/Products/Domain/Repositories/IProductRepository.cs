@@ -5,7 +5,7 @@ namespace Kipu.Platform.Products.Domain.Repositories;
 
 public interface IProductRepository : IBaseRepository<Product>
 {
-    Task<IEnumerable<Product>> FindAllByBusinessIdAsync(int businessId, string? category,
+    Task<IEnumerable<Product>> FindAllByBusinessIdAsync(int businessId, string? category, bool includeInactive = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

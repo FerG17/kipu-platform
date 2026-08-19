@@ -92,4 +92,7 @@
   <data name="SupplierNotFound" xml:space="preserve">
     <value>One of the supplier tags does not exist for this business.</value>
   </data>
+  <data name="ProductInactive" xml:space="preserve">
+    <value>This product is deactivated. Reactivate it before registering a stock intake.</value>
+  </data>
 </root>
