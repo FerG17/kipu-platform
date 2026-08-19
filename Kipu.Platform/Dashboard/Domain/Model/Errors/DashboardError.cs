@@ -5,5 +5,6 @@ public enum DashboardError
     ReportNotFound,
     UnsupportedReportTypeForPdf,
     InvalidReportData,
+    InvalidDateRange,
     DatabaseError
 }

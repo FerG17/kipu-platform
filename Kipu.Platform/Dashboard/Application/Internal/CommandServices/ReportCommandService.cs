@@ -21,6 +21,16 @@ public class ReportCommandService(
 {
     public async Task<Result<Report>> Handle(GenerateReportCommand command, CancellationToken cancellationToken)
     {
+        // Checked ahead of the generic validator so a too-wide range gets its
+        // own specific message instead of collapsing into "invalid data —
+        // check the type and date range", which doesn't say what's actually
+        // wrong.
+        if (command.DateFrom.HasValue && command.DateTo.HasValue
+            && command.DateTo.Value.DayNumber - command.DateFrom.Value.DayNumber > 366)
+        {
+            return Result<Report>.Failure(DashboardError.InvalidDateRange, localizer[nameof(DashboardError.InvalidDateRange)]);
+        }
+
         if (!(await generateReportValidator.ValidateAsync(command, cancellationToken)).IsValid)
             return Result<Report>.Failure(DashboardError.InvalidReportData, localizer[nameof(DashboardError.InvalidReportData)]);
 

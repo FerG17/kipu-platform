@@ -1,12 +1,16 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using Kipu.Platform.Dashboard.Application.QueryServices;
+using Kipu.Platform.Dashboard.Domain.Model.Errors;
 using Kipu.Platform.Dashboard.Domain.Model.Queries;
 using Kipu.Platform.Dashboard.Interfaces.Rest.Resources;
 using Kipu.Platform.Dashboard.Interfaces.Rest.Transform;
+using Kipu.Platform.Dashboard.Resources;
 using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Kipu.Platform.Dashboard.Interfaces.Rest;
@@ -21,9 +25,16 @@ namespace Kipu.Platform.Dashboard.Interfaces.Rest;
 [Route("api/v1/dashboard")]
 [Produces(MediaTypeNames.Application.Json)]
 [SwaggerTag("Live KPIs and charts — composes Product/Inventory/Sales, no data of its own")]
-public class DashboardController(IDashboardQueryService dashboardQueryService, ICurrentUserAccessor currentUserAccessor)
+public class DashboardController(
+    IDashboardQueryService dashboardQueryService,
+    ICurrentUserAccessor currentUserAccessor,
+    ProblemDetailsFactory problemDetailsFactory,
+    IStringLocalizer<DashboardMessages> localizer)
     : ControllerBase
 {
+    /// <summary>Same 366-day cap as GenerateReportCommandValidator — an unbounded dateFrom/dateTo pair here drives GetSalesByDay's day-by-day loop, not just a query filter.</summary>
+    private const int MaxDateRangeDays = 366;
+
     [HttpGet("kpis")]
     [SwaggerOperation(Summary = "The 6 business KPIs, computed live", OperationId = "GetBusinessKpis")]
     public async Task<IActionResult> GetBusinessKpis(CancellationToken cancellationToken)
@@ -43,6 +54,10 @@ public class DashboardController(IDashboardQueryService dashboardQueryService, I
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
+
+        if (dateFrom.HasValue && dateTo.HasValue && dateTo.Value.DayNumber - dateFrom.Value.DayNumber > MaxDateRangeDays)
+            return problemDetailsFactory.ToActionResult(StatusCodes.Status400BadRequest, "InvalidDateRange",
+                localizer[nameof(DashboardError.InvalidDateRange)]);
 
         var result = await dashboardQueryService.Handle(new GetSalesByDayQuery(businessId.Value, dateFrom, dateTo), cancellationToken);
         return Ok(result.Select(entry => new SalesByDayResource(entry.Date, entry.Total)));
