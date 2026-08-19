@@ -10,7 +10,7 @@ public class ProductQueryService(IProductRepository productRepository, IProductS
 {
     public async Task<IEnumerable<Product>> Handle(GetAllProductsByBusinessIdQuery query, CancellationToken cancellationToken)
     {
-        return await productRepository.FindAllByBusinessIdAsync(query.BusinessId, query.Category, cancellationToken);
+        return await productRepository.FindAllByBusinessIdAsync(query.BusinessId, query.Category, query.IncludeInactive, cancellationToken);
     }
 
     public async Task<Product?> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)

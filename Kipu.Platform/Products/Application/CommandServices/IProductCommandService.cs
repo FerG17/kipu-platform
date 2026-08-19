@@ -9,4 +9,5 @@ public interface IProductCommandService
     Task<Result<Product>> Handle(CreateProductCommand command, CancellationToken cancellationToken);
     Task<Result<Product>> Handle(UpdateProductCommand command, CancellationToken cancellationToken);
     Task<Result> Handle(DeleteProductCommand command, CancellationToken cancellationToken);
+    Task<Result> Handle(ActivateProductCommand command, CancellationToken cancellationToken);
 }

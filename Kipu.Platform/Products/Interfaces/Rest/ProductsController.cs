@@ -29,13 +29,14 @@ public class ProductsController(
 {
     [HttpGet]
     [SwaggerOperation(Summary = "List products of the current business", OperationId = "GetProducts")]
-    public async Task<IActionResult> GetProducts([FromQuery] string? category, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetProducts([FromQuery] string? category, [FromQuery] bool includeInactive,
+        CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var products = await productQueryService.Handle(new GetAllProductsByBusinessIdQuery(businessId.Value, category),
-            cancellationToken);
+        var products = await productQueryService.Handle(
+            new GetAllProductsByBusinessIdQuery(businessId.Value, category, includeInactive), cancellationToken);
         var supplierIdsByProduct = await productQueryService.Handle(
             new GetProductSupplierIdsByBusinessIdQuery(businessId.Value), cancellationToken);
 
@@ -93,6 +94,16 @@ public class ProductsController(
     public async Task<IActionResult> DeleteProduct([FromRoute] int id, CancellationToken cancellationToken)
     {
         var result = await productCommandService.Handle(new DeleteProductCommand(id), cancellationToken);
+        return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
+    }
+
+    /// <summary>Undoes DeleteProduct's soft delete, bringing a discontinued product back into the active catalog.</summary>
+    [HttpPost("{id:int}/activate")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
+    [SwaggerOperation(Summary = "Reactivate a deactivated product", OperationId = "ActivateProduct")]
+    public async Task<IActionResult> ActivateProduct([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var result = await productCommandService.Handle(new ActivateProductCommand(id), cancellationToken);
         return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory, () => NoContent());
     }
 

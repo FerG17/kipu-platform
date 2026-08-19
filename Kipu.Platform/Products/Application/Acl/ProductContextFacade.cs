@@ -51,19 +51,38 @@ public class ProductContextFacade(
         return items.Sum(item => item.StockUnit);
     }
 
+    /// <summary>
+    ///     Receives into whichever warehouse the product already has stock in
+    ///     (its lowest WarehouseId, matching the order RegisterStockSaleCommand
+    ///     draws from), so a purchase order tops up the existing InventoryItem
+    ///     instead of creating a second one in "the first warehouse" — which
+    ///     used to fragment a single product's stock into two separate rows
+    ///     the moment its existing stock happened to live anywhere but the
+    ///     business's very first warehouse, each with its own independent
+    ///     LOW_STOCK/OUT_OF_STOCK alert (the old one never clearing, a new one
+    ///     firing for the "empty" original warehouse). Only a product with no
+    ///     InventoryItem anywhere yet (never stocked before) falls back to the
+    ///     business's first warehouse.
+    /// </summary>
     public async Task<bool> RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice,
         string? supplier, string? note, int? supplierId, CancellationToken cancellationToken)
     {
-        var warehouses = await warehouseQueryService.Handle(new GetAllWarehousesByBusinessIdQuery(businessId), cancellationToken);
-        var warehouse = warehouses.FirstOrDefault();
+        var existingItems = await inventoryQueryService.Handle(new GetInventoryByProductIdQuery(productId), cancellationToken);
+        var targetWarehouseId = existingItems.OrderBy(item => item.WarehouseId).FirstOrDefault()?.WarehouseId;
+
+        if (targetWarehouseId == null)
+        {
+            var warehouses = await warehouseQueryService.Handle(new GetAllWarehousesByBusinessIdQuery(businessId), cancellationToken);
+            targetWarehouseId = warehouses.FirstOrDefault()?.Id;
+        }
 
         // A business with nowhere to receive into is a real failure, not a
         // no-op to pass over in silence — the caller has to know the goods
         // never landed.
-        if (warehouse == null) return false;
+        if (targetWarehouseId == null) return false;
 
-        var command = new RegisterStockIntakeCommand(productId, businessId, warehouse.Id, quantity, purchasePrice, null,
-            supplier, note, null, supplierId);
+        var command = new RegisterStockIntakeCommand(productId, businessId, targetWarehouseId.Value, quantity, purchasePrice,
+            null, supplier, note, null, supplierId);
         var result = await inventoryCommandService.Handle(command, cancellationToken);
         return result.IsSuccess;
     }
@@ -80,15 +99,30 @@ public class ProductContextFacade(
         return product?.BasePrice;
     }
 
+    public async Task<bool> IsProductActive(int productId, CancellationToken cancellationToken)
+    {
+        var product = await productQueryService.Handle(new GetProductByIdQuery(productId), cancellationToken);
+        return product?.IsActive ?? false;
+    }
+
+    /// <summary>
+    ///     Deactivated products are excluded here: their batches would
+    ///     otherwise keep re-triggering EXPIRATION/EXPIRED alerts on every
+    ///     sweep forever, even though ProductDeactivatedEventHandler already
+    ///     resolved those alerts the moment the product was deactivated — the
+    ///     next sweep would just raise them right back.
+    /// </summary>
     public async Task<IReadOnlyCollection<ActiveBatchInfo>> GetAllActiveBatchesForExpirationSweep(CancellationToken cancellationToken)
     {
         var batches = await batchRepository.FindAllActiveAsync(cancellationToken);
-        var products = await productRepository.ListIgnoringTenantAsync(cancellationToken);
-        var productNamesById = products.ToDictionary(product => product.Id, product => product.Name);
+        var activeProductsById = (await productRepository.ListIgnoringTenantAsync(cancellationToken))
+            .Where(product => product.IsActive)
+            .ToDictionary(product => product.Id);
 
         return batches
+            .Where(batch => activeProductsById.ContainsKey(batch.ProductId))
             .Select(batch => new ActiveBatchInfo(batch.Id, batch.ProductId,
-                productNamesById.GetValueOrDefault(batch.ProductId, string.Empty), batch.BusinessId, batch.Expiration))
+                activeProductsById[batch.ProductId].Name, batch.BusinessId, batch.Expiration))
             .ToList();
     }
 

@@ -11,6 +11,25 @@ public static class StockMovementType
     ///     merchandise arriving in the entradas/salidas report.
     /// </summary>
     public const string Return = "RETURN";
+
+    /// <summary>
+    ///     A manual stock correction not tied to a sale — shrinkage, breakage,
+    ///     theft, or fixing a physical count (I25). Signed: unlike every other
+    ///     type here, Quantity itself carries the direction (negative removes
+    ///     units, positive adds them) instead of the type alone implying it.
+    /// </summary>
+    public const string Adjustment = "ADJUSTMENT";
+
+    /// <summary>Whether a movement added stock (true) or removed it (false) — Intake/Return always add, Sale always removes, Adjustment depends on its signed quantity.</summary>
+    public static bool IsInbound(string type, int quantity)
+    {
+        return type switch
+        {
+            Sale => false,
+            Adjustment => quantity >= 0,
+            _ => true
+        };
+    }
 }
 
 /// <summary>

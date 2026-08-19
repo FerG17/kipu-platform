@@ -5,6 +5,9 @@ public enum SalesError
     SaleNotFound,
     CustomerNotFound,
     ProductNotFound,
+
+    /// <summary>The product exists but is deactivated — it can no longer be sold.</summary>
+    ProductInactive,
     InsufficientStock,
     SaleAlreadyCancelled,
     InvalidStatusTransition,

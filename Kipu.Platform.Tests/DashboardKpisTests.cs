@@ -57,18 +57,18 @@ public class DashboardKpisTests(KipuApiFactory factory) : IntegrationTestBase(fa
     }
 
     /// <summary>
-    ///     A deactivated product's stock shouldn't be valorized as sellable
-    ///     inventory or count against catalog health — TotalProducts already
-    ///     excludes inactive products, and InventoryValue/LowStockCount used
-    ///     to include their InventoryItem rows anyway, mixing an active-only
-    ///     count against an all-products value.
-    ///
-    ///     DELETE /products/{id} (soft-deactivate) refuses a product that
-    ///     still has stock (CannotDeleteWithStock), so a deactivated product
-    ///     is deactivated at 0 stock first, then stock is added to it while
-    ///     already inactive — RegisterStockIntake has no active-product
-    ///     guard today (that gap is tracked separately, I26), which is
-    ///     exactly the scenario this KPI exclusion needs to hold up against.
+    ///     A deactivated product must not count against catalog health or be
+    ///     valorized as sellable inventory. Reaching "inactive with stock"
+    ///     through the real API is no longer possible at all as of I26
+    ///     (RegisterStockIntake now rejects a deactivated product, and
+    ///     DeleteProduct already refused to deactivate one that still has
+    ///     stock — see ProductLifecycleTests.RegisterStockIntake_ForADeactivatedProduct_IsRejected),
+    ///     so this only exercises the reachable case: a product deactivated
+    ///     at 0 stock must not appear in any KPI, including its (unrelated,
+    ///     deliberately high) BasePrice being valorized into InventoryValue.
+    ///     The facade's own inventory-item filter (GetProductKpisSnapshot)
+    ///     stays as defense-in-depth for any pre-existing data from before
+    ///     this fix.
     /// </summary>
     [Fact]
     public async Task InventoryValueAndLowStockCount_ExcludeDeactivatedProducts()
@@ -82,8 +82,6 @@ public class DashboardKpisTests(KipuApiFactory factory) : IntegrationTestBase(fa
 
         var inactiveProductId = await CreateProductAsync(client, basePrice: 1000m, name: "Producto Desactivado");
         (await client.DeleteAsync($"/api/v1/products/{inactiveProductId}")).EnsureSuccessStatusCode();
-        (await RegisterStockIntakeAsync(client, inactiveProductId, warehouseId, quantity: 1, minimumStock: 5))
-            .EnsureSuccessStatusCode();
 
         var kpisResponse = await client.GetAsync("/api/v1/dashboard/kpis");
         kpisResponse.EnsureSuccessStatusCode();

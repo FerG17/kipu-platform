@@ -54,4 +54,10 @@ public class Product(int businessId, string name, string description, string cat
         Status = ProductStatus.Inactive;
         return this;
     }
+
+    public Product Activate()
+    {
+        Status = ProductStatus.Active;
+        return this;
+    }
 }

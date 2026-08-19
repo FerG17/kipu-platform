@@ -134,6 +134,31 @@ public class AlertsLifecycleTests(KipuApiFactory factory) : IntegrationTestBase(
             "a batch 20 days out must count as expiring soon when the business warns at 30 days");
     }
 
+    /// <summary>
+    ///     Turning a rule off used to leave its already-raised alerts sitting
+    ///     ACTIVE until the next scheduled sweep (hours later, per
+    ///     Alerts:SweepIntervalHours) — even though the owner had just said
+    ///     that alert type no longer matters to them. Disabling a rule must
+    ///     resolve its outstanding alerts right away.
+    /// </summary>
+    [Fact]
+    public async Task DisablingAnAlertRule_ResolvesItsActiveAlertsImmediately()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+
+        // Quantity 0 registers it in the warehouse and trips OUT_OF_STOCK.
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 0)).EnsureSuccessStatusCode();
+        Assert.Contains(await GetActiveAlertsAsync(client), alert => alert.GetProperty("type").GetString() == "OUT_OF_STOCK");
+
+        (await client.PostAsJsonAsync("/api/v1/alert-rules",
+            new { alertType = "OUT_OF_STOCK", thresholdValue = 0, enabled = false })).EnsureSuccessStatusCode();
+
+        Assert.DoesNotContain(await GetActiveAlertsAsync(client),
+            alert => alert.GetProperty("type").GetString() == "OUT_OF_STOCK");
+    }
+
     private static async Task<int> GetFirstBatchIdAsync(HttpClient client, int productId)
     {
         var response = await client.GetAsync($"/api/v1/batches?productId={productId}");

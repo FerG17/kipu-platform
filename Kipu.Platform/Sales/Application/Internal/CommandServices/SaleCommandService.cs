@@ -69,6 +69,10 @@ public class SaleCommandService(
             var basePrice = await productContextFacade.GetBasePrice(productLines.Key, cancellationToken);
             if (basePrice is null)
                 return Result<Sale>.Failure(SalesError.ProductNotFound, localizer[nameof(SalesError.ProductNotFound)]);
+
+            if (!await productContextFacade.IsProductActive(productLines.Key, cancellationToken))
+                return Result<Sale>.Failure(SalesError.ProductInactive, localizer[nameof(SalesError.ProductInactive)]);
+
             basePriceByProductId[productLines.Key] = basePrice.Value;
 
             var requestedQuantity = productLines.Sum(line => line.Quantity);

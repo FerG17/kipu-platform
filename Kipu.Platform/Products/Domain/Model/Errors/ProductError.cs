@@ -14,6 +14,18 @@ public enum ProductError
     BatchNotFound,
     BatchAlreadyDiscarded,
 
+    /// <summary>The product is deactivated — it cannot receive a stock intake until it's reactivated.</summary>
+    ProductInactive,
+
+    /// <summary>A stock adjustment's delta was zero — nothing to correct.</summary>
+    InvalidAdjustmentQuantity,
+
+    /// <summary>A stock adjustment must always record why (shrinkage, breakage, theft, count fix).</summary>
+    AdjustmentReasonRequired,
+
+    /// <summary>A downward stock adjustment asked to remove more units than the warehouse actually has.</summary>
+    AdjustmentExceedsAvailableStock,
+
     /// <summary>Name/description/category/price outside what the catalog (and its columns) accept.</summary>
     InvalidProductData,
 

@@ -1,5 +1,6 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
+using Kipu.Platform.Products.Domain.Model.Entities;
 using Kipu.Platform.Products.Interfaces.Acl;
 using Kipu.Platform.Shared.Application;
 
@@ -61,7 +62,7 @@ public static class StockMovementsPdfGenerator
                     {
                         table.Cell().Text(businessClock.ToLocalDateTime(line.RegisteredAt).ToString("yyyy-MM-dd HH:mm"));
                         table.Cell().Text(line.ProductName);
-                        table.Cell().Text(line.Type == "INTAKE" ? "Entrada" : "Salida");
+                        table.Cell().Text(StockMovementType.IsInbound(line.Type, line.Quantity) ? "Entrada" : "Salida");
                         table.Cell().Text(line.Quantity.ToString());
                         table.Cell().Text(line.Supplier);
                         table.Cell().Text(line.Note);
