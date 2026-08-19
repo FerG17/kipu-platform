@@ -19,6 +19,13 @@ public static class ModelBuilderExtensions
             entity.Property(sale => sale.PaymentMethod).IsRequired().HasMaxLength(50);
             entity.Property(sale => sale.Description).HasMaxLength(500);
             entity.Property(sale => sale.Currency).IsRequired().HasMaxLength(10);
+            entity.Property(sale => sale.IdempotencyKey).HasMaxLength(64);
+
+            // MySQL treats every NULL as distinct in a unique index, so this
+            // only ever rejects a genuine repeat key for the same business —
+            // sales without one (IdempotencyKey null) never collide with
+            // each other.
+            entity.HasIndex(sale => new { sale.BusinessId, sale.IdempotencyKey }).IsUnique();
 
             // Makes a cancellation conditional on the sale still being in the
             // state the request read, so simultaneous cancellations can't each

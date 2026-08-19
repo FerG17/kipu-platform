@@ -68,6 +68,9 @@
   <data name="InvalidSaleLine" xml:space="preserve">
     <value>Every sale line needs a quantity above zero, a non-negative unit price, and a discount between 0 and 1.</value>
   </data>
+  <data name="InvalidSaleData" xml:space="preserve">
+    <value>Check the payment method, currency and description — one of them is invalid or too long.</value>
+  </data>
   <data name="PaymentPlanNotFound" xml:space="preserve">
     <value>Payment plan not found.</value>
   </data>

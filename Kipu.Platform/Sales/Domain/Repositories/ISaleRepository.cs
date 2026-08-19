@@ -13,4 +13,8 @@ public interface ISaleRepository : IBaseRepository<Sale>
 
     Task<decimal> SumPaidTotalByBusinessIdAsync(int businessId, DateOnly? dateFrom, DateOnly? dateTo,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Used to make CreateSaleCommand idempotent — see Sale.IdempotencyKey.</summary>
+    Task<Sale?> FindByBusinessIdAndIdempotencyKeyAsync(int businessId, string idempotencyKey,
+        CancellationToken cancellationToken = default);
 }

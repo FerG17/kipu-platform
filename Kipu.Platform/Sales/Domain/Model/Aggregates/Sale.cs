@@ -21,13 +21,15 @@ public class Sale : IVersionedEntity
 {
     private readonly List<SaleDetail> _saleDetails = [];
 
-    public Sale(int businessId, int? customerId, string paymentMethod, string currency, string description)
+    public Sale(int businessId, int? customerId, string paymentMethod, string currency, string description,
+        string? idempotencyKey = null)
     {
         BusinessId = businessId;
         CustomerId = customerId;
         PaymentMethod = paymentMethod;
         Currency = currency;
         Description = description;
+        IdempotencyKey = idempotencyKey;
         Status = SaleStatus.Paid;
         Date = DateTimeOffset.UtcNow;
     }
@@ -49,6 +51,17 @@ public class Sale : IVersionedEntity
     public DateTimeOffset Date { get; private set; }
     public string Description { get; private set; }
     public string Currency { get; private set; }
+
+    /// <summary>
+    ///     Client-generated key (one per checkout attempt, reused across
+    ///     retries of that same attempt — see the POS store's startNewSale).
+    ///     A repeat CreateSaleCommand carrying a key that already exists for
+    ///     this business returns the existing sale instead of creating a
+    ///     second one, so a request that succeeded but whose response never
+    ///     reached the client (dropped connection, F5 mid-flight) can't be
+    ///     double-charged by a retry.
+    /// </summary>
+    public string? IdempotencyKey { get; private set; }
 
     /// <summary>
     ///     Optimistic-concurrency token — what stops the same sale being

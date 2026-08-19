@@ -11,6 +11,6 @@ public static class CreateSaleCommandFromResourceAssembler
             .Select(line => new SaleLineCommand(line.ProductId, line.Quantity, line.UnitPrice))
             .ToList();
         return new CreateSaleCommand(businessId, resource.CustomerId, resource.PaymentMethod, resource.Currency,
-            resource.Description, lines);
+            resource.Description, lines, resource.IdempotencyKey);
     }
 }

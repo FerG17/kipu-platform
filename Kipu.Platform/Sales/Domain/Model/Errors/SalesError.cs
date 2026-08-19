@@ -13,6 +13,9 @@ public enum SalesError
     InvalidStatusTransition,
     EmptySaleLines,
     InvalidSaleLine,
+
+    /// <summary>PaymentMethod/Currency outside their allowed values, or Description too long.</summary>
+    InvalidSaleData,
     PaymentPlanNotFound,
     PaymentPlanAlreadyExists,
     InstallmentsFullyPaid,

@@ -74,4 +74,7 @@
   <data name="InvalidPurchaseOrderDate" xml:space="preserve">
     <value>La fecha de la orden y la fecha esperada de entrega deben ser válidas, estar dentro de un rango razonable, y la fecha de entrega no puede ser anterior a la fecha de la orden.</value>
   </data>
+  <data name="InvalidPurchaseOrderData" xml:space="preserve">
+    <value>Revisa la moneda y la descripción — alguna es inválida o demasiado larga.</value>
+  </data>
 </root>

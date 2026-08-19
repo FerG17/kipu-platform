@@ -6,7 +6,8 @@ public class CreateOrUpdateAlertRuleCommandValidator : AbstractValidator<CreateO
 {
     public CreateOrUpdateAlertRuleCommandValidator()
     {
-        RuleFor(command => command.AlertType).NotEmpty();
+        // Mirrors the column in Alerts' ModelBuilderExtensions (AlertRule entity).
+        RuleFor(command => command.AlertType).NotEmpty().MaximumLength(20);
         RuleFor(command => command.ThresholdValue).GreaterThanOrEqualTo(0);
     }
 }
