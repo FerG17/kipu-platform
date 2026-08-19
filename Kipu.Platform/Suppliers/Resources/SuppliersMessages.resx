@@ -68,4 +68,10 @@
   <data name="InvalidSupplierData" xml:space="preserve">
     <value>Supplier name is required and must fit its field lengths.</value>
   </data>
+  <data name="SupplierHasPendingOrders" xml:space="preserve">
+    <value>This supplier has pending or delayed purchase orders. Receive or cancel them before deactivating the supplier.</value>
+  </data>
+  <data name="InvalidPurchaseOrderDate" xml:space="preserve">
+    <value>The order date and expected delivery date must be valid, within a reasonable range, and the delivery date cannot be earlier than the order date.</value>
+  </data>
 </root>

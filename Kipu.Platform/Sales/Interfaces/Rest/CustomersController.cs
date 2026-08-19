@@ -75,8 +75,10 @@ public class CustomersController(
             customer => Ok(CustomerResourceFromEntityAssembler.ToResourceFromEntity(customer)));
     }
 
+    /// <summary>Soft delete (I31) — restricted to Admin, unlike the rest of this controller which Cashiers can also use.</summary>
     [HttpDelete("{id:int}")]
-    [SwaggerOperation(Summary = "Delete a customer", OperationId = "DeleteCustomer")]
+    [Authorize(RoleNames.Admin)]
+    [SwaggerOperation(Summary = "Deactivate a customer", OperationId = "DeleteCustomer")]
     public async Task<IActionResult> DeleteCustomer([FromRoute] int id, CancellationToken cancellationToken)
     {
         var result = await customerCommandService.Handle(new DeleteCustomerCommand(id), cancellationToken);

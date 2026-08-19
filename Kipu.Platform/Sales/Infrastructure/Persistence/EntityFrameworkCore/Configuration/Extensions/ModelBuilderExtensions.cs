@@ -60,6 +60,7 @@ public static class ModelBuilderExtensions
             entity.Property(customer => customer.DocumentNumber).HasMaxLength(20);
             entity.Property(customer => customer.PhoneNumber).HasMaxLength(20);
             entity.Property(customer => customer.Email).HasMaxLength(150);
+            entity.Property(customer => customer.Status).IsRequired().HasMaxLength(20);
 
             entity.HasOne<Business>().WithMany().HasForeignKey(customer => customer.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
