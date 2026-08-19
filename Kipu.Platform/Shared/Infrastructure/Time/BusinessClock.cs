@@ -44,7 +44,12 @@ public class BusinessClock : IBusinessClock
 
     public DateOnly ToLocalDate(DateTimeOffset instant)
     {
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, _timeZone).DateTime);
+        return DateOnly.FromDateTime(ToLocalDateTime(instant));
+    }
+
+    public DateTime ToLocalDateTime(DateTimeOffset instant)
+    {
+        return TimeZoneInfo.ConvertTime(instant, _timeZone).DateTime;
     }
 
     private DateTimeOffset ToInstant(DateTime localDateTime)

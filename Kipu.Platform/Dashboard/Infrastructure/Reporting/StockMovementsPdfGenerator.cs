@@ -1,6 +1,7 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using Kipu.Platform.Products.Interfaces.Acl;
+using Kipu.Platform.Shared.Application;
 
 namespace Kipu.Platform.Dashboard.Infrastructure.Reporting;
 
@@ -13,7 +14,7 @@ namespace Kipu.Platform.Dashboard.Infrastructure.Reporting;
 public static class StockMovementsPdfGenerator
 {
     public static byte[] Generate(int reportId, DateOnly? dateFrom, DateOnly? dateTo, string? productFilterName,
-        string? supplierFilterName, IReadOnlyCollection<StockMovementReportLine> lines)
+        string? supplierFilterName, IReadOnlyCollection<StockMovementReportLine> lines, IBusinessClock businessClock)
     {
         var document = Document.Create(container =>
         {
@@ -58,7 +59,7 @@ public static class StockMovementsPdfGenerator
 
                     foreach (var line in lines)
                     {
-                        table.Cell().Text(line.RegisteredAt.ToString("yyyy-MM-dd HH:mm"));
+                        table.Cell().Text(businessClock.ToLocalDateTime(line.RegisteredAt).ToString("yyyy-MM-dd HH:mm"));
                         table.Cell().Text(line.ProductName);
                         table.Cell().Text(line.Type == "INTAKE" ? "Entrada" : "Salida");
                         table.Cell().Text(line.Quantity.ToString());

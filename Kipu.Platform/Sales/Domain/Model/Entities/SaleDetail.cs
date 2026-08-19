@@ -18,6 +18,12 @@ public class SaleDetail(int saleId, int productId, int quantity, decimal unitPri
     public decimal UnitPrice { get; private set; } = unitPrice;
     public decimal Discount { get; private set; } = discount;
 
-    /// <summary>quantity × unitPrice × (1 - discount) — server-side, never trusted from the client.</summary>
-    public decimal Subtotal => Quantity * UnitPrice * (1 - Discount);
+    /// <summary>
+    ///     quantity × unitPrice × (1 - discount) — server-side, never trusted
+    ///     from the client. Rounded to 2 decimals so this line's own total
+    ///     always matches what the sum of every line (Sale.TotalAmount, a
+    ///     decimal(10,2) column) actually persists — the raw product can
+    ///     carry more than 2 decimal places whenever Discount is a fraction.
+    /// </summary>
+    public decimal Subtotal => Math.Round(Quantity * UnitPrice * (1 - Discount), 2, MidpointRounding.AwayFromZero);
 }

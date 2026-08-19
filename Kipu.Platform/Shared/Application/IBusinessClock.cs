@@ -28,4 +28,7 @@ public interface IBusinessClock
 
     /// <summary>The local calendar date an instant falls on — e.g. to group sales into the day the bodega counted them.</summary>
     DateOnly ToLocalDate(DateTimeOffset instant);
+
+    /// <summary>The full local wall-clock date and time an instant falls on — e.g. to print a timestamp on an exported report.</summary>
+    DateTime ToLocalDateTime(DateTimeOffset instant);
 }

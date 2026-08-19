@@ -9,6 +9,7 @@ using Kipu.Platform.Dashboard.Infrastructure.Reporting;
 using Kipu.Platform.Dashboard.Resources;
 using Kipu.Platform.Products.Interfaces.Acl;
 using Kipu.Platform.Sales.Interfaces.Acl;
+using Kipu.Platform.Shared.Application;
 using Kipu.Platform.Shared.Application.Model;
 using Kipu.Platform.Suppliers.Interfaces.Acl;
 
@@ -19,6 +20,7 @@ public class ReportQueryService(
     ISalesContextFacade salesContextFacade,
     IProductContextFacade productContextFacade,
     ISupplierContextFacade supplierContextFacade,
+    IBusinessClock businessClock,
     IStringLocalizer<DashboardMessages> localizer,
     ILogger<ReportQueryService> logger)
     : IReportQueryService
@@ -68,7 +70,7 @@ public class ReportQueryService(
                 localizer[nameof(DashboardError.UnsupportedReportTypeForPdf)]);
 
         var (lines, productName, supplierName) = await GetStockMovementLines(report, cancellationToken);
-        var pdf = StockMovementsPdfGenerator.Generate(report.Id, report.DateFrom, report.DateTo, productName, supplierName, lines);
+        var pdf = StockMovementsPdfGenerator.Generate(report.Id, report.DateFrom, report.DateTo, productName, supplierName, lines, businessClock);
 
         logger.LogInformation(
             "Report {ReportId} (STOCK_MOVEMENTS) exported as PDF for business {BusinessId}: {LineCount} line(s), {SizeBytes} bytes",
@@ -80,7 +82,7 @@ public class ReportQueryService(
     private async Task<byte[]> BuildSalesExcel(Report report, CancellationToken cancellationToken)
     {
         var rows = await salesContextFacade.GetSalesForExport(report.BusinessId, report.DateFrom, report.DateTo, cancellationToken);
-        return ExcelReportGenerator.GenerateSales(report.Id, report.DateFrom, report.DateTo, rows);
+        return ExcelReportGenerator.GenerateSales(report.Id, report.DateFrom, report.DateTo, rows, businessClock);
     }
 
     private async Task<byte[]> BuildInventoryExcel(Report report, CancellationToken cancellationToken)
@@ -93,7 +95,7 @@ public class ReportQueryService(
     {
         var (rows, productName, supplierName) = await GetStockMovementLines(report, cancellationToken);
         return ExcelReportGenerator.GenerateStockMovements(report.Id, report.DateFrom, report.DateTo, productName,
-            supplierName, rows);
+            supplierName, rows, businessClock);
     }
 
     /// <summary>

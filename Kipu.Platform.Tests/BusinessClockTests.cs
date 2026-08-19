@@ -77,4 +77,20 @@ public class BusinessClockTests
 
         Assert.InRange(LateEveningInLima, clock.StartOfDay(day), clock.EndOfDay(day));
     }
+
+    /// <summary>
+    ///     Exported reports (Excel/PDF) used to write the raw stored UTC
+    ///     instant's wall-clock component straight into the cell — a sale
+    ///     rung up at 21:00 Lima time (already the 11th in UTC) would print
+    ///     as "2026-08-11 02:00" with no timezone label, reading as 5 hours
+    ///     later than it actually happened. ToLocalDateTime must preserve
+    ///     the time of day, not just the calendar date ToLocalDate already covers.
+    /// </summary>
+    [Fact]
+    public void ToLocalDateTime_ForAnEveningSale_KeepsBothTheDayAndTheWallClockTime()
+    {
+        var clock = CreateClock(LateEveningInLima);
+
+        Assert.Equal(new DateTime(2026, 8, 10, 21, 0, 0), clock.ToLocalDateTime(LateEveningInLima));
+    }
 }
