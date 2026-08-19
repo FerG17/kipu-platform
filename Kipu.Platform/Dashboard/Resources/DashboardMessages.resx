@@ -50,6 +50,9 @@
   <data name="InvalidReportData" xml:space="preserve">
     <value>Invalid report data — check the type and date range.</value>
   </data>
+  <data name="InvalidDateRange" xml:space="preserve">
+    <value>The date range cannot span more than 366 days.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>
   </data>
