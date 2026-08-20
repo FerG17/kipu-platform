@@ -65,6 +65,9 @@ public static class ProductActionResultAssembler
             ProductError.SupplierNotFound => StatusCodes.Status400BadRequest,
             ProductError.InvalidWarehouseData => StatusCodes.Status400BadRequest,
             ProductError.ConcurrentModification => StatusCodes.Status409Conflict,
+            ProductError.InvalidAdjustmentReason => StatusCodes.Status400BadRequest,
+            ProductError.InvalidStockIntakeData => StatusCodes.Status400BadRequest,
+            ProductError.WarehouseInactive => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

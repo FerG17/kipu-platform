@@ -8,9 +8,13 @@ namespace Kipu.Platform.Suppliers.Infrastructure.Persistence.EntityFrameworkCore
 
 public class SupplierRepository(AppDbContext context) : BaseRepository<Supplier>(context), ISupplierRepository
 {
-    public async Task<IEnumerable<Supplier>> FindAllByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Supplier>> FindAllByBusinessIdAsync(int businessId, bool includeInactive = false,
+        CancellationToken cancellationToken = default)
     {
-        return await Context.Set<Supplier>().Where(supplier => supplier.BusinessId == businessId).ToListAsync(cancellationToken);
+        var query = Context.Set<Supplier>().Where(supplier => supplier.BusinessId == businessId);
+        if (!includeInactive) query = query.Where(supplier => supplier.Status == SupplierStatus.Active);
+
+        return await query.ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<int>> FindExistingIdsAsync(int businessId, IReadOnlyCollection<int> supplierIds,

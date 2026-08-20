@@ -26,14 +26,16 @@ public class SuppliersController(
     ProblemDetailsFactory problemDetailsFactory)
     : ControllerBase
 {
+    /// <summary>Active suppliers only by default (X4 M11) — pass includeInactive=true for the management page, which also needs to show and reactivate deactivated ones.</summary>
     [HttpGet]
     [SwaggerOperation(Summary = "List suppliers of the current business", OperationId = "GetSuppliers")]
-    public async Task<IActionResult> GetSuppliers(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetSuppliers([FromQuery] bool includeInactive, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var suppliers = await supplierQueryService.Handle(new GetAllSuppliersByBusinessIdQuery(businessId.Value), cancellationToken);
+        var suppliers = await supplierQueryService.Handle(
+            new GetAllSuppliersByBusinessIdQuery(businessId.Value, includeInactive), cancellationToken);
         return Ok(suppliers.Select(SupplierResourceFromEntityAssembler.ToResourceFromEntity));
     }
 
@@ -82,6 +84,17 @@ public class SuppliersController(
     public async Task<IActionResult> DeactivateSupplier([FromRoute] int id, CancellationToken cancellationToken)
     {
         var result = await supplierCommandService.Handle(new DeactivateSupplierCommand(id), cancellationToken);
+
+        return SuppliersActionResultAssembler.ToActionResult(result, problemDetailsFactory,
+            supplier => Ok(SupplierResourceFromEntityAssembler.ToResourceFromEntity(supplier)));
+    }
+
+    /// <summary>X4 M11: undoes DeactivateSupplier — there was no way back from it before.</summary>
+    [HttpPatch("{id:int}/activate")]
+    [SwaggerOperation(Summary = "Reactivate a supplier", OperationId = "ReactivateSupplier")]
+    public async Task<IActionResult> ReactivateSupplier([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var result = await supplierCommandService.Handle(new ReactivateSupplierCommand(id), cancellationToken);
 
         return SuppliersActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             supplier => Ok(SupplierResourceFromEntityAssembler.ToResourceFromEntity(supplier)));
