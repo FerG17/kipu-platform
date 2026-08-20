@@ -33,7 +33,7 @@ public static class ExcelReportGenerator
         WriteTitle(sheet, $"Reporte de ventas #{reportId}", BuildDateRangeSummary(dateFrom, dateTo), businessClock);
 
         var headerRow = 4;
-        WriteHeader(sheet, headerRow, "N° venta", "Fecha", "Método de pago", "Total", "Moneda");
+        WriteHeader(sheet, headerRow, "N° venta", "Fecha", "Método de pago", "Total", "Cobrado", "Moneda");
 
         var row = headerRow + 1;
         foreach (var line in rows)
@@ -49,11 +49,17 @@ public static class ExcelReportGenerator
             WriteText(sheet.Cell(row, 3), PaymentMethodLabel(line.PaymentMethod));
             sheet.Cell(row, 4).Value = line.TotalAmount;
             sheet.Cell(row, 4).Style.NumberFormat.Format = "#,##0.00";
-            WriteText(sheet.Cell(row, 5), line.Currency);
+            // Equal to Total for a Paid sale; for a Credit sale, whatever has
+            // actually been collected on its installments so far — the two
+            // columns are meant to visibly diverge for a sale still being
+            // paid off, rather than pretending the full total already came in.
+            sheet.Cell(row, 5).Value = line.CollectedAmount;
+            sheet.Cell(row, 5).Style.NumberFormat.Format = "#,##0.00";
+            WriteText(sheet.Cell(row, 6), line.Currency);
             row++;
         }
 
-        FinishSheet(sheet, headerRow, lastColumn: 5, hasRows: rows.Count > 0, emptyMessage: "Sin ventas en el rango seleccionado.");
+        FinishSheet(sheet, headerRow, lastColumn: 6, hasRows: rows.Count > 0, emptyMessage: "Sin ventas en el rango seleccionado.");
         return ToBytes(workbook);
     }
 
@@ -176,6 +182,7 @@ public static class ExcelReportGenerator
             "CARD" => "Tarjeta",
             "YAPE" => "Yape",
             "PLIN" => "Plin",
+            "CREDIT" => "Crédito",
             _ => paymentMethod
         };
     }

@@ -1,3 +1,3 @@
 namespace Kipu.Platform.Sales.Domain.Model.Commands;
 
-public record RegisterInstallmentPaymentCommand(int PaymentPlanId);
+public record RegisterInstallmentPaymentCommand(int PaymentPlanId, int PaidByUserId);

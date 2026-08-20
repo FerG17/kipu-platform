@@ -195,10 +195,16 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
 
     protected static async Task<HttpResponseMessage> CreateSaleAsync(HttpClient client, params object[] lines)
     {
+        return await CreateSaleAsync(client, paymentMethod: "CASH", lines);
+    }
+
+    /// <summary>X4: lets a test create a CREDIT sale (Sale.Status == Credit — required before a payment plan can be attached, see PaymentPlanCommandService) without every other CreateSaleAsync call site having to pass a payment method it doesn't care about.</summary>
+    protected static async Task<HttpResponseMessage> CreateSaleAsync(HttpClient client, string paymentMethod, params object[] lines)
+    {
         return await client.PostAsJsonAsync("/api/v1/sales", new
         {
             customerId = (int?)null,
-            paymentMethod = "CASH",
+            paymentMethod,
             currency = "PEN",
             description = "venta de prueba",
             lines

@@ -148,7 +148,7 @@ public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(f
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
-        var saleResponse = await CreateSaleAsync(client, SaleLine(productId, quantity: 2, unitPrice: 10m));
+        var saleResponse = await CreateSaleAsync(client, "CREDIT", SaleLine(productId, quantity: 2, unitPrice: 10m));
         saleResponse.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(saleResponse)).GetProperty("id").GetInt32();
 
@@ -182,7 +182,7 @@ public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(f
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
-        var saleResponse = await CreateSaleAsync(client, SaleLine(productId, quantity: 2, unitPrice: 10m));
+        var saleResponse = await CreateSaleAsync(client, "CREDIT", SaleLine(productId, quantity: 2, unitPrice: 10m));
         saleResponse.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(saleResponse)).GetProperty("id").GetInt32();
 

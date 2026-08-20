@@ -22,6 +22,12 @@ public enum SalesError
     InvalidInstallmentCount,
     PaymentPlanCancelled,
 
+    /// <summary>A payment plan can only be attached to a sale checked out with the CREDIT payment method (Sale.Status == Credit) — never a sale already paid in full.</summary>
+    SaleIsNotACreditSale,
+
+    /// <summary>RevertInstallmentPaymentCommand against a plan with no unreversed payment to undo.</summary>
+    NoPaymentToRevert,
+
     /// <summary>Customer name/document/phone/email outside what its columns accept.</summary>
     InvalidCustomerData,
 

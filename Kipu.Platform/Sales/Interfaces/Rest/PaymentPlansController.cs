@@ -89,7 +89,33 @@ public class PaymentPlansController(
     [SwaggerResponse(StatusCodes.Status409Conflict, "All installments were already paid")]
     public async Task<IActionResult> RegisterInstallmentPayment([FromRoute] int id, CancellationToken cancellationToken)
     {
-        var result = await paymentPlanCommandService.Handle(new RegisterInstallmentPaymentCommand(id), cancellationToken);
+        var userId = currentUserAccessor.CurrentUserId;
+        if (userId == null) return Unauthorized();
+
+        var result = await paymentPlanCommandService.Handle(new RegisterInstallmentPaymentCommand(id, userId.Value),
+            cancellationToken);
+        return SalesActionResultAssembler.ToActionResult(result, problemDetailsFactory,
+            plan => Ok(PaymentPlanResourceFromEntityAssembler.ToResourceFromEntity(plan)));
+    }
+
+    /// <summary>
+    ///     Undoes the most recently registered payment — Admin only. Same
+    ///     reasoning as SalesController's cancel-sale override: an
+    ///     irreversible-if-unaudited money action shouldn't be a cashier's
+    ///     single click to undo (it still IS undoable, deliberately — see
+    ///     InstallmentPayment.Reverse — but only a manager decides that).
+    /// </summary>
+    [Authorize(RoleNames.Admin)]
+    [HttpPost("{id:int}/revert-last-payment")]
+    [SwaggerOperation(Summary = "Revert the most recently registered payment", OperationId = "RevertInstallmentPayment")]
+    [SwaggerResponse(StatusCodes.Status409Conflict, "There is no payment left to revert")]
+    public async Task<IActionResult> RevertInstallmentPayment([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var userId = currentUserAccessor.CurrentUserId;
+        if (userId == null) return Unauthorized();
+
+        var result = await paymentPlanCommandService.Handle(new RevertInstallmentPaymentCommand(id, userId.Value),
+            cancellationToken);
         return SalesActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             plan => Ok(PaymentPlanResourceFromEntityAssembler.ToResourceFromEntity(plan)));
     }

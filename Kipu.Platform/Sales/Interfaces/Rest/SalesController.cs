@@ -67,7 +67,14 @@ public class SalesController(
                 SaleResourceFromEntityAssembler.ToResourceFromEntity(sale)));
     }
 
-    /// <summary>Only meaningful transition today is to CANCELLED.</summary>
+    /// <summary>
+    ///     Only meaningful transition today is to CANCELLED. Admin only — it
+    ///     reverses stock and revenue for a sale that already happened, and
+    ///     is irreversible, so it gets the same override the DELETE on
+    ///     CustomersController already has, rather than inheriting the
+    ///     class-level Admin+Cashier default.
+    /// </summary>
+    [Authorize(RoleNames.Admin)]
     [HttpPatch("{id:int}")]
     [SwaggerOperation(Summary = "Update a sale's status (cancel)", OperationId = "UpdateSaleStatus")]
     public async Task<IActionResult> UpdateSaleStatus([FromRoute] int id, [FromBody] UpdateSaleStatusResource resource,
