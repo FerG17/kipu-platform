@@ -58,4 +58,95 @@ public class RateLimitingTests(KipuApiFactory factory) : IntegrationTestBase(fac
             Environment.SetEnvironmentVariable(AuthPermitsEnvVar, originalValue);
         }
     }
+
+    private const string TrustLastProxyHopEnvVar = "ForwardedHeaders__TrustLastProxyHop";
+
+    /// <summary>
+    ///     X4 S2: with TrustLastProxyHop on, two callers behind the same test
+    ///     connection (TestServer gives every request the same
+    ///     RemoteIpAddress, standing in for every caller sharing Railway's
+    ///     edge address) must still get independent budgets once they present
+    ///     different X-Forwarded-For values — proving the partition key
+    ///     really switches off RemoteIpAddress once this is enabled.
+    /// </summary>
+    [Fact]
+    public async Task WithTrustLastProxyHopEnabled_DifferentForwardedForValues_GetIndependentBudgets()
+    {
+        const string limitedValue = "3";
+        var originalPermits = Environment.GetEnvironmentVariable(AuthPermitsEnvVar);
+        var originalTrust = Environment.GetEnvironmentVariable(TrustLastProxyHopEnvVar);
+        Environment.SetEnvironmentVariable(AuthPermitsEnvVar, limitedValue);
+        Environment.SetEnvironmentVariable(TrustLastProxyHopEnvVar, "true");
+        try
+        {
+            await using var limitedFactory = new WebApplicationFactory<Program>();
+            var clientA = limitedFactory.CreateClient();
+            clientA.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.10");
+            var clientB = limitedFactory.CreateClient();
+            clientB.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.20");
+
+            for (var i = 0; i < int.Parse(limitedValue); i++)
+            {
+                var responseA = await clientA.PostAsJsonAsync("/api/v1/authentication/sign-in",
+                    new { email = "nobody@test.local", password = "wrong-password" });
+                Assert.NotEqual(HttpStatusCode.TooManyRequests, responseA.StatusCode);
+
+                var responseB = await clientB.PostAsJsonAsync("/api/v1/authentication/sign-in",
+                    new { email = "nobody@test.local", password = "wrong-password" });
+                Assert.NotEqual(HttpStatusCode.TooManyRequests, responseB.StatusCode);
+            }
+
+            // Each has now made exactly the limit — one more from either must 429,
+            // which would not be true if they shared one collapsed bucket.
+            var overLimitA = await clientA.PostAsJsonAsync("/api/v1/authentication/sign-in",
+                new { email = "nobody@test.local", password = "wrong-password" });
+            Assert.Equal(HttpStatusCode.TooManyRequests, overLimitA.StatusCode);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AuthPermitsEnvVar, originalPermits);
+            Environment.SetEnvironmentVariable(TrustLastProxyHopEnvVar, originalTrust);
+        }
+    }
+
+    /// <summary>
+    ///     X4 S2, the flip side: with TrustLastProxyHop left at its default
+    ///     (off), a caller cannot spoof X-Forwarded-For to dodge the limit —
+    ///     two different header values from the same connection must still
+    ///     share one bucket, keyed on RemoteIpAddress like before.
+    /// </summary>
+    [Fact]
+    public async Task WithTrustLastProxyHopDisabled_ForwardedForIsIgnored_BudgetStaysShared()
+    {
+        const string limitedValue = "3";
+        var originalPermits = Environment.GetEnvironmentVariable(AuthPermitsEnvVar);
+        var originalTrust = Environment.GetEnvironmentVariable(TrustLastProxyHopEnvVar);
+        Environment.SetEnvironmentVariable(AuthPermitsEnvVar, limitedValue);
+        Environment.SetEnvironmentVariable(TrustLastProxyHopEnvVar, "false");
+        try
+        {
+            await using var limitedFactory = new WebApplicationFactory<Program>();
+            var clientA = limitedFactory.CreateClient();
+            clientA.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.10");
+            var clientB = limitedFactory.CreateClient();
+            clientB.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.20");
+
+            HttpResponseMessage? lastResponse = null;
+            for (var i = 0; i < int.Parse(limitedValue) + 1; i++)
+            {
+                // Alternate senders — if the header were honoured, neither alone
+                // would ever hit its own limit within this loop.
+                var client = i % 2 == 0 ? clientA : clientB;
+                lastResponse = await client.PostAsJsonAsync("/api/v1/authentication/sign-in",
+                    new { email = "nobody@test.local", password = "wrong-password" });
+            }
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, lastResponse!.StatusCode);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AuthPermitsEnvVar, originalPermits);
+            Environment.SetEnvironmentVariable(TrustLastProxyHopEnvVar, originalTrust);
+        }
+    }
 }

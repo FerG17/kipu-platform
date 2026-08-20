@@ -350,6 +350,47 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
     }
 
+    /// <summary>
+    ///     X4 S2/M1: once a code is verified, CanBeAttempted() correctly stops
+    ///     counting a repeat of the CORRECT code against the attempt budget
+    ///     (see VerifyingTheSameCorrectCodeTwice_SucceedsBothTimes above) — but
+    ///     that used to mean a WRONG guess after verification was free too,
+    ///     forever, in both verify-reset-code and reset-password. Neither
+    ///     endpoint ever registered those attempts, so the 5-guess budget only
+    ///     ever applied before the first successful verification, not after.
+    /// </summary>
+    [Fact]
+    public async Task TooManyWrongAttempts_AfterVerification_StillLocksTheCode()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
+            .EnsureSuccessStatusCode();
+        var code = await CodeSentTo(admin.Email);
+
+        var verify = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+            new { email = admin.Email, code });
+        Assert.True(verify.IsSuccessStatusCode);
+
+        // Five wrong guesses against the now-verified code — each must count.
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var wrong = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+                new { email = admin.Email, code = "000000" });
+            Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        }
+
+        // The real code — already verified, never guessed wrong itself — must
+        // now be locked out too, same as TooManyWrongAttempts_InvalidatesTheCode.
+        var reset = await Client.PostAsJsonAsync("/api/v1/authentication/reset-password",
+            new { email = admin.Email, code, newPassword = "BrandNewPassw0rd!" });
+        Assert.Equal(HttpStatusCode.BadRequest, reset.StatusCode);
+
+        // And the real password still works — nothing reset.
+        var stillWorks = await Client.PostAsJsonAsync("/api/v1/authentication/sign-in",
+            new { email = admin.Email, password = ValidPassword });
+        Assert.True(stillWorks.IsSuccessStatusCode);
+    }
+
     private static async Task<int> MemberIdByEmailAsync(HttpClient adminClient, string email)
     {
         var users = await ReadJsonAsync(await adminClient.GetAsync("/api/v1/users"));
