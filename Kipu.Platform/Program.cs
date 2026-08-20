@@ -448,6 +448,8 @@ builder.Services.AddScoped<IAlertsContextFacade, AlertsContextFacade>();
 // are created (see IAlertNotificationDispatcher).
 builder.Services.AddScoped<IAlertNotificationDispatcher, NoOpAlertNotificationDispatcher>();
 
+AlertSweepIntervalGuard.EnsureUsable(builder.Configuration.GetValue("Alerts:SweepIntervalHours", 6.0));
+
 // Event handlers are auto-discovered by AddCortexMediator's assembly scan
 // (StockLevelChangedEventHandler, BatchRegisteredEventHandler) — no
 // explicit registration needed here.

@@ -52,6 +52,19 @@ public class AlertRepository(AppDbContext context) : BaseRepository<Alert>(conte
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>IgnoreQueryFilters() deliberately — same reasoning as FindActiveByProductAndTypeAsync.</summary>
+    public async Task<IEnumerable<Alert>> FindActiveExpirationAlertsByBatchIdsAsync(IReadOnlyCollection<int> batchIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (batchIds.Count == 0) return [];
+
+        return await Context.Set<Alert>().IgnoreQueryFilters()
+            .Where(alert => alert.BatchId != null && batchIds.Contains(alert.BatchId.Value)
+                             && (alert.Type == AlertType.Expiration || alert.Type == AlertType.Expired)
+                             && alert.Status != AlertStatus.Resolved)
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>Tenant-filtered, same reasoning as FindActiveByBatchIdAsync.</summary>
     public async Task<IEnumerable<Alert>> FindActiveByProductIdAsync(int productId, CancellationToken cancellationToken = default)
     {

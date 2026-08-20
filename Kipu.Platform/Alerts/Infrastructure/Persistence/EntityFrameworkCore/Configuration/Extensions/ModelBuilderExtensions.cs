@@ -30,6 +30,11 @@ public static class ModelBuilderExtensions
                 .OnDelete(DeleteBehavior.SetNull).IsRequired(false);
             entity.HasOne<Warehouse>().WithMany().HasForeignKey(alert => alert.WarehouseId)
                 .OnDelete(DeleteBehavior.SetNull).IsRequired(false);
+
+            // Covers AlertExpirationSweepJob's batched lookup (BatchId IN (...)
+            // AND Type IN (EXPIRATION, EXPIRED) AND Status != RESOLVED) — the
+            // plain FK index on BatchId alone doesn't help the Type/Status filter.
+            entity.HasIndex(alert => new { alert.BatchId, alert.Type, alert.Status });
         });
 
         builder.Entity<AlertRule>(entity =>

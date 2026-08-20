@@ -44,43 +44,65 @@ public class AlertExpirationSweepJob(
         }
     }
 
+    /// <summary>
+    ///     Groups every active batch by business and sweeps each business in
+    ///     its own scope/DbContext/commit — a persistence failure for one
+    ///     business (e.g. a bad insert) is caught and logged there, and can
+    ///     no longer roll back the alerts already computed and committed for
+    ///     every other business in the same sweep cycle.
+    /// </summary>
     private async Task RunSweepAsync(CancellationToken cancellationToken)
     {
+        using var discoveryScope = scopeFactory.CreateScope();
+        var productContextFacade = discoveryScope.ServiceProvider.GetRequiredService<IProductContextFacade>();
+        var batches = await productContextFacade.GetAllActiveBatchesForExpirationSweep(cancellationToken);
+        var today = businessClock.Today;
+
+        foreach (var businessBatches in batches.GroupBy(batch => batch.BusinessId))
+        {
+            try
+            {
+                await SweepBusinessAsync(businessBatches.Key, businessBatches.ToList(), today, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Alert expiration sweep failed for business {BusinessId}", businessBatches.Key);
+            }
+        }
+    }
+
+    private async Task SweepBusinessAsync(int businessId, IReadOnlyCollection<ActiveBatchInfo> batches, DateOnly today,
+        CancellationToken cancellationToken)
+    {
         using var scope = scopeFactory.CreateScope();
-        var productContextFacade = scope.ServiceProvider.GetRequiredService<IProductContextFacade>();
         var alertRepository = scope.ServiceProvider.GetRequiredService<IAlertRepository>();
         var alertRuleRepository = scope.ServiceProvider.GetRequiredService<IAlertRuleRepository>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var notificationDispatcher = scope.ServiceProvider.GetRequiredService<IAlertNotificationDispatcher>();
 
-        var batches = await productContextFacade.GetAllActiveBatchesForExpirationSweep(cancellationToken);
-        var today = businessClock.Today;
-        var rulesByBusiness = new Dictionary<int, ExpirationRuleSettings>();
+        var rules = await LoadExpirationRules(alertRuleRepository, businessId, cancellationToken);
+        if (!rules.ExpiringSoonEnabled && !rules.ExpiredEnabled) return;
+
+        // One batched lookup for the whole business instead of two queries
+        // (existingExpired/existingExpiringSoon) per batch — was an N+1 that
+        // scaled with every active batch across every business.
+        var batchIds = batches.Select(batch => batch.BatchId).ToList();
+        var existingAlertsByBatchAndType = (await alertRepository.FindActiveExpirationAlertsByBatchIdsAsync(batchIds, cancellationToken))
+            .GroupBy(alert => (alert.BatchId!.Value, alert.Type))
+            .ToDictionary(group => group.Key, group => group.First());
+
         var newAlerts = new List<Alert>();
 
         foreach (var batch in batches)
         {
-            // Cached per business, including the disabled case — a business
-            // with the rule turned off used to re-query the database for
-            // every single one of its batches.
-            if (!rulesByBusiness.TryGetValue(batch.BusinessId, out var rules))
-            {
-                rules = await LoadExpirationRules(alertRuleRepository, batch.BusinessId, cancellationToken);
-                rulesByBusiness[batch.BusinessId] = rules;
-            }
-
-            if (!rules.ExpiringSoonEnabled && !rules.ExpiredEnabled) continue;
-
             var thresholdDays = rules.ThresholdDays;
             var isExpired = ExpirationRules.IsExpired(batch.Expiration, today) && rules.ExpiredEnabled;
             var isExpiringSoon = ExpirationRules.IsExpiringSoon(batch.Expiration, today, thresholdDays)
                                  && rules.ExpiringSoonEnabled;
             var daysToExpiry = batch.Expiration?.DayNumber - today.DayNumber;
 
-            var existingExpired = await alertRepository.FindActiveByProductAndTypeAsync(batch.ProductId, AlertType.Expired,
-                batch.BatchId, null, cancellationToken);
-            var existingExpiringSoon = await alertRepository.FindActiveByProductAndTypeAsync(batch.ProductId,
-                AlertType.Expiration, batch.BatchId, null, cancellationToken);
+            existingAlertsByBatchAndType.TryGetValue((batch.BatchId, AlertType.Expired), out var existingExpired);
+            existingAlertsByBatchAndType.TryGetValue((batch.BatchId, AlertType.Expiration), out var existingExpiringSoon);
 
             if (isExpired)
             {
@@ -126,8 +148,8 @@ public class AlertExpirationSweepJob(
         await unitOfWork.CompleteAsync(cancellationToken);
 
         if (newAlerts.Count > 0)
-            logger.LogWarning("Alert expiration sweep created {NewAlertCount} new alert(s) across {BatchCount} active batch(es)",
-                newAlerts.Count, batches.Count);
+            logger.LogWarning("Alert expiration sweep created {NewAlertCount} new alert(s) across {BatchCount} active batch(es) for business {BusinessId}",
+                newAlerts.Count, batches.Count, businessId);
 
         foreach (var alert in newAlerts)
             await notificationDispatcher.NotifyAsync(alert, cancellationToken);

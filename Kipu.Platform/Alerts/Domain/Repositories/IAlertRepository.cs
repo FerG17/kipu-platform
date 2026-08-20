@@ -23,6 +23,17 @@ public interface IAlertRepository : IBaseRepository<Alert>
     /// <summary>Every still-open alert raised for a batch — closed when the batch is discarded.</summary>
     Task<IEnumerable<Alert>> FindActiveByBatchIdAsync(int batchId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    ///     Every still-open EXPIRATION/EXPIRED alert across the given batches,
+    ///     in one query — used by AlertExpirationSweepJob to look up existing
+    ///     alerts for a whole business's batches at once instead of two
+    ///     queries per batch (FindActiveByProductAndTypeAsync). Ignores query
+    ///     filters for the same reason that method does: the sweep runs
+    ///     outside any authenticated business.
+    /// </summary>
+    Task<IEnumerable<Alert>> FindActiveExpirationAlertsByBatchIdsAsync(IReadOnlyCollection<int> batchIds,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Every still-open alert raised for a product — closed when the product is deactivated.</summary>
     Task<IEnumerable<Alert>> FindActiveByProductIdAsync(int productId, CancellationToken cancellationToken = default);
 }
