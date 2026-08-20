@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Kipu.Platform.Shared.Application;
 using Kipu.Platform.Products.Domain.Model.Entities;
 using Kipu.Platform.Products.Domain.Repositories;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 
@@ -10,12 +12,15 @@ namespace Kipu.Platform.Products.Infrastructure.Persistence.EntityFrameworkCore.
 public class StockMovementRepository(AppDbContext context, IBusinessClock businessClock)
     : BaseRepository<StockMovement>(context), IStockMovementRepository
 {
-    public async Task<IEnumerable<StockMovement>> FindAllByBusinessIdAsync(int businessId,
+    public async Task<PagedResult<StockMovement>> FindAllByBusinessIdAsync(int businessId, PageRequest page,
         CancellationToken cancellationToken = default)
     {
-        return await Context.Set<StockMovement>().Where(movement => movement.BusinessId == businessId)
-            .OrderByDescending(movement => movement.RegisteredAt)
+        var query = Context.Set<StockMovement>().Where(movement => movement.BusinessId == businessId);
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query.OrderByDescending(movement => movement.RegisteredAt)
+            .Skip(page.Skip).Take(page.PageSize)
             .ToListAsync(cancellationToken);
+        return new PagedResult<StockMovement>(items, totalCount, page.Page, page.PageSize);
     }
 
     public async Task<IEnumerable<StockMovement>> FindFilteredByBusinessIdAsync(int businessId, DateOnly? dateFrom,

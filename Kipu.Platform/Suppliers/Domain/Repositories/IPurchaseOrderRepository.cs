@@ -1,3 +1,5 @@
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Domain.Repositories;
 using Kipu.Platform.Suppliers.Domain.Model.Aggregates;
 using Kipu.Platform.Suppliers.Domain.Model.Entities;
@@ -6,7 +8,7 @@ namespace Kipu.Platform.Suppliers.Domain.Repositories;
 
 public interface IPurchaseOrderRepository : IBaseRepository<PurchaseOrder>
 {
-    Task<IEnumerable<PurchaseOrder>> FindAllByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default);
+    Task<PagedResult<PurchaseOrder>> FindAllByBusinessIdAsync(int businessId, PageRequest page, CancellationToken cancellationToken = default);
     Task<IEnumerable<PurchaseOrder>> FindAllBySupplierIdAsync(int supplierId, CancellationToken cancellationToken = default);
 
     /// <summary>FindByIdAsync (from IBaseRepository) does not eager-load Details — use this when the lines are needed.</summary>

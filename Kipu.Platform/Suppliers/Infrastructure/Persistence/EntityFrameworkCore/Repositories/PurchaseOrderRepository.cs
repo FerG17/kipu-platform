@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Kipu.Platform.Suppliers.Domain.Model.Aggregates;
@@ -9,11 +11,15 @@ namespace Kipu.Platform.Suppliers.Infrastructure.Persistence.EntityFrameworkCore
 
 public class PurchaseOrderRepository(AppDbContext context) : BaseRepository<PurchaseOrder>(context), IPurchaseOrderRepository
 {
-    public async Task<IEnumerable<PurchaseOrder>> FindAllByBusinessIdAsync(int businessId,
+    public async Task<PagedResult<PurchaseOrder>> FindAllByBusinessIdAsync(int businessId, PageRequest page,
         CancellationToken cancellationToken = default)
     {
-        return await Context.Set<PurchaseOrder>().Include(order => order.Details)
-            .Where(order => order.BusinessId == businessId).ToListAsync(cancellationToken);
+        var query = Context.Set<PurchaseOrder>().Where(order => order.BusinessId == businessId);
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query.Include(order => order.Details).OrderByDescending(order => order.Date)
+            .Skip(page.Skip).Take(page.PageSize)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<PurchaseOrder>(items, totalCount, page.Page, page.PageSize);
     }
 
     public async Task<IEnumerable<PurchaseOrder>> FindAllBySupplierIdAsync(int supplierId,

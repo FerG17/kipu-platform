@@ -1,11 +1,17 @@
 using Kipu.Platform.Products.Domain.Model.Aggregates;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Domain.Repositories;
 
 namespace Kipu.Platform.Products.Domain.Repositories;
 
 public interface IProductRepository : IBaseRepository<Product>
 {
+    /// <summary>Unpaged — used internally (ProductContextFacade) where the whole set is genuinely needed. The GetProducts collection endpoint uses FindPageByBusinessIdAsync instead (X4 S3).</summary>
     Task<IEnumerable<Product>> FindAllByBusinessIdAsync(int businessId, string? category, bool includeInactive = false,
+        CancellationToken cancellationToken = default);
+
+    Task<PagedResult<Product>> FindPageByBusinessIdAsync(int businessId, string? category, bool includeInactive, PageRequest page,
         CancellationToken cancellationToken = default);
 
     /// <summary>

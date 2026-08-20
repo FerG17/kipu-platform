@@ -9,7 +9,9 @@ using Kipu.Platform.Alerts.Interfaces.Rest.Transform;
 using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
 using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Kipu.Platform.Alerts.Interfaces.Rest;
@@ -38,14 +40,18 @@ public class AlertsController(
     }
 
     [HttpGet("history")]
-    [SwaggerOperation(Summary = "List resolved alerts (immutable history) of the current business", OperationId = "GetAlertHistory")]
-    public async Task<IActionResult> GetAlertHistory(CancellationToken cancellationToken)
+    [SwaggerOperation(Summary = "List resolved alerts (immutable history) of the current business (paginated)",
+        OperationId = "GetAlertHistory")]
+    public async Task<IActionResult> GetAlertHistory([FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var alerts = await alertQueryService.Handle(new GetAlertHistoryByBusinessIdQuery(businessId.Value), cancellationToken);
-        return Ok(alerts.Select(AlertResourceFromEntityAssembler.ToResourceFromEntity));
+        var pageRequest = PageRequest.Create(page, pageSize);
+        var result = await alertQueryService.Handle(new GetAlertHistoryByBusinessIdQuery(businessId.Value, pageRequest),
+            cancellationToken);
+        return Ok(new PagedResource<AlertResource>(result.Items.Select(AlertResourceFromEntityAssembler.ToResourceFromEntity),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
     /// <summary>Manual/technical creation — the normal path is the reactive engine, not this endpoint (see architecture doc §6.5).</summary>

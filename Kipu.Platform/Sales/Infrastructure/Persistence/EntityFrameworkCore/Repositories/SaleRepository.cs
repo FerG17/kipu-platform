@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Kipu.Platform.Sales.Domain.Model.Aggregates;
 using Kipu.Platform.Sales.Domain.Repositories;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 
@@ -25,6 +27,20 @@ public class SaleRepository(AppDbContext context, IBusinessClock businessClock)
         if (dateTo.HasValue) query = query.Where(sale => sale.Date <= businessClock.EndOfDay(dateTo.Value));
 
         return await query.OrderByDescending(sale => sale.Date).ToListAsync(cancellationToken);
+    }
+
+    public async Task<PagedResult<Sale>> FindPageByBusinessIdAsync(int businessId, DateOnly? dateFrom, DateOnly? dateTo,
+        PageRequest page, CancellationToken cancellationToken = default)
+    {
+        var query = Context.Set<Sale>().Where(sale => sale.BusinessId == businessId);
+        if (dateFrom.HasValue) query = query.Where(sale => sale.Date >= businessClock.StartOfDay(dateFrom.Value));
+        if (dateTo.HasValue) query = query.Where(sale => sale.Date <= businessClock.EndOfDay(dateTo.Value));
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query.Include(sale => sale.SaleDetails).OrderByDescending(sale => sale.Date)
+            .Skip(page.Skip).Take(page.PageSize)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<Sale>(items, totalCount, page.Page, page.PageSize);
     }
 
     public async Task<Sale?> FindByIdWithDetailsAsync(int id, CancellationToken cancellationToken = default)

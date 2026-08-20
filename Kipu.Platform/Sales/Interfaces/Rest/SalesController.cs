@@ -9,7 +9,9 @@ using Kipu.Platform.Sales.Domain.Model.Queries;
 using Kipu.Platform.Sales.Interfaces.Rest.Resources;
 using Kipu.Platform.Sales.Interfaces.Rest.Transform;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
 using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Kipu.Platform.Sales.Interfaces.Rest;
@@ -27,16 +29,18 @@ public class SalesController(
     : ControllerBase
 {
     [HttpGet]
-    [SwaggerOperation(Summary = "List sales of the current business (optional date range)", OperationId = "GetSales")]
+    [SwaggerOperation(Summary = "List sales of the current business (optional date range, paginated)", OperationId = "GetSales")]
     public async Task<IActionResult> GetSales([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo,
-        CancellationToken cancellationToken)
+        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var sales = await saleQueryService.Handle(new GetAllSalesByBusinessIdQuery(businessId.Value, dateFrom, dateTo),
+        var pageRequest = PageRequest.Create(page, pageSize);
+        var result = await saleQueryService.Handle(new GetSalesPageByBusinessIdQuery(businessId.Value, dateFrom, dateTo, pageRequest),
             cancellationToken);
-        return Ok(sales.Select(SaleResourceFromEntityAssembler.ToResourceFromEntity));
+        return Ok(new PagedResource<SaleResource>(result.Items.Select(SaleResourceFromEntityAssembler.ToResourceFromEntity),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
     /// <summary>

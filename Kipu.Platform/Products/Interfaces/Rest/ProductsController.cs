@@ -9,7 +9,9 @@ using Kipu.Platform.Products.Domain.Model.Queries;
 using Kipu.Platform.Products.Interfaces.Rest.Resources;
 using Kipu.Platform.Products.Interfaces.Rest.Transform;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
 using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Kipu.Platform.Products.Interfaces.Rest;
@@ -28,20 +30,22 @@ public class ProductsController(
     : ControllerBase
 {
     [HttpGet]
-    [SwaggerOperation(Summary = "List products of the current business", OperationId = "GetProducts")]
+    [SwaggerOperation(Summary = "List products of the current business (paginated)", OperationId = "GetProducts")]
     public async Task<IActionResult> GetProducts([FromQuery] string? category, [FromQuery] bool includeInactive,
-        CancellationToken cancellationToken)
+        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var products = await productQueryService.Handle(
-            new GetAllProductsByBusinessIdQuery(businessId.Value, category, includeInactive), cancellationToken);
+        var pageRequest = PageRequest.Create(page, pageSize);
+        var result = await productQueryService.Handle(
+            new GetProductsPageByBusinessIdQuery(businessId.Value, category, includeInactive, pageRequest), cancellationToken);
         var supplierIdsByProduct = await productQueryService.Handle(
             new GetProductSupplierIdsByBusinessIdQuery(businessId.Value), cancellationToken);
 
-        return Ok(products.Select(product => ProductResourceFromEntityAssembler.ToResourceFromEntity(product,
-            supplierIdsByProduct.GetValueOrDefault(product.Id, []))));
+        return Ok(new PagedResource<ProductResource>(result.Items.Select(product => ProductResourceFromEntityAssembler.ToResourceFromEntity(
+                product, supplierIdsByProduct.GetValueOrDefault(product.Id, []))),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
     [HttpGet("{id:int}")]

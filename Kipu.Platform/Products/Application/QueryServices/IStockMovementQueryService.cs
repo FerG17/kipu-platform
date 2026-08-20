@@ -1,9 +1,10 @@
 using Kipu.Platform.Products.Domain.Model.Entities;
 using Kipu.Platform.Products.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 
 namespace Kipu.Platform.Products.Application.QueryServices;
 
 public interface IStockMovementQueryService
 {
-    Task<IEnumerable<StockMovement>> Handle(GetAllStockMovementsByBusinessIdQuery query, CancellationToken cancellationToken);
+    Task<PagedResult<StockMovement>> Handle(GetAllStockMovementsByBusinessIdQuery query, CancellationToken cancellationToken);
 }

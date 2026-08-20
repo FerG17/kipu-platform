@@ -1,3 +1,5 @@
+using Kipu.Platform.Shared.Domain.Model.Queries;
+
 namespace Kipu.Platform.Suppliers.Domain.Model.Queries;
 
 /// <summary>
@@ -7,4 +9,4 @@ namespace Kipu.Platform.Suppliers.Domain.Model.Queries;
 ///     page itself passes true, since it needs to show (and offer to
 ///     reactivate) inactive suppliers too.
 /// </summary>
-public record GetAllSuppliersByBusinessIdQuery(int BusinessId, bool IncludeInactive = false);
+public record GetAllSuppliersByBusinessIdQuery(int BusinessId, PageRequest Page, bool IncludeInactive = false);

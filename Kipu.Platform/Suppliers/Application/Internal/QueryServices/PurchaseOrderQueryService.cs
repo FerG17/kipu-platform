@@ -1,3 +1,4 @@
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Suppliers.Application.QueryServices;
 using Kipu.Platform.Suppliers.Domain.Model.Aggregates;
 using Kipu.Platform.Suppliers.Domain.Model.Queries;
@@ -7,10 +8,10 @@ namespace Kipu.Platform.Suppliers.Application.Internal.QueryServices;
 
 public class PurchaseOrderQueryService(IPurchaseOrderRepository purchaseOrderRepository) : IPurchaseOrderQueryService
 {
-    public async Task<IEnumerable<PurchaseOrder>> Handle(GetAllPurchaseOrdersByBusinessIdQuery query,
+    public async Task<PagedResult<PurchaseOrder>> Handle(GetAllPurchaseOrdersByBusinessIdQuery query,
         CancellationToken cancellationToken)
     {
-        return await purchaseOrderRepository.FindAllByBusinessIdAsync(query.BusinessId, cancellationToken);
+        return await purchaseOrderRepository.FindAllByBusinessIdAsync(query.BusinessId, query.Page, cancellationToken);
     }
 
     public async Task<IEnumerable<PurchaseOrder>> Handle(GetPurchaseOrdersBySupplierIdQuery query,

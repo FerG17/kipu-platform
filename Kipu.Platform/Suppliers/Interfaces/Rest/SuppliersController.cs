@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
 using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Kipu.Platform.Suppliers.Application.CommandServices;
 using Kipu.Platform.Suppliers.Application.QueryServices;
 using Kipu.Platform.Suppliers.Domain.Model.Commands;
@@ -28,15 +30,18 @@ public class SuppliersController(
 {
     /// <summary>Active suppliers only by default (X4 M11) — pass includeInactive=true for the management page, which also needs to show and reactivate deactivated ones.</summary>
     [HttpGet]
-    [SwaggerOperation(Summary = "List suppliers of the current business", OperationId = "GetSuppliers")]
-    public async Task<IActionResult> GetSuppliers([FromQuery] bool includeInactive, CancellationToken cancellationToken)
+    [SwaggerOperation(Summary = "List suppliers of the current business (paginated)", OperationId = "GetSuppliers")]
+    public async Task<IActionResult> GetSuppliers([FromQuery] bool includeInactive, [FromQuery] int? page,
+        [FromQuery] int? pageSize, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var suppliers = await supplierQueryService.Handle(
-            new GetAllSuppliersByBusinessIdQuery(businessId.Value, includeInactive), cancellationToken);
-        return Ok(suppliers.Select(SupplierResourceFromEntityAssembler.ToResourceFromEntity));
+        var pageRequest = PageRequest.Create(page, pageSize);
+        var result = await supplierQueryService.Handle(
+            new GetAllSuppliersByBusinessIdQuery(businessId.Value, pageRequest, includeInactive), cancellationToken);
+        return Ok(new PagedResource<SupplierResource>(result.Items.Select(SupplierResourceFromEntityAssembler.ToResourceFromEntity),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
     [HttpGet("{id:int}")]
