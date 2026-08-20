@@ -13,6 +13,18 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # No ASPNETCORE_ENVIRONMENT set — the container runs as Production
+      # (the ASP.NET Core default when unset), loading appsettings.Production.json.
+      # That file's placeholders are filled in from these three, read from
+      # the untracked .env (see .env.example). "mysql" below is this
+      # Compose file's own service name, not "localhost" — the app and the
+      # database are different containers on the Compose network.
+      BODEGA_DB_CONNECTION_STRING: "server=mysql;port=3306;user=root;password=${BODEGA_DB_PASSWORD:?set BODEGA_DB_PASSWORD in .env, see .env.example};database=kipu_platform"
+      BODEGA_JWT_SECRET: ${BODEGA_JWT_SECRET:?set BODEGA_JWT_SECRET in .env, see .env.example}
+      BODEGA_BOOTSTRAP_KEY: ${BODEGA_BOOTSTRAP_KEY:?set BODEGA_BOOTSTRAP_KEY in .env, see .env.example}
 
   mysql:
     image: mysql:8.4
