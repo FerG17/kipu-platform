@@ -118,8 +118,10 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
     }
 
-    /// <summary>Requesting a second code kills the first one — never more than one guessable code at a time.</summary>
     /// <summary>
+    ///     Requesting a second code kills the first one — never more than one
+    ///     guessable code at a time.
+    ///
     ///     Occasionally observed to fail only when run as part of the FULL
     ///     suite (never in isolation, never reproduced with cross-collection
     ///     parallelism fully disabled either). Investigated at length —
