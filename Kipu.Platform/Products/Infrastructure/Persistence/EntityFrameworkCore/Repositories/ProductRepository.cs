@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Kipu.Platform.Products.Domain.Model.Aggregates;
 using Kipu.Platform.Products.Domain.Repositories;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 
@@ -23,6 +25,18 @@ public class ProductRepository(AppDbContext context) : BaseRepository<Product>(c
         if (!includeInactive) query = query.Where(product => product.Status == ProductStatus.Active);
         if (!string.IsNullOrEmpty(category)) query = query.Where(product => product.Category == category);
         return await query.ToListAsync(cancellationToken);
+    }
+
+    public async Task<PagedResult<Product>> FindPageByBusinessIdAsync(int businessId, string? category, bool includeInactive,
+        PageRequest page, CancellationToken cancellationToken = default)
+    {
+        var query = Context.Set<Product>().Where(product => product.BusinessId == businessId);
+        if (!includeInactive) query = query.Where(product => product.Status == ProductStatus.Active);
+        if (!string.IsNullOrEmpty(category)) query = query.Where(product => product.Category == category);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query.OrderBy(product => product.Id).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
+        return new PagedResult<Product>(items, totalCount, page.Page, page.PageSize);
     }
 
     public async Task<IEnumerable<Product>> ListIgnoringTenantAsync(CancellationToken cancellationToken = default)

@@ -9,7 +9,9 @@ using Kipu.Platform.Sales.Domain.Model.Queries;
 using Kipu.Platform.Sales.Interfaces.Rest.Resources;
 using Kipu.Platform.Sales.Interfaces.Rest.Transform;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
 using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Kipu.Platform.Sales.Interfaces.Rest;
@@ -27,14 +29,17 @@ public class CustomersController(
     : ControllerBase
 {
     [HttpGet]
-    [SwaggerOperation(Summary = "List customers of the current business", OperationId = "GetCustomers")]
-    public async Task<IActionResult> GetCustomers(CancellationToken cancellationToken)
+    [SwaggerOperation(Summary = "List customers of the current business (paginated)", OperationId = "GetCustomers")]
+    public async Task<IActionResult> GetCustomers([FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var customers = await customerQueryService.Handle(new GetAllCustomersByBusinessIdQuery(businessId.Value), cancellationToken);
-        return Ok(customers.Select(CustomerResourceFromEntityAssembler.ToResourceFromEntity));
+        var pageRequest = PageRequest.Create(page, pageSize);
+        var result = await customerQueryService.Handle(new GetAllCustomersByBusinessIdQuery(businessId.Value, pageRequest),
+            cancellationToken);
+        return Ok(new PagedResource<CustomerResource>(result.Items.Select(CustomerResourceFromEntityAssembler.ToResourceFromEntity),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
     [HttpGet("{id:int}")]

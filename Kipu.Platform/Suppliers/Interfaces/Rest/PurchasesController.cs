@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
 using Kipu.Platform.Shared.Interfaces.Rest.ProblemDetails;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Kipu.Platform.Suppliers.Application.CommandServices;
 using Kipu.Platform.Suppliers.Application.QueryServices;
 using Kipu.Platform.Suppliers.Domain.Model.Commands;
@@ -28,17 +30,36 @@ public class PurchasesController(
 {
     /// <summary>Lists purchase orders of the current business, or of a single supplier when ?supplierId= is given.</summary>
     [HttpGet]
-    [SwaggerOperation(Summary = "List purchase orders", OperationId = "GetPurchaseOrders")]
-    public async Task<IActionResult> GetPurchaseOrders([FromQuery] int? supplierId, CancellationToken cancellationToken)
+    [SwaggerOperation(Summary = "List purchase orders (paginated)", OperationId = "GetPurchaseOrders")]
+    public async Task<IActionResult> GetPurchaseOrders([FromQuery] int? supplierId, [FromQuery] int? page,
+        [FromQuery] int? pageSize, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var orders = supplierId.HasValue
-            ? await purchaseOrderQueryService.Handle(new GetPurchaseOrdersBySupplierIdQuery(supplierId.Value), cancellationToken)
-            : await purchaseOrderQueryService.Handle(new GetAllPurchaseOrdersByBusinessIdQuery(businessId.Value), cancellationToken);
+        var pageRequest = PageRequest.Create(page, pageSize);
 
-        return Ok(orders.Select(PurchaseOrderResourceFromEntityAssembler.ToResourceFromEntity));
+        if (supplierId.HasValue)
+        {
+            // Already bounded by construction (one supplier's own orders), so
+            // this branch pages the in-memory result rather than needing a
+            // dedicated DB-side query — FindAllBySupplierIdAsync is also used
+            // unpaged by SupplierCommandService's deactivation guard, which
+            // needs the true full set.
+            var supplierOrders = (await purchaseOrderQueryService.Handle(new GetPurchaseOrdersBySupplierIdQuery(supplierId.Value),
+                cancellationToken)).ToList();
+            var pagedSupplierOrders = supplierOrders.Skip(pageRequest.Skip).Take(pageRequest.PageSize);
+            return Ok(new PagedResource<PurchaseOrderResource>(
+                pagedSupplierOrders.Select(PurchaseOrderResourceFromEntityAssembler.ToResourceFromEntity),
+                pageRequest.Page, pageRequest.PageSize, supplierOrders.Count, pageRequest.PageSize <= 0 ? 0
+                    : (int)Math.Ceiling(supplierOrders.Count / (double)pageRequest.PageSize)));
+        }
+
+        var result = await purchaseOrderQueryService.Handle(new GetAllPurchaseOrdersByBusinessIdQuery(businessId.Value, pageRequest),
+            cancellationToken);
+        return Ok(new PagedResource<PurchaseOrderResource>(
+            result.Items.Select(PurchaseOrderResourceFromEntityAssembler.ToResourceFromEntity),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
     [HttpGet("{id:int}")]

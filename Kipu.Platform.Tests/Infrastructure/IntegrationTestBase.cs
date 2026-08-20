@@ -229,7 +229,25 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
         return total;
     }
 
+    /// <summary>
+    ///     Transparently unwraps a paginated collection envelope
+    ///     ({ items, page, pageSize, totalCount, totalPages } — X4 S3) down
+    ///     to its "items" array, so every existing test that calls
+    ///     .EnumerateArray() on a GET-collection response keeps working
+    ///     whether that endpoint got paginated or not. Single-resource GETs
+    ///     (never shaped like { items: [...] }) pass through unchanged.
+    /// </summary>
     protected static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)
+    {
+        var json = await ReadJsonEnvelopeAsync(response);
+        return json.ValueKind == JsonValueKind.Object && json.TryGetProperty("items", out var items) &&
+               items.ValueKind == JsonValueKind.Array
+            ? items
+            : json;
+    }
+
+    /// <summary>The raw response body, unwrapped — for tests that assert on a paginated envelope's own shape (page/pageSize/totalCount/totalPages), not just its items.</summary>
+    protected static async Task<JsonElement> ReadJsonEnvelopeAsync(HttpResponseMessage response)
     {
         return JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync(), JsonOptions);
     }

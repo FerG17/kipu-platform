@@ -1,3 +1,4 @@
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Suppliers.Application.QueryServices;
 using Kipu.Platform.Suppliers.Domain.Model.Aggregates;
 using Kipu.Platform.Suppliers.Domain.Model.Queries;
@@ -7,9 +8,9 @@ namespace Kipu.Platform.Suppliers.Application.Internal.QueryServices;
 
 public class SupplierQueryService(ISupplierRepository supplierRepository) : ISupplierQueryService
 {
-    public async Task<IEnumerable<Supplier>> Handle(GetAllSuppliersByBusinessIdQuery query, CancellationToken cancellationToken)
+    public async Task<PagedResult<Supplier>> Handle(GetAllSuppliersByBusinessIdQuery query, CancellationToken cancellationToken)
     {
-        return await supplierRepository.FindAllByBusinessIdAsync(query.BusinessId, query.IncludeInactive, cancellationToken);
+        return await supplierRepository.FindAllByBusinessIdAsync(query.BusinessId, query.Page, query.IncludeInactive, cancellationToken);
     }
 
     public async Task<Supplier?> Handle(GetSupplierByIdQuery query, CancellationToken cancellationToken)

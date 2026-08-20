@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 using Kipu.Platform.Suppliers.Domain.Model.Aggregates;
@@ -8,13 +10,15 @@ namespace Kipu.Platform.Suppliers.Infrastructure.Persistence.EntityFrameworkCore
 
 public class SupplierRepository(AppDbContext context) : BaseRepository<Supplier>(context), ISupplierRepository
 {
-    public async Task<IEnumerable<Supplier>> FindAllByBusinessIdAsync(int businessId, bool includeInactive = false,
+    public async Task<PagedResult<Supplier>> FindAllByBusinessIdAsync(int businessId, PageRequest page, bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
         var query = Context.Set<Supplier>().Where(supplier => supplier.BusinessId == businessId);
         if (!includeInactive) query = query.Where(supplier => supplier.Status == SupplierStatus.Active);
 
-        return await query.ToListAsync(cancellationToken);
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query.OrderBy(supplier => supplier.Id).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
+        return new PagedResult<Supplier>(items, totalCount, page.Page, page.PageSize);
     }
 
     public async Task<IReadOnlyCollection<int>> FindExistingIdsAsync(int businessId, IReadOnlyCollection<int> supplierIds,

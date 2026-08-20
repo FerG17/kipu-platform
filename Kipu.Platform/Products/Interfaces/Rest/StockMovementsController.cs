@@ -4,8 +4,11 @@ using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Kipu.Platform.Products.Application.QueryServices;
 using Kipu.Platform.Products.Domain.Model.Queries;
+using Kipu.Platform.Products.Interfaces.Rest.Resources;
 using Kipu.Platform.Products.Interfaces.Rest.Transform;
 using Kipu.Platform.Shared.Application;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Interfaces.Rest.Resources;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Kipu.Platform.Products.Interfaces.Rest;
@@ -22,14 +25,18 @@ public class StockMovementsController(
     : ControllerBase
 {
     [HttpGet]
-    [SwaggerOperation(Summary = "List stock movements of the current business", OperationId = "GetStockMovements")]
-    public async Task<IActionResult> GetStockMovements(CancellationToken cancellationToken)
+    [SwaggerOperation(Summary = "List stock movements of the current business (paginated)", OperationId = "GetStockMovements")]
+    public async Task<IActionResult> GetStockMovements([FromQuery] int? page, [FromQuery] int? pageSize,
+        CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
-        var movements = await stockMovementQueryService.Handle(new GetAllStockMovementsByBusinessIdQuery(businessId.Value),
-            cancellationToken);
-        return Ok(movements.Select(StockMovementResourceFromEntityAssembler.ToResourceFromEntity));
+        var pageRequest = PageRequest.Create(page, pageSize);
+        var result = await stockMovementQueryService.Handle(
+            new GetAllStockMovementsByBusinessIdQuery(businessId.Value, pageRequest), cancellationToken);
+        return Ok(new PagedResource<StockMovementResource>(
+            result.Items.Select(StockMovementResourceFromEntityAssembler.ToResourceFromEntity),
+            result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 }

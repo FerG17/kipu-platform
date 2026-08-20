@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Kipu.Platform.Alerts.Domain.Model.Aggregates;
 using Kipu.Platform.Alerts.Domain.Repositories;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Repositories;
 
@@ -16,12 +18,15 @@ public class AlertRepository(AppDbContext context) : BaseRepository<Alert>(conte
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Alert>> FindResolvedByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<Alert>> FindResolvedByBusinessIdAsync(int businessId, PageRequest page,
+        CancellationToken cancellationToken = default)
     {
-        return await Context.Set<Alert>()
-            .Where(alert => alert.BusinessId == businessId && alert.Status == AlertStatus.Resolved)
-            .OrderByDescending(alert => alert.ResolvedAt)
+        var query = Context.Set<Alert>().Where(alert => alert.BusinessId == businessId && alert.Status == AlertStatus.Resolved);
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query.OrderByDescending(alert => alert.ResolvedAt)
+            .Skip(page.Skip).Take(page.PageSize)
             .ToListAsync(cancellationToken);
+        return new PagedResult<Alert>(items, totalCount, page.Page, page.PageSize);
     }
 
     /// <summary>

@@ -1,4 +1,6 @@
 using Kipu.Platform.Alerts.Domain.Model.Aggregates;
+using Kipu.Platform.Shared.Domain.Model.Queries;
+using Kipu.Platform.Shared.Domain.Model.ValueObjects;
 using Kipu.Platform.Shared.Domain.Repositories;
 
 namespace Kipu.Platform.Alerts.Domain.Repositories;
@@ -6,7 +8,7 @@ namespace Kipu.Platform.Alerts.Domain.Repositories;
 public interface IAlertRepository : IBaseRepository<Alert>
 {
     Task<IEnumerable<Alert>> FindActiveByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default);
-    Task<IEnumerable<Alert>> FindResolvedByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default);
+    Task<PagedResult<Alert>> FindResolvedByBusinessIdAsync(int businessId, PageRequest page, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Finds a non-resolved alert of the given type for a product (and
