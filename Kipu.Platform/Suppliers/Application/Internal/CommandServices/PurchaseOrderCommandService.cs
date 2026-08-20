@@ -2,6 +2,7 @@ using Cortex.Mediator;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Kipu.Platform.Shared.Application;
 using Kipu.Platform.Products.Interfaces.Acl;
 using Kipu.Platform.Shared.Application.Model;
@@ -24,7 +25,8 @@ public class PurchaseOrderCommandService(
     IMediator mediator,
     IValidator<CreatePurchaseOrderCommand> createPurchaseOrderValidator,
     IStringLocalizer<SuppliersMessages> localizer,
-    IBusinessClock businessClock)
+    IBusinessClock businessClock,
+    ILogger<PurchaseOrderCommandService> logger)
     : IPurchaseOrderCommandService
 {
     public async Task<Result<PurchaseOrder>> Handle(CreatePurchaseOrderCommand command, CancellationToken cancellationToken)
@@ -172,9 +174,14 @@ public class PurchaseOrderCommandService(
             return Result<PurchaseOrder>.Failure(SuppliersError.InvalidStatusTransition,
                 localizer[nameof(SuppliersError.InvalidStatusTransition)]);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            // X4 M13: this used to swallow the exception entirely — a real
+            // failure receiving an order (Products context down, a genuine
+            // DB fault) left no trace anywhere to diagnose it from.
             await transaction.RollbackAsync(cancellationToken);
+            logger.LogError(exception, "Failed to mark purchase order {PurchaseOrderId} as received for business {BusinessId}",
+                purchaseOrder.Id, purchaseOrder.BusinessId);
             return Result<PurchaseOrder>.Failure(SuppliersError.DatabaseError, localizer[nameof(SuppliersError.DatabaseError)]);
         }
     }

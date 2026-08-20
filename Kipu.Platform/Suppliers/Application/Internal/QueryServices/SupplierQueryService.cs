@@ -9,7 +9,7 @@ public class SupplierQueryService(ISupplierRepository supplierRepository) : ISup
 {
     public async Task<IEnumerable<Supplier>> Handle(GetAllSuppliersByBusinessIdQuery query, CancellationToken cancellationToken)
     {
-        return await supplierRepository.FindAllByBusinessIdAsync(query.BusinessId, cancellationToken);
+        return await supplierRepository.FindAllByBusinessIdAsync(query.BusinessId, query.IncludeInactive, cancellationToken);
     }
 
     public async Task<Supplier?> Handle(GetSupplierByIdQuery query, CancellationToken cancellationToken)

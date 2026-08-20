@@ -55,10 +55,18 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
         return ExpirationRules.IsExpiringSoon(Expiration, today, thresholdDays);
     }
 
-    public Batch UpdateDetails(DateOnly? expiration, decimal purchasePrice, int? inventoryId)
+    /// <summary>
+    ///     purchasePrice is nullable and preserved when omitted, symmetric
+    ///     with Expiration/InventoryId — it used to be a plain `decimal`
+    ///     assigned unconditionally, so registering a stock intake that only
+    ///     set an expiration date (no price) silently zeroed out whatever
+    ///     cost the batch already had (X4 A7, same class of bug as X3's C4 on
+    ///     Expiration in this same method).
+    /// </summary>
+    public Batch UpdateDetails(DateOnly? expiration, decimal? purchasePrice, int? inventoryId)
     {
         Expiration = expiration ?? Expiration;
-        PurchasePrice = purchasePrice;
+        PurchasePrice = purchasePrice ?? PurchasePrice;
         InventoryId = inventoryId ?? InventoryId;
         return this;
     }

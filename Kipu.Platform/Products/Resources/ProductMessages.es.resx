@@ -104,4 +104,13 @@
   <data name="AdjustmentExceedsAvailableStock" xml:space="preserve">
     <value>Este ajuste dejaría el stock por debajo de cero.</value>
   </data>
+  <data name="InvalidAdjustmentReason" xml:space="preserve">
+    <value>El motivo del ajuste es demasiado largo, o la cantidad es implausiblemente grande.</value>
+  </data>
+  <data name="InvalidStockIntakeData" xml:space="preserve">
+    <value>El nombre del proveedor o la nota son demasiado largos.</value>
+  </data>
+  <data name="WarehouseInactive" xml:space="preserve">
+    <value>Este almacén está desactivado y no puede recibir ni mantener stock.</value>
+  </data>
 </root>

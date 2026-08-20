@@ -12,8 +12,15 @@ public static class StockRules
         return stock > 0 && stock <= minimumStock;
     }
 
+    /// <summary>
+    ///     `&lt;= 0`, not `== 0` — defense in depth. Stock should never go
+    ///     negative (every write path is guarded against it), but if
+    ///     something corrupt ever slips through, a negative value must still
+    ///     read as "out of stock" rather than as neither low nor out, which
+    ///     silences every alert for it (see X4 A6).
+    /// </summary>
     public static bool IsOutOfStock(int stock)
     {
-        return stock == 0;
+        return stock <= 0;
     }
 }

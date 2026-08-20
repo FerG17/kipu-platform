@@ -72,4 +72,17 @@ public class SupplierCommandService(
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<Supplier>.Success(supplier);
     }
+
+    /// <summary>X4 M11: undoes DeactivateSupplierCommand — a supplier removed by mistake used to be gone forever.</summary>
+    public async Task<Result<Supplier>> Handle(ReactivateSupplierCommand command, CancellationToken cancellationToken)
+    {
+        var supplier = await supplierRepository.FindByIdAsync(command.SupplierId, cancellationToken);
+        if (supplier == null)
+            return Result<Supplier>.Failure(SuppliersError.SupplierNotFound, localizer[nameof(SuppliersError.SupplierNotFound)]);
+
+        supplier.Activate();
+        supplierRepository.Update(supplier);
+        await unitOfWork.CompleteAsync(cancellationToken);
+        return Result<Supplier>.Success(supplier);
+    }
 }

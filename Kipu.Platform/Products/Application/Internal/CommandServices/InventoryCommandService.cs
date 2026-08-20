@@ -2,8 +2,10 @@ using Cortex.Mediator;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Kipu.Platform.Shared.Application;
 using Kipu.Platform.Products.Application.CommandServices;
+using Kipu.Platform.Products.Domain.Model.Aggregates;
 using Kipu.Platform.Products.Domain.Model.Commands;
 using Kipu.Platform.Products.Domain.Model.Entities;
 using Kipu.Platform.Products.Domain.Model.Errors;
@@ -28,8 +30,11 @@ public class InventoryCommandService(
     IUnitOfWork unitOfWork,
     IMediator mediator,
     IValidator<CreateOrUpdateBatchCommand> createOrUpdateBatchValidator,
+    IValidator<RegisterStockIntakeCommand> registerStockIntakeValidator,
+    IValidator<AdjustStockCommand> adjustStockValidator,
     IStringLocalizer<ProductMessages> localizer,
-    IBusinessClock businessClock)
+    IBusinessClock businessClock,
+    ILogger<InventoryCommandService> logger)
     : IInventoryCommandService
 {
     /// <summary>
@@ -55,13 +60,22 @@ public class InventoryCommandService(
         if (command.Quantity < 0)
             return Result<InventoryItem>.Failure(ProductError.InvalidQuantity, localizer[nameof(ProductError.InvalidQuantity)]);
 
+        // X4 M9: Quantity's upper bound and Supplier/Note's lengths had no
+        // validation at all before this — an absurd quantity (typo, runaway
+        // script) could accumulate toward InventoryItem.StockUnit overflowing
+        // (X4 A6), and an oversized Supplier/Note would only be caught by
+        // MySQL, as an unhandled 500 (see the DbUpdateException catch below,
+        // X4 M9's other half).
+        var intakeValidation = await registerStockIntakeValidator.ValidateAsync(command, cancellationToken);
+        if (!intakeValidation.IsValid)
+            return Result<InventoryItem>.Failure(ProductError.InvalidStockIntakeData,
+                localizer[nameof(ProductError.InvalidStockIntakeData)]);
+
         // Validated here too (not just inside the delegated CreateOrUpdateBatch
         // call below) so an invalid expiration/price is rejected before this
-        // method's own unitOfWork.CompleteAsync() commits the InventoryItem
-        // and StockMovement — otherwise a product's stock intake persists
-        // successfully while its batch (cost + expiration) silently fails,
-        // leaving a confusing partial write with no way to tell from the
-        // error alone that the rest already saved.
+        // method touches the InventoryItem/StockMovement — the two now share
+        // one transaction (X4 A9), but failing fast here still avoids doing
+        // any of that work only to roll it back.
         if (command.Expiration.HasValue && command.Expiration.Value < businessClock.Today)
             return Result<InventoryItem>.Failure(ProductError.InvalidExpirationDate,
                 localizer[nameof(ProductError.InvalidExpirationDate)]);
@@ -88,9 +102,25 @@ public class InventoryCommandService(
         if (warehouse == null)
             return Result<InventoryItem>.Failure(ProductError.WarehouseNotFound, localizer[nameof(ProductError.WarehouseNotFound)]);
 
+        // X4 M10: nothing checked this before — a deactivated warehouse kept
+        // silently accepting new stock forever.
+        if (warehouse.Status != WarehouseStatus.Active)
+            return Result<InventoryItem>.Failure(ProductError.WarehouseInactive, localizer[nameof(ProductError.WarehouseInactive)]);
+
         var existingItem = await inventoryItemRepository.FindByProductAndWarehouseAsync(command.ProductId,
             command.WarehouseId, cancellationToken);
 
+        // X4 A9: the InventoryItem/StockMovement write and the batch upsert
+        // below used to be two independent SaveChanges calls — if the batch
+        // one failed (e.g. a race on Expiration), stock was already increased
+        // with no batch and no expiration tracking for it, and no way to tell
+        // from the error alone that part of the request had already landed.
+        // A single SaveChangesAsync call is already atomic on its own (EF
+        // Core wraps it in an implicit transaction) — that's the actual fix;
+        // there is deliberately no explicit BeginTransactionAsync here, since
+        // this method is itself called from inside PurchaseOrderCommandService's
+        // own explicit transaction (receiving an order), and EF Core does not
+        // support a nested one.
         InventoryItem item;
         if (existingItem != null)
         {
@@ -102,11 +132,11 @@ public class InventoryCommandService(
         else
         {
             // A brand-new warehouse for this product inherits the threshold
-            // already configured on any of its sibling InventoryItems (kept in
-            // sync by UpdateMinimumStockCommand) instead of silently starting
-            // at 0 — otherwise splitting stock into a second warehouse would
-            // reset "stock mínimo" for that portion until the product is
-            // re-saved.
+            // already configured on any of its sibling InventoryItems (kept
+            // in sync by UpdateMinimumStockCommand) instead of silently
+            // starting at 0 — otherwise splitting stock into a second
+            // warehouse would reset "stock mínimo" for that portion until
+            // the product is re-saved.
             var minimumStock = command.MinimumStock ?? (await inventoryItemRepository
                 .FindAllByProductIdAsync(command.ProductId, cancellationToken))
                 .Select(sibling => sibling.MinimumStock)
@@ -126,6 +156,20 @@ public class InventoryCommandService(
                 cancellationToken);
         }
 
+        // Batch data the caller supplied used to be accepted and then thrown
+        // away: this handler never touched batchRepository, so registering
+        // goods through the natural "stock intake" path left no batch, no
+        // traceability, and no expiration alert could ever fire for them —
+        // breaking the core "every product has an expiration date" rule.
+        // Queued on the tracker only (no commit yet) so it lands in the SAME
+        // SaveChanges call as the InventoryItem/StockMovement above.
+        Batch? pendingBatchEvent = null;
+        if (command.Expiration.HasValue || command.PurchasePrice.HasValue)
+        {
+            pendingBatchEvent = await UpsertBatchWithoutCommitOrPublish(command.ProductId, command.BusinessId,
+                command.Expiration, command.PurchasePrice, item.Id, cancellationToken);
+        }
+
         try
         {
             await unitOfWork.CompleteAsync(cancellationToken);
@@ -139,25 +183,25 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.ConcurrentModification,
                 localizer[nameof(ProductError.ConcurrentModification)]);
         }
-
-        // Batch data the caller supplied used to be accepted and then thrown
-        // away: this handler never touched batchRepository, so registering
-        // goods through the natural "stock intake" path left no batch, no
-        // traceability, and no expiration alert could ever fire for them —
-        // breaking the core "every product has an expiration date" rule.
-        // Delegating keeps the upsert-in-place semantics and fires
-        // BatchRegisteredEvent, so Alerts reacts exactly as it does when the
-        // batch is registered directly.
-        if (command.Expiration.HasValue || command.PurchasePrice.HasValue)
+        catch (OverflowException)
         {
-            var batchResult = await Handle(
-                new CreateOrUpdateBatchCommand(command.ProductId, command.BusinessId, command.Expiration,
-                    command.PurchasePrice ?? 0m, item.Id),
-                cancellationToken);
-
-            if (batchResult.IsFailure)
-                return Result<InventoryItem>.Failure(batchResult.Error!, batchResult.Message);
+            // X4 A6: InventoryItem.AddStock/AdjustStock now use `checked`
+            // arithmetic specifically so this can be caught here instead of
+            // silently wrapping StockUnit to a negative value that reads as
+            // neither low nor out of stock. Thrown synchronously by AddStock
+            // above, before SaveChanges is ever called, so nothing here was
+            // persisted — there is nothing to roll back.
+            logger.LogError(
+                "Stock intake overflowed StockUnit for product {ProductId} in business {BusinessId} (quantity {Quantity})",
+                command.ProductId, command.BusinessId, command.Quantity);
+            return Result<InventoryItem>.Failure(ProductError.InvalidQuantity, localizer[nameof(ProductError.InvalidQuantity)]);
         }
+
+        if (pendingBatchEvent != null)
+            await mediator.PublishAsync(
+                new BatchRegisteredEvent(pendingBatchEvent.Id, pendingBatchEvent.ProductId, product.Name,
+                    pendingBatchEvent.BusinessId, pendingBatchEvent.Expiration),
+                cancellationToken);
 
         await PublishStockLevelChangedEvent(item, cancellationToken);
 
@@ -326,12 +370,29 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.AdjustmentReasonRequired,
                 localizer[nameof(ProductError.AdjustmentReasonRequired)]);
 
+        // X4 M9: bounds command.Delta's magnitude and command.Reason's length —
+        // neither had any validation before.
+        var adjustmentValidation = await adjustStockValidator.ValidateAsync(command, cancellationToken);
+        if (!adjustmentValidation.IsValid)
+            return Result<InventoryItem>.Failure(ProductError.InvalidAdjustmentReason,
+                localizer[nameof(ProductError.InvalidAdjustmentReason)]);
+
         var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
         if (product == null)
             return Result<InventoryItem>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
 
         if (!product.IsActive)
             return Result<InventoryItem>.Failure(ProductError.ProductInactive, localizer[nameof(ProductError.ProductInactive)]);
+
+        // X4 M10: an adjustment against a deactivated warehouse used to go
+        // through with no check at all — nothing here ever looked the
+        // warehouse itself up before.
+        var warehouse = await warehouseRepository.FindByIdAsync(command.WarehouseId, cancellationToken);
+        if (warehouse == null)
+            return Result<InventoryItem>.Failure(ProductError.WarehouseNotFound, localizer[nameof(ProductError.WarehouseNotFound)]);
+
+        if (warehouse.Status != WarehouseStatus.Active)
+            return Result<InventoryItem>.Failure(ProductError.WarehouseInactive, localizer[nameof(ProductError.WarehouseInactive)]);
 
         var item = await inventoryItemRepository.FindByProductAndWarehouseAsync(command.ProductId, command.WarehouseId,
             cancellationToken);
@@ -343,9 +404,6 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.AdjustmentExceedsAvailableStock,
                 localizer[nameof(ProductError.AdjustmentExceedsAvailableStock)]);
 
-        item.AdjustStock(command.Delta);
-        inventoryItemRepository.Update(item);
-
         await stockMovementRepository.AddAsync(
             new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, command.Delta,
                 StockMovementType.Adjustment, string.Empty, command.Reason),
@@ -353,12 +411,23 @@ public class InventoryCommandService(
 
         try
         {
+            item.AdjustStock(command.Delta);
+            inventoryItemRepository.Update(item);
             await unitOfWork.CompleteAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
             return Result<InventoryItem>.Failure(ProductError.ConcurrentModification,
                 localizer[nameof(ProductError.ConcurrentModification)]);
+        }
+        catch (OverflowException)
+        {
+            // X4 A6 — see the matching catch in Handle(RegisterStockIntakeCommand).
+            logger.LogError(
+                "Stock adjustment overflowed StockUnit for product {ProductId} in business {BusinessId} (delta {Delta})",
+                command.ProductId, command.BusinessId, command.Delta);
+            return Result<InventoryItem>.Failure(ProductError.InvalidAdjustmentReason,
+                localizer[nameof(ProductError.InvalidAdjustmentReason)]);
         }
 
         await PublishStockLevelChangedEvent(item, cancellationToken);
@@ -391,22 +460,8 @@ public class InventoryCommandService(
             return Result<Batch>.Failure(ProductError.InvalidExpirationDate,
                 localizer[nameof(ProductError.InvalidExpirationDate)]);
 
-        var existingBatch = await batchRepository.FindActiveByProductIdAsync(command.ProductId, cancellationToken);
-
-        Batch batch;
-        if (existingBatch != null)
-        {
-            existingBatch.UpdateDetails(command.Expiration, command.PurchasePrice, command.InventoryId);
-            batchRepository.Update(existingBatch);
-            batch = existingBatch;
-        }
-        else
-        {
-            batch = new Batch(command.ProductId, command.BusinessId, command.Expiration, command.PurchasePrice,
-                command.InventoryId);
-            await batchRepository.AddAsync(batch, cancellationToken);
-        }
-
+        var batch = await UpsertBatchWithoutCommitOrPublish(command.ProductId, command.BusinessId, command.Expiration,
+            command.PurchasePrice, command.InventoryId, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
 
         await mediator.PublishAsync(
@@ -414,6 +469,30 @@ public class InventoryCommandService(
             cancellationToken);
 
         return Result<Batch>.Success(batch);
+    }
+
+    /// <summary>
+    ///     Shared upsert-in-place logic behind Handle(CreateOrUpdateBatchCommand)
+    ///     and the batch step of Handle(RegisterStockIntakeCommand) — queues the
+    ///     change on the change tracker only; the caller is responsible for
+    ///     committing and publishing BatchRegisteredEvent (X4 A9: the stock-intake
+    ///     caller defers both until its own transaction commits).
+    /// </summary>
+    private async Task<Batch> UpsertBatchWithoutCommitOrPublish(int productId, int businessId, DateOnly? expiration,
+        decimal? purchasePrice, int? inventoryId, CancellationToken cancellationToken)
+    {
+        var existingBatch = await batchRepository.FindActiveByProductIdAsync(productId, cancellationToken);
+
+        if (existingBatch != null)
+        {
+            existingBatch.UpdateDetails(expiration, purchasePrice, inventoryId);
+            batchRepository.Update(existingBatch);
+            return existingBatch;
+        }
+
+        var newBatch = new Batch(productId, businessId, expiration, purchasePrice ?? 0m, inventoryId);
+        await batchRepository.AddAsync(newBatch, cancellationToken);
+        return newBatch;
     }
 
     /// <summary>

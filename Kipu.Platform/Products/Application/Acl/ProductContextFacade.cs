@@ -67,18 +67,24 @@ public class ProductContextFacade(
     public async Task<bool> RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice,
         string? supplier, string? note, int? supplierId, CancellationToken cancellationToken)
     {
+        // X4 M10: nothing checked warehouse status before — a purchase order
+        // could silently receive into a deactivated warehouse, including one
+        // the product already happened to have (now-stale) stock in.
+        var warehouses = (await warehouseQueryService.Handle(new GetAllWarehousesByBusinessIdQuery(businessId),
+            cancellationToken)).ToList();
+        var activeWarehouseIds = warehouses.Where(warehouse => warehouse.Status == WarehouseStatus.Active)
+            .Select(warehouse => warehouse.Id).ToHashSet();
+
         var existingItems = await inventoryQueryService.Handle(new GetInventoryByProductIdQuery(productId), cancellationToken);
-        var targetWarehouseId = existingItems.OrderBy(item => item.WarehouseId).FirstOrDefault()?.WarehouseId;
+        var targetWarehouseId = existingItems.Where(item => activeWarehouseIds.Contains(item.WarehouseId))
+            .OrderBy(item => item.WarehouseId).FirstOrDefault()?.WarehouseId;
 
-        if (targetWarehouseId == null)
-        {
-            var warehouses = await warehouseQueryService.Handle(new GetAllWarehousesByBusinessIdQuery(businessId), cancellationToken);
-            targetWarehouseId = warehouses.FirstOrDefault()?.Id;
-        }
+        targetWarehouseId ??= warehouses.Where(warehouse => warehouse.Status == WarehouseStatus.Active)
+            .OrderBy(warehouse => warehouse.Id).FirstOrDefault()?.Id;
 
-        // A business with nowhere to receive into is a real failure, not a
-        // no-op to pass over in silence — the caller has to know the goods
-        // never landed.
+        // A business with nowhere active to receive into is a real failure,
+        // not a no-op to pass over in silence — the caller has to know the
+        // goods never landed.
         if (targetWarehouseId == null) return false;
 
         var command = new RegisterStockIntakeCommand(productId, businessId, targetWarehouseId.Value, quantity, purchasePrice,

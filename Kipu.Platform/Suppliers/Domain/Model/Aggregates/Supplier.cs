@@ -62,4 +62,11 @@ public class Supplier(
         Status = SupplierStatus.Inactive;
         return this;
     }
+
+    /// <summary>X4 M11: there was no way back from Deactivate() — a supplier removed by mistake was gone from every picker forever, with no endpoint to undo it.</summary>
+    public Supplier Activate()
+    {
+        Status = SupplierStatus.Active;
+        return this;
+    }
 }

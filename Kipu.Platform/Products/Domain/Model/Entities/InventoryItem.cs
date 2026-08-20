@@ -35,9 +35,23 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
     public bool IsLowStock => StockRules.IsLowStock(StockUnit, MinimumStock);
     public bool IsOutOfStock => StockRules.IsOutOfStock(StockUnit);
 
+    /// <summary>
+    ///     `checked` on purpose (X4 A6): the application layer already bounds
+    ///     `quantity` per intake (see RegisterStockIntakeCommandValidator),
+    ///     but that alone doesn't stop StockUnit from wrapping to negative
+    ///     across many intakes over the product's lifetime — a plain `int`
+    ///     overflow used to do that silently, and a negative StockUnit read
+    ///     as neither low nor out of stock, silencing every alert for it.
+    ///     Throwing here turns that into a loud, caught failure instead
+    ///     (see InventoryCommandService's OverflowException handling).
+    /// </summary>
     public InventoryItem AddStock(int quantity)
     {
-        StockUnit += quantity;
+        checked
+        {
+            StockUnit += quantity;
+        }
+
         UpdatedAt = DateTimeOffset.UtcNow;
         return this;
     }
@@ -60,7 +74,11 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
     /// </summary>
     public InventoryItem AdjustStock(int delta)
     {
-        StockUnit += delta;
+        checked
+        {
+            StockUnit += delta;
+        }
+
         UpdatedAt = DateTimeOffset.UtcNow;
         return this;
     }

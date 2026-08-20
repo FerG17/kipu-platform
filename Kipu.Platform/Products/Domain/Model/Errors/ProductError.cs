@@ -26,6 +26,15 @@ public enum ProductError
     /// <summary>A downward stock adjustment asked to remove more units than the warehouse actually has.</summary>
     AdjustmentExceedsAvailableStock,
 
+    /// <summary>A stock adjustment's reason exceeds its column length, or its delta's magnitude is implausibly large.</summary>
+    InvalidAdjustmentReason,
+
+    /// <summary>A stock intake's Supplier/Note text exceeds its column length.</summary>
+    InvalidStockIntakeData,
+
+    /// <summary>The warehouse a movement targets is deactivated — it can no longer receive or hold stock.</summary>
+    WarehouseInactive,
+
     /// <summary>Name/description/category/price outside what the catalog (and its columns) accept.</summary>
     InvalidProductData,
 
