@@ -39,6 +39,27 @@ public class SalesController(
         return Ok(sales.Select(SaleResourceFromEntityAssembler.ToResourceFromEntity));
     }
 
+    /// <summary>
+    ///     Paid sales' totals plus whatever's actually been collected on
+    ///     credit sales' installments — never a credit sale's own total (see
+    ///     SaleQueryService.Handle(GetTotalRevenueByBusinessIdQuery)).
+    ///     Admin+Cashier, unlike DashboardController's Admin-only KPI — a
+    ///     cashier's own POS stats bar needs this same figure, and it must
+    ///     come from here rather than be recomputed client-side.
+    /// </summary>
+    [HttpGet("revenue")]
+    [SwaggerOperation(Summary = "Total revenue (optional date range)", OperationId = "GetSalesRevenue")]
+    public async Task<IActionResult> GetSalesRevenue([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo,
+        CancellationToken cancellationToken)
+    {
+        var businessId = currentUserAccessor.CurrentBusinessId;
+        if (businessId == null) return Unauthorized();
+
+        var totalRevenue = await saleQueryService.Handle(
+            new GetTotalRevenueByBusinessIdQuery(businessId.Value, dateFrom, dateTo), cancellationToken);
+        return Ok(new SalesRevenueResource(totalRevenue));
+    }
+
     [HttpGet("{id:int}")]
     [SwaggerOperation(Summary = "Get a sale (with its lines) by id", OperationId = "GetSaleById")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "The sale was not found")]

@@ -21,6 +21,41 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         return (await ReadJsonAsync(response)).GetProperty("totalSales").GetDecimal();
     }
 
+    /// <summary>
+    ///     X4: DashboardController's KPI is Admin-only, but a cashier's own POS
+    ///     stats bar needs this same figure — SalesController exposes it
+    ///     separately (Admin+Cashier) so the frontend never has to recompute
+    ///     revenue itself (the root cause of A10: two places calculating the
+    ///     same number, client-side one wrong).
+    /// </summary>
+    [Fact]
+    public async Task SalesRevenueEndpoint_IsReachableByCashier_AndMatchesTheDashboardKpi()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        var cashier = await InviteAndSignInAsync(admin.Client, CashierRoleId);
+
+        var productId = await CreateProductAsync(admin.Client, basePrice: 100m);
+        var warehouseId = await GetDefaultWarehouseIdAsync(admin.Client);
+        (await RegisterStockIntakeAsync(admin.Client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
+
+        var sale = await CreateSaleAsync(admin.Client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
+        sale.EnsureSuccessStatusCode();
+        var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
+        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        plan.EnsureSuccessStatusCode();
+        var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
+        (await admin.Client.PostAsync($"/api/v1/payment-plans/{planId}/register-payment", null)).EnsureSuccessStatusCode();
+
+        var dashboardTotal = await TotalSalesAsync(admin.Client);
+
+        var cashierResponse = await cashier.GetAsync("/api/v1/sales/revenue");
+        cashierResponse.EnsureSuccessStatusCode();
+        var cashierTotal = (await ReadJsonAsync(cashierResponse)).GetProperty("totalRevenue").GetDecimal();
+
+        Assert.Equal(dashboardTotal, cashierTotal);
+        Assert.Equal(50m, cashierTotal);
+    }
+
     [Fact]
     public async Task CreditSale_ContributesNothingToRevenueUntilAnInstallmentIsPaid()
     {
