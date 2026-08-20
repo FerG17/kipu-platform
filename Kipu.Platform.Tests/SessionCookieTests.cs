@@ -213,6 +213,33 @@ public class SessionCookieTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, (await adminClient.SendAsync(stillWorksRequest)).StatusCode);
     }
 
+    /// <summary>
+    ///     X3 "Endurecer tests": RequestAuthorizationMiddleware re-checks the
+    ///     user's live status on every authenticated request, not just at
+    ///     sign-in — this proves an already-issued session actually stops
+    ///     working the moment its owner is suspended, not just that a NEW
+    ///     sign-in gets blocked afterward (PasswordResetTests only covers a
+    ///     suspended user requesting a reset code, a different path).
+    /// </summary>
+    [Fact]
+    public async Task SuspendingAUser_InvalidatesTheirAlreadyIssuedSession()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        var memberEmail = await InviteMemberAsync(admin.Client, CashierRoleId);
+        var memberClient = AuthenticatedClient(await SignInForTokenAsync(memberEmail, ValidPassword));
+
+        // Confirm the session actually works before suspending it.
+        Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/v1/products")).StatusCode);
+
+        var users = await ReadJsonAsync(await admin.Client.GetAsync("/api/v1/users"));
+        var memberId = users.EnumerateArray().First(u => u.GetProperty("email").GetString() == memberEmail)
+            .GetProperty("id").GetInt32();
+        (await admin.Client.PatchAsync($"/api/v1/users/{memberId}/deactivate", null)).EnsureSuccessStatusCode();
+
+        var response = await memberClient.GetAsync("/api/v1/products");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private static string ExtractSessionCookie(HttpResponseMessage response)
     {
         Assert.True(response.Headers.TryGetValues("Set-Cookie", out var cookieHeaders));
