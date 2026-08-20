@@ -333,19 +333,29 @@ public class TenantIsolationTests(KipuApiFactory factory) : IntegrationTestBase(
 
         var attacker = await CreateBusinessAsync();
 
+        // "<= 1" tolerance here would silently mask a real single-row leak on
+        // any of these — a brand-new business must see exactly 0 rows on all
+        // of them. /api/v1/users is excluded on purpose: it legitimately has
+        // 1 row (the signup owner), checked separately below alongside the
+        // warehouse special-case for the same reason.
         foreach (var path in new[]
                  {
                      "/api/v1/products", "/api/v1/sales", "/api/v1/customers", "/api/v1/suppliers",
                      "/api/v1/inventories", "/api/v1/batches", "/api/v1/purchases", "/api/v1/alerts",
-                     "/api/v1/stock-movements", "/api/v1/reports", "/api/v1/users"
+                     "/api/v1/stock-movements", "/api/v1/reports"
                  })
         {
             var response = await attacker.GetAsync(path);
             response.EnsureSuccessStatusCode();
 
             var rows = (await ReadJsonAsync(response)).EnumerateArray().ToList();
-            Assert.True(rows.Count <= 1, $"{path} leaked {rows.Count} rows into a brand-new business");
+            Assert.True(rows.Count == 0, $"{path} leaked {rows.Count} row(s) into a brand-new business");
         }
+
+        // The attacker's own signup owner is the only row here, never the victim's team.
+        var users = await attacker.GetAsync("/api/v1/users");
+        users.EnsureSuccessStatusCode();
+        Assert.Single((await ReadJsonAsync(users)).EnumerateArray());
 
         // The one warehouse a new business legitimately has is its own.
         var warehouses = await attacker.GetAsync("/api/v1/warehouses");

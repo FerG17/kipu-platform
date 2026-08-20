@@ -35,8 +35,16 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         // reads, so the container and the suite cannot drift apart —
         // see LocalEnvironment.
         var databasePassword = LocalEnvironment.Require("BODEGA_DB_PASSWORD");
+        // Pool/timeout raised above MySqlConnector's defaults (Maximum Pool
+        // Size=100, Connection Timeout=15s) as cheap insurance against
+        // connection contention during a full-suite run (211 tests, each
+        // opening its own scoped connection, several building their own
+        // extra isolated WebApplicationFactory on top) — a mitigation, not a
+        // proven fix, for occasional full-suite-only flakiness investigated
+        // in PasswordResetTests.RequestingANewCode_InvalidatesThePreviousOne.
         var testConnectionString =
-            $"server=localhost;port=3307;user=root;password={databasePassword};database=kipu_platform_test";
+            $"server=localhost;port=3307;user=root;password={databasePassword};database=kipu_platform_test;" +
+            "Maximum Pool Size=200;Connection Timeout=30";
 
         Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", testConnectionString);
         Environment.SetEnvironmentVariable("TokenSettings__Secret", TestJwtSecret);

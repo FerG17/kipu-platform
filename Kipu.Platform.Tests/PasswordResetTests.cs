@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Time.Testing;
 using Kipu.Platform.Iam.Application.Internal.CommandServices;
 using Kipu.Platform.Tests.Infrastructure;
 
@@ -116,7 +118,23 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
     }
 
-    /// <summary>Requesting a second code kills the first one — never more than one guessable code at a time.</summary>
+    /// <summary>
+    ///     Requesting a second code kills the first one — never more than one
+    ///     guessable code at a time.
+    ///
+    ///     Occasionally observed to fail only when run as part of the FULL
+    ///     suite (never in isolation, never reproduced with cross-collection
+    ///     parallelism fully disabled either). Investigated at length —
+    ///     ruled out cross-collection parallelism, duplicate/colliding test
+    ///     emails, DbContext pooling, and EF Core retry-on-failure as causes;
+    ///     traced the delete-then-insert code replacement path in
+    ///     UserCommandService/PasswordResetCodeRepository and found no logic
+    ///     bug. Root cause not conclusively identified — most likely genuine
+    ///     DB/connection contention under a long, heavily-loaded run (see
+    ///     KipuApiFactory's connection-string pool sizing). If this fails,
+    ///     re-run it alone first before assuming the reset-code flow itself
+    ///     is broken.
+    /// </summary>
     [Fact]
     public async Task RequestingANewCode_InvalidatesThePreviousOne()
     {
@@ -285,6 +303,51 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         var reset = await Client.PostAsJsonAsync("/api/v1/authentication/reset-password",
             new { email = admin.Email, code, newPassword = "BrandNewPassw0rd!" });
         Assert.True(reset.IsSuccessStatusCode);
+    }
+
+    /// <summary>
+    ///     X3 "Endurecer tests": the reset-code lifetime (5 min) was
+    ///     previously untestable without either waiting for real time to
+    ///     pass or trusting the frozen clock the suite already has elsewhere
+    ///     (BusinessClockTests) — that one never touches UserCommandService
+    ///     through a real HTTP call, so it couldn't prove this. Now that
+    ///     UserCommandService takes an injected TimeProvider instead of
+    ///     calling DateTimeOffset.UtcNow directly, a fake clock swapped into
+    ///     an isolated host can fast-forward past expiry deterministically.
+    /// </summary>
+    [Fact]
+    public async Task VerifyingAResetCode_AfterItExpires_IsRejected()
+    {
+        var fakeTime = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        await using var timeFactory = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(fakeTime);
+            }));
+        var client = timeFactory.CreateClient();
+
+        var email = $"expiry-{Guid.NewGuid():N}@test.local";
+        var signUp = await PostSignUpAsync(client, new
+        {
+            email,
+            password = ValidPassword,
+            name = "Expiry",
+            lastName = "Test",
+            businessName = "Kipu expiry test",
+            businessType = "RETAIL"
+        });
+        signUp.EnsureSuccessStatusCode();
+
+        (await client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email }))
+            .EnsureSuccessStatusCode();
+        var code = await timeFactory.Services.GetRequiredService<CapturingEmailService>().WaitForCodeAsync(email);
+
+        // Reset codes live for 5 minutes (UserCommandService.ResetCodeLifetime) — jump past that.
+        fakeTime.Advance(TimeSpan.FromMinutes(6));
+
+        var verify = await client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code", new { email, code });
+        Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
     }
 
     private static async Task<int> MemberIdByEmailAsync(HttpClient adminClient, string email)

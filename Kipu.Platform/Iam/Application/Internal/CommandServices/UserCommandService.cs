@@ -41,7 +41,8 @@ public class UserCommandService(
     IOptions<PasswordResetSettings> passwordResetSettings,
     IServiceScopeFactory serviceScopeFactory,
     ILogger<UserCommandService> logger,
-    IStringLocalizer<IamMessages> localizer)
+    IStringLocalizer<IamMessages> localizer,
+    TimeProvider timeProvider)
     : IUserCommandService
 {
     private const int DefaultOwnerRoleId = 1; // ADMIN — matches the frontend's hardcoded sign-up roleId.
@@ -406,7 +407,7 @@ public class UserCommandService(
         var user = await userRepository.FindByEmailAsync(command.Email, cancellationToken);
         if (user == null || user.Status != UserStatus.Active) return Result.Success();
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var existingCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
 
         if (existingCode != null)
@@ -472,7 +473,7 @@ public class UserCommandService(
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
-        if (resetCode == null || resetCode.IsExpired(DateTimeOffset.UtcNow))
+        if (resetCode == null || resetCode.IsExpired(timeProvider.GetUtcNow()))
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         // Already verified by an earlier call against this same code (e.g. a
@@ -486,7 +487,7 @@ public class UserCommandService(
                 : Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
         }
 
-        if (!resetCode.CanBeAttempted(DateTimeOffset.UtcNow))
+        if (!resetCode.CanBeAttempted(timeProvider.GetUtcNow()))
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         try
@@ -539,7 +540,7 @@ public class UserCommandService(
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
-        if (resetCode == null || !resetCode.IsVerified || resetCode.IsExpired(DateTimeOffset.UtcNow) ||
+        if (resetCode == null || !resetCode.IsVerified || resetCode.IsExpired(timeProvider.GetUtcNow()) ||
             !hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 

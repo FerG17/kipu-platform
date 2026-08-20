@@ -56,7 +56,13 @@ public class ApiCorrectnessTests(KipuApiFactory factory) : IntegrationTestBase(f
         first.EnsureSuccessStatusCode();
         var stockAfterFirst = await GetTotalStockAsync(client, productId);
 
-        await client.PatchAsJsonAsync($"/api/v1/purchases/{purchaseOrderId}", new { status = "RECEIVED" });
+        // Must be explicitly rejected (409 — PurchaseOrderCommandService's
+        // "already Received/Cancelled is final" guard), not just silently
+        // no-op via a crash that happens not to re-book stock as a side
+        // effect. Without asserting this, the test couldn't tell "idempotent
+        // by design" apart from "the second call 500s".
+        var second = await client.PatchAsJsonAsync($"/api/v1/purchases/{purchaseOrderId}", new { status = "RECEIVED" });
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
 
         Assert.Equal(stockAfterFirst, await GetTotalStockAsync(client, productId));
     }
