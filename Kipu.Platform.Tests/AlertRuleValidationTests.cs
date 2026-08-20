@@ -18,9 +18,25 @@ public class AlertRuleValidationTests(KipuApiFactory factory) : IntegrationTestB
         var client = await CreateBusinessAsync();
 
         var response = await client.PostAsJsonAsync("/api/v1/alert-rules",
-            new { alertType = "EXPIRED", thresholdValue = 7, enabled = true });
+            new { alertType = "BOGUS_TYPE", thresholdValue = 7, enabled = true });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     EXPIRED is a real, independently configurable rule type — distinct
+    ///     from EXPIRATION (see AlertExpirationSweepJob.LoadExpirationRules).
+    ///     Regression test: an earlier pass at this whitelist wrongly rejected it.
+    /// </summary>
+    [Fact]
+    public async Task SettingAnAlertRule_WithExpiredType_Succeeds()
+    {
+        var client = await CreateBusinessAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/alert-rules",
+            new { alertType = "EXPIRED", thresholdValue = 0, enabled = true });
+
+        Assert.True(response.IsSuccessStatusCode);
     }
 
     [Fact]
