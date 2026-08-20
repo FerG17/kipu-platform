@@ -37,6 +37,15 @@ public class SaleCommandService(
     /// </summary>
     public async Task<Result<Sale>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
     {
+        // An empty string is not the same as "no key" — MySQL's unique index
+        // on (BusinessId, IdempotencyKey) treats every NULL as distinct but
+        // still enforces uniqueness on "" like any other real value. Left as
+        // "", a second sale from a client that always sends "" instead of
+        // omitting the field would permanently 500 on the unique-index
+        // violation below. Normalized to null here so it's treated exactly
+        // like "no key was sent" everywhere downstream.
+        if (command.IdempotencyKey is { Length: 0 }) command = command with { IdempotencyKey = null };
+
         // Checked before anything else: a retry carrying the same key as a
         // request that already succeeded (its response just never reached
         // the client) returns that original sale untouched, rather than
@@ -68,7 +77,11 @@ public class SaleCommandService(
         if (command.CustomerId.HasValue)
         {
             var customer = await customerRepository.FindByIdAsync(command.CustomerId.Value, cancellationToken);
-            if (customer == null || customer.BusinessId != command.BusinessId)
+            // A deactivated (soft-deleted) customer stays in the table — see
+            // Customer.Deactivate — so this used to still resolve and let a
+            // sale, and a credit plan with it, be attributed to someone who
+            // no longer exists as an active customer of this business.
+            if (customer == null || customer.BusinessId != command.BusinessId || !customer.IsActive)
                 return Result<Sale>.Failure(SalesError.CustomerNotFound, localizer[nameof(SalesError.CustomerNotFound)]);
         }
 
@@ -153,6 +166,28 @@ public class SaleCommandService(
                     command.BusinessId);
                 return Result<Sale>.Failure(SalesError.InsufficientStock,
                     localizer[nameof(SalesError.InsufficientStock)]);
+            }
+            catch (DbUpdateException) when (!string.IsNullOrEmpty(command.IdempotencyKey))
+            {
+                // A genuine race between two requests carrying the SAME real
+                // key: the "does this already exist" lookup above is a read,
+                // so both could have passed it before either committed. The
+                // unique index on (BusinessId, IdempotencyKey) is what
+                // actually decided the winner — this request's own insert
+                // just lost it, before any stock was touched. That is not a
+                // server fault; it's exactly the case this key exists to
+                // cover, so look up and return the sale the winner created
+                // instead of reporting a bare 500 for a request that, from
+                // the client's point of view, succeeded.
+                await transaction.RollbackAsync(cancellationToken);
+                var existingSale = await saleRepository.FindByBusinessIdAndIdempotencyKeyAsync(command.BusinessId,
+                    command.IdempotencyKey, cancellationToken);
+                if (existingSale != null) return Result<Sale>.Success(existingSale);
+
+                logger.LogError(
+                    "Failed to register sale for business {BusinessId}: unique constraint violation with no matching idempotency key",
+                    command.BusinessId);
+                return Result<Sale>.Failure(SalesError.DatabaseError, localizer[nameof(SalesError.DatabaseError)]);
             }
             catch (Exception exception)
             {

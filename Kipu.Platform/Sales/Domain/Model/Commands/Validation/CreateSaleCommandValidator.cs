@@ -1,4 +1,5 @@
 using FluentValidation;
+using Kipu.Platform.Sales.Domain.Model.Aggregates;
 
 namespace Kipu.Platform.Sales.Domain.Model.Commands.Validation;
 
@@ -16,7 +17,8 @@ namespace Kipu.Platform.Sales.Domain.Model.Commands.Validation;
 public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
 {
     /// <summary>The only methods the POS actually offers (see the frontend's PaymentMethod enum) — PaymentMethod is free text on the wire, not a real enum.</summary>
-    private static readonly string[] AllowedPaymentMethods = ["CASH", "CARD", "YAPE", "PLIN"];
+    private static readonly string[] AllowedPaymentMethods =
+        [SalePaymentMethod.Cash, SalePaymentMethod.Card, SalePaymentMethod.Yape, SalePaymentMethod.Plin, SalePaymentMethod.Credit];
 
     /// <summary>The business operates in Soles only — a stray currency here would still get summed into revenue as if it were PEN (see the Dashboard KPI query).</summary>
     private static readonly string[] AllowedCurrencies = ["PEN"];

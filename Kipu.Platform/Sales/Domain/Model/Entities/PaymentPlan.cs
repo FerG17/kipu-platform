@@ -12,6 +12,8 @@ namespace Kipu.Platform.Sales.Domain.Model.Entities;
 /// </summary>
 public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IVersionedEntity
 {
+    private readonly List<InstallmentPayment> _payments = [];
+
     public PaymentPlan() : this(0, 0, 1)
     {
     }
@@ -21,6 +23,14 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
     public int BusinessId { get; private set; } = businessId;
     public int TotalInstallments { get; private set; } = totalInstallments;
     public int PaidInstallments { get; private set; }
+
+    /// <summary>
+    ///     The audit trail behind PaidInstallments — every payment ever
+    ///     registered against this plan, reversed ones included. Reversed
+    ///     payments stay in this list (see InstallmentPayment.IsReversed);
+    ///     they just stop counting toward PaidInstallments/revenue.
+    /// </summary>
+    public IReadOnlyCollection<InstallmentPayment> Payments => _payments.AsReadOnly();
 
     /// <summary>
     ///     Set when the sale this plan belongs to gets cancelled — the plan
@@ -38,12 +48,38 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
 
     public bool IsFullyPaid => PaidInstallments >= TotalInstallments;
 
-    /// <summary>Caller (PaymentPlanCommandService) is responsible for rejecting this when already fully paid or cancelled.</summary>
-    public PaymentPlan RegisterPayment()
+    /// <summary>
+    ///     Caller (PaymentPlanCommandService) is responsible for rejecting
+    ///     this when already fully paid or cancelled, and for computing
+    ///     `amount` (Sale.TotalAmount / TotalInstallments, remainder folded
+    ///     into the last one) — this method just records whatever it's given.
+    /// </summary>
+    public PaymentPlan RegisterPayment(decimal amount, int paidByUserId)
     {
         PaidInstallments++;
+        _payments.Add(new InstallmentPayment(Id, amount, paidByUserId));
         return this;
     }
+
+    /// <summary>
+    ///     Undoes the most recent unreversed payment — a double-click at the
+    ///     till, or one registered against the wrong plan. Caller
+    ///     (PaymentPlanCommandService) is responsible for rejecting this when
+    ///     there is nothing left to revert.
+    /// </summary>
+    public PaymentPlan RevertLastPayment(int reversedByUserId)
+    {
+        var lastPayment = _payments.Where(payment => !payment.IsReversed)
+            .OrderByDescending(payment => payment.PaidAt)
+            .ThenByDescending(payment => payment.Id)
+            .First();
+        lastPayment.Reverse(reversedByUserId);
+        PaidInstallments--;
+        return this;
+    }
+
+    /// <summary>Whether RevertLastPayment has anything to act on.</summary>
+    public bool HasReversiblePayment => _payments.Any(payment => !payment.IsReversed);
 
     /// <summary>Caller (SaleCommandService, on sale cancellation) is responsible for not calling this twice.</summary>
     public PaymentPlan Cancel()

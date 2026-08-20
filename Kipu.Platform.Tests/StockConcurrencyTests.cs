@@ -149,7 +149,7 @@ public class StockConcurrencyTests(KipuApiFactory factory) : IntegrationTestBase
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
-        var sale = await CreateSaleAsync(client, SaleLine(productId, quantity: 1, unitPrice: 100m));
+        var sale = await CreateSaleAsync(client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
 

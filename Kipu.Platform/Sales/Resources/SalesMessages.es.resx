@@ -86,6 +86,12 @@
   <data name="PaymentPlanCancelled" xml:space="preserve">
     <value>Este plan de pago fue cancelado junto con su venta.</value>
   </data>
+  <data name="SaleIsNotACreditSale" xml:space="preserve">
+    <value>Un plan de pago solo se puede adjuntar a una venta hecha a crédito.</value>
+  </data>
+  <data name="NoPaymentToRevert" xml:space="preserve">
+    <value>No queda ningún pago por revertir en este plan.</value>
+  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

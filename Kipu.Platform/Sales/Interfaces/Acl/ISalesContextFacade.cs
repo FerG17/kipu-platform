@@ -14,9 +14,11 @@ public interface ISalesContextFacade
     Task<IReadOnlyCollection<(DateOnly Date, decimal Total)>> GetSalesByDay(int businessId, DateOnly dateFrom, DateOnly dateTo,
         CancellationToken cancellationToken);
 
-    /// <summary>Every PAID sale within the range, for CSV export — respects the date range (bug fixed per the handoff, §6.8).</summary>
+    /// <summary>Every PAID or CREDIT sale within the range, for CSV export — respects the date range (bug fixed per the handoff, §6.8).</summary>
     Task<IReadOnlyCollection<SaleExportRow>> GetSalesForExport(int businessId, DateOnly? dateFrom, DateOnly? dateTo,
         CancellationToken cancellationToken);
 }
 
-public record SaleExportRow(int SaleId, DateTimeOffset Date, string PaymentMethod, decimal TotalAmount, string Currency);
+/// <summary>CollectedAmount equals TotalAmount for a Paid sale; for a Credit sale it's whatever has actually been collected on its installments so far, which can be less.</summary>
+public record SaleExportRow(int SaleId, DateTimeOffset Date, string PaymentMethod, decimal TotalAmount,
+    decimal CollectedAmount, string Currency);

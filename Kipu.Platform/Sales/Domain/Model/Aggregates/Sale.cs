@@ -8,9 +8,39 @@ public static class SaleStatus
     public const string Paid = "PAID";
     public const string Cancelled = "CANCELLED";
 
-    // No OPEN/cart status: the current POS flow always creates a fully paid
+    /// <summary>
+    ///     A sale sold on installments (see SalePaymentMethod.Credit). Nothing was
+    ///     collected at checkout, so — unlike Paid — its TotalAmount is never
+    ///     counted as revenue on its own; revenue comes from the
+    ///     InstallmentPayment rows registered against its PaymentPlan as they
+    ///     actually get paid (see SalesContextFacade). A Credit sale stays
+    ///     Credit for its whole life, even once fully paid — there is no
+    ///     transition back to Paid, so a payment plan's history stays
+    ///     attached to it forever instead of needing to be looked up
+    ///     differently depending on how much has been collected so far.
+    /// </summary>
+    public const string Credit = "CREDIT";
+
+    // No OPEN/cart status: the current POS flow always creates a confirmed
     // sale at checkout (stock is validated and decremented atomically with
     // creation) — add it back only if a hold-cart feature is ever built.
+}
+
+/// <summary>
+///     The methods a sale can be checked out with. Free text on the wire
+///     (see CreateSaleCommandValidator's whitelist), not a real enum — these
+///     constants exist so Sale/the validator don't each hardcode their own
+///     copy of the same four (now five) literal strings.
+/// </summary>
+public static class SalePaymentMethod
+{
+    public const string Cash = "CASH";
+    public const string Card = "CARD";
+    public const string Yape = "YAPE";
+    public const string Plin = "PLIN";
+
+    /// <summary>Nothing is collected at checkout — see SaleStatus.Credit, which a sale created with this method is born into.</summary>
+    public const string Credit = "CREDIT";
 }
 
 /// <summary>
@@ -30,7 +60,7 @@ public class Sale : IVersionedEntity
         Currency = currency;
         Description = description;
         IdempotencyKey = idempotencyKey;
-        Status = SaleStatus.Paid;
+        Status = paymentMethod == SalePaymentMethod.Credit ? SaleStatus.Credit : SaleStatus.Paid;
         Date = DateTimeOffset.UtcNow;
     }
 

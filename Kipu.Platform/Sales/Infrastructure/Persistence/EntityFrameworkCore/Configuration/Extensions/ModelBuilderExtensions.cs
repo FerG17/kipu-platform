@@ -90,6 +90,21 @@ public static class ModelBuilderExtensions
             entity.HasOne<Sale>().WithOne().HasForeignKey<PaymentPlan>(plan => plan.SaleId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(plan => plan.SaleId).IsUnique();
+
+            // Payments is a private-field-backed collection, same treatment
+            // as Sale.SaleDetails — the aggregate boundary is enforced in
+            // code (PaymentPlan.RegisterPayment/RevertLastPayment), EF just
+            // needs to know where to materialize rows into.
+            entity.HasMany(plan => plan.Payments).WithOne().HasForeignKey(payment => payment.PaymentPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Metadata.FindNavigation(nameof(PaymentPlan.Payments))!.SetPropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<InstallmentPayment>(entity =>
+        {
+            entity.HasKey(payment => payment.Id);
+            entity.Property(payment => payment.Id).ValueGeneratedOnAdd();
+            entity.Property(payment => payment.Amount).HasColumnType("decimal(10,2)");
         });
     }
 }
