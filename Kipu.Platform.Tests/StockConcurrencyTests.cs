@@ -163,6 +163,15 @@ public class StockConcurrencyTests(KipuApiFactory factory) : IntegrationTestBase
         var final = await client.GetAsync($"/api/v1/payment-plans/by-sale/{saleId}");
         final.EnsureSuccessStatusCode();
 
+        // Upper bound only, deliberately: PaymentPlanCommandService.Handle
+        // (RegisterInstallmentPaymentCommand) does NOT retry on a lost
+        // DbUpdateConcurrencyException race — a loser gets ConcurrentModification
+        // and the caller is expected to look at the plan again, not the server.
+        // Firing 8 truly simultaneous requests (no retry) can legitimately land
+        // fewer than 2 — that's correct, by-design behavior, not undercounting.
+        // Asserting exact(2) here would fail against CORRECT behavior, not catch
+        // a bug (verified by tracing the handler: no silent-drop path exists —
+        // every non-winning request gets a real 409, never a swallowed no-op).
         var paid = (await ReadJsonAsync(final)).GetProperty("paidInstallments").GetInt32();
         Assert.True(paid <= 2, $"{paid} installments were registered against a 2-installment plan");
     }
