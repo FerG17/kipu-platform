@@ -48,7 +48,7 @@
     <value>Esta alerta ya fue resuelta.</value>
   </data>
   <data name="InvalidThreshold" xml:space="preserve">
-    <value>El umbral no puede ser negativo.</value>
+    <value>Regla de alerta inválida — revisa el tipo y el umbral (0-365 días).</value>
   </data>
   <data name="ProductNotFound" xml:space="preserve">
     <value>Producto no encontrado.</value>

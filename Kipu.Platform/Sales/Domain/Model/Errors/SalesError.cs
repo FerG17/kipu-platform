@@ -25,6 +25,9 @@ public enum SalesError
     /// <summary>Customer name/document/phone/email outside what its columns accept.</summary>
     InvalidCustomerData,
 
+    /// <summary>Another customer in the same business already has this document number.</summary>
+    DuplicateCustomerDocument,
+
     /// <summary>Another request changed the same row first — a conflict the caller can retry (409), not a server fault (500).</summary>
     ConcurrentModification,
     DatabaseError

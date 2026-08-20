@@ -51,6 +51,28 @@ public class CustomerDeletionTests(KipuApiFactory factory) : IntegrationTestBase
         Assert.Equal(customerId, reloadedSale.GetProperty("customerId").GetInt32());
     }
 
+    /// <summary>
+    ///     X3 QA fix: sales-history.vue/payment-plans-list.vue resolve a
+    ///     customer's name via GET /customers/{id} when it's missing from
+    ///     the (active-only) bulk list — that only works if this endpoint
+    ///     doesn't filter by Status. A payment plan with money still owed
+    ///     needs to keep showing who owes it, even after "deleting" them.
+    /// </summary>
+    [Fact]
+    public async Task GettingADeletedCustomerById_StillReturnsThemAsInactive()
+    {
+        var client = await CreateBusinessAsync();
+        var customerId = await CreateCustomerAsync(client);
+
+        (await client.DeleteAsync($"/api/v1/customers/{customerId}")).EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync($"/api/v1/customers/{customerId}");
+        response.EnsureSuccessStatusCode();
+        var customer = await ReadJsonAsync(response);
+        Assert.Equal(customerId, customer.GetProperty("id").GetInt32());
+        Assert.False(customer.GetProperty("isActive").GetBoolean());
+    }
+
     [Fact]
     public async Task DeletingACustomer_AsCashier_IsForbidden()
     {

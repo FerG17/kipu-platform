@@ -259,6 +259,34 @@ public class PasswordResetTests(KipuApiFactory factory) : IntegrationTestBase(fa
         Assert.True(verify.IsSuccessStatusCode);
     }
 
+    /// <summary>
+    ///     X3 minor item: a double-click/double-submit re-sending the same
+    ///     correct code (e.g. after the winning request already marked it
+    ///     verified) must succeed again, not fail with an "invalid code" or
+    ///     "concurrent modification" error for a code that was actually right.
+    /// </summary>
+    [Fact]
+    public async Task VerifyingTheSameCorrectCodeTwice_SucceedsBothTimes()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        (await Client.PostAsJsonAsync("/api/v1/authentication/forgot-password", new { email = admin.Email }))
+            .EnsureSuccessStatusCode();
+        var code = await CodeSentTo(admin.Email);
+
+        var firstVerify = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+            new { email = admin.Email, code });
+        Assert.True(firstVerify.IsSuccessStatusCode);
+
+        var secondVerify = await Client.PostAsJsonAsync("/api/v1/authentication/verify-reset-code",
+            new { email = admin.Email, code });
+        Assert.True(secondVerify.IsSuccessStatusCode);
+
+        // The already-verified code can still be used to actually reset the password.
+        var reset = await Client.PostAsJsonAsync("/api/v1/authentication/reset-password",
+            new { email = admin.Email, code, newPassword = "BrandNewPassw0rd!" });
+        Assert.True(reset.IsSuccessStatusCode);
+    }
+
     private static async Task<int> MemberIdByEmailAsync(HttpClient adminClient, string email)
     {
         var users = await ReadJsonAsync(await adminClient.GetAsync("/api/v1/users"));

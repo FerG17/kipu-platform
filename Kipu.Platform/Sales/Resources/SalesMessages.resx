@@ -95,4 +95,7 @@
   <data name="InvalidCustomerData" xml:space="preserve">
     <value>Customer name is required and must fit its field lengths.</value>
   </data>
+  <data name="DuplicateCustomerDocument" xml:space="preserve">
+    <value>Another customer already has this document number.</value>
+  </data>
 </root>

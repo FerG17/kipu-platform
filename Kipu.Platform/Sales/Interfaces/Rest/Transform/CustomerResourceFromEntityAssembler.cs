@@ -8,6 +8,6 @@ public static class CustomerResourceFromEntityAssembler
     public static CustomerResource ToResourceFromEntity(Customer customer)
     {
         return new CustomerResource(customer.Id, customer.BusinessId, customer.FullName, customer.DocumentNumber,
-            customer.PhoneNumber, customer.Email, customer.RegisteredAt);
+            customer.PhoneNumber, customer.Email, customer.RegisteredAt, customer.IsActive);
     }
 }

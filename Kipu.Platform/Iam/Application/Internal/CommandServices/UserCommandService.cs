@@ -100,6 +100,10 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<(User user, string token)>> Handle(SignUpCommand command, CancellationToken cancellationToken)
     {
+        // Trim + lowercase so "Test@Example.com " and "test@example.com"
+        // aren't treated as two different accounts by ExistsByEmailAsync.
+        command = command with { Email = (command.Email ?? string.Empty).Trim().ToLowerInvariant() };
+
         var signUpValidation = await signUpValidator.ValidateAsync(command, cancellationToken);
         if (!signUpValidation.IsValid)
         {
@@ -162,6 +166,9 @@ public class UserCommandService(
     /// </summary>
     public async Task<Result<User>> Handle(InviteUserCommand command, CancellationToken cancellationToken)
     {
+        // Same normalization as SignUp — see its comment.
+        command = command with { Email = (command.Email ?? string.Empty).Trim().ToLowerInvariant() };
+
         var inviteValidation = await inviteUserValidator.ValidateAsync(command, cancellationToken);
         if (!inviteValidation.IsValid)
         {
@@ -465,7 +472,21 @@ public class UserCommandService(
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
-        if (resetCode == null || !resetCode.CanBeAttempted(DateTimeOffset.UtcNow))
+        if (resetCode == null || resetCode.IsExpired(DateTimeOffset.UtcNow))
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        // Already verified by an earlier call against this same code (e.g. a
+        // double-click/double-submit retry) — re-checking the same correct
+        // code should succeed again, not fail just because it was already
+        // marked verified. Only a genuinely different/wrong code is rejected.
+        if (resetCode.IsVerified)
+        {
+            return hashingService.VerifyPassword(command.Code, resetCode.CodeHash)
+                ? Result.Success()
+                : Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+        }
+
+        if (!resetCode.CanBeAttempted(DateTimeOffset.UtcNow))
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         try
@@ -485,9 +506,15 @@ public class UserCommandService(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Two guesses against the same code landed at once — whichever
-            // loses the race should retry against the code's now-current
-            // state rather than this write silently clobbering the other one.
+            // Two guesses against the same code landed at once. Reload and
+            // check whether the request that won the race verified with this
+            // same code — if so this was just a race, not a real conflict, so
+            // succeed too instead of making the user re-enter a code that was
+            // actually correct.
+            var reloaded = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
+            if (reloaded is { IsVerified: true } && hashingService.VerifyPassword(command.Code, reloaded.CodeHash))
+                return Result.Success();
+
             return Result.Failure(IamError.ConcurrentModification, localizer[nameof(IamError.ConcurrentModification)]);
         }
     }

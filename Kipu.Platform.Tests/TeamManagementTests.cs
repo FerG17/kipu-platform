@@ -76,4 +76,46 @@ public class TeamManagementTests(KipuApiFactory factory) : IntegrationTestBase(f
         var signIn = await Client.PostAsJsonAsync("/api/v1/authentication/sign-in", new { email = admin.Email, password = ValidPassword });
         Assert.True(signIn.IsSuccessStatusCode);
     }
+
+    /// <summary>
+    ///     X3 minor item: emails weren't trimmed/lowercased before being
+    ///     stored, so " Test@Example.com" and "test@example.com" were treated
+    ///     as two different accounts instead of one.
+    /// </summary>
+    [Fact]
+    public async Task InvitingAUser_NormalizesTheEmail_TrimAndLowercase()
+    {
+        var admin = await CreateBusinessWithOwnerAsync();
+        var rawEmail = $"  Member-{Guid.NewGuid():N}@Test.LOCAL  ";
+        var normalizedEmail = rawEmail.Trim().ToLowerInvariant();
+
+        (await admin.Client.PostAsJsonAsync("/api/v1/users", new
+        {
+            email = rawEmail,
+            password = ValidPassword,
+            name = "Team",
+            lastName = "Member",
+            roleId = CashierRoleId,
+            phone = ""
+        })).EnsureSuccessStatusCode();
+
+        // Signing in with the normalized (trimmed/lowercased) form must work.
+        var signIn = await Client.PostAsJsonAsync("/api/v1/authentication/sign-in",
+            new { email = normalizedEmail, password = ValidPassword });
+        Assert.True(signIn.IsSuccessStatusCode);
+
+        // Inviting the same address again — even in a different case/with
+        // whitespace — must be rejected as already taken, not create a
+        // second account.
+        var duplicate = await admin.Client.PostAsJsonAsync("/api/v1/users", new
+        {
+            email = rawEmail.ToUpperInvariant(),
+            password = ValidPassword,
+            name = "Duplicate",
+            lastName = "Member",
+            roleId = CashierRoleId,
+            phone = ""
+        });
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+    }
 }

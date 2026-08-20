@@ -25,6 +25,11 @@ public class CustomerCommandService(
             return Result<Customer>.Failure(SalesError.InvalidCustomerData,
                 localizer[nameof(SalesError.InvalidCustomerData)]);
 
+        if (!string.IsNullOrWhiteSpace(command.DocumentNumber) &&
+            await customerRepository.FindByBusinessIdAndDocumentNumberAsync(command.BusinessId, command.DocumentNumber, cancellationToken) != null)
+            return Result<Customer>.Failure(SalesError.DuplicateCustomerDocument,
+                localizer[nameof(SalesError.DuplicateCustomerDocument)]);
+
         var customer = new Customer(command.BusinessId, command.FullName, command.DocumentNumber, command.PhoneNumber,
             command.Email);
         await customerRepository.AddAsync(customer, cancellationToken);
@@ -41,6 +46,14 @@ public class CustomerCommandService(
         var customer = await customerRepository.FindByIdAsync(command.CustomerId, cancellationToken);
         if (customer == null)
             return Result<Customer>.Failure(SalesError.CustomerNotFound, localizer[nameof(SalesError.CustomerNotFound)]);
+
+        if (!string.IsNullOrWhiteSpace(command.DocumentNumber))
+        {
+            var existing = await customerRepository.FindByBusinessIdAndDocumentNumberAsync(customer.BusinessId, command.DocumentNumber, cancellationToken);
+            if (existing != null && existing.Id != customer.Id)
+                return Result<Customer>.Failure(SalesError.DuplicateCustomerDocument,
+                    localizer[nameof(SalesError.DuplicateCustomerDocument)]);
+        }
 
         customer.UpdateDetails(command.FullName, command.DocumentNumber, command.PhoneNumber, command.Email);
         customerRepository.Update(customer);

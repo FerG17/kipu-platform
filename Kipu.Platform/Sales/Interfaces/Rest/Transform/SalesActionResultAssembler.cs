@@ -56,6 +56,7 @@ public static class SalesActionResultAssembler
             SalesError.PaymentPlanCancelled => StatusCodes.Status409Conflict,
             SalesError.InvalidInstallmentCount => StatusCodes.Status400BadRequest,
             SalesError.InvalidCustomerData => StatusCodes.Status400BadRequest,
+            SalesError.DuplicateCustomerDocument => StatusCodes.Status409Conflict,
             SalesError.ConcurrentModification => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };

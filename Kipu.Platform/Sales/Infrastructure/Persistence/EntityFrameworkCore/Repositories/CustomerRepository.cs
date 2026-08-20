@@ -15,4 +15,12 @@ public class CustomerRepository(AppDbContext context) : BaseRepository<Customer>
             .Where(customer => customer.BusinessId == businessId && customer.Status == CustomerStatus.Active)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<Customer?> FindByBusinessIdAndDocumentNumberAsync(int businessId, string documentNumber,
+        CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Customer>()
+            .FirstOrDefaultAsync(customer => customer.BusinessId == businessId && customer.DocumentNumber == documentNumber,
+                cancellationToken);
+    }
 }
