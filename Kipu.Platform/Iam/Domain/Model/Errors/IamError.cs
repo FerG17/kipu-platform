@@ -12,6 +12,9 @@ public enum IamError
     /// <summary>Name/LastName/Phone/Email outside what their columns accept, or a malformed email.</summary>
     InvalidUserData,
 
+    /// <summary>Name/Type/Address/Ruc outside what their columns accept, or Type outside the known set.</summary>
+    InvalidBusinessData,
+
     RoleNotFound,
 
     /// <summary>Removing this user would leave the business with nobody who can administer it, and there is no recovery path.</summary>

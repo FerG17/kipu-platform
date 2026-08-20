@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Kipu.Platform.Iam.Application.CommandServices;
 using Kipu.Platform.Iam.Domain.Model.Aggregates;
@@ -13,11 +14,15 @@ namespace Kipu.Platform.Iam.Application.Internal.CommandServices;
 public class BusinessCommandService(
     IBusinessRepository businessRepository,
     IUnitOfWork unitOfWork,
+    IValidator<UpdateBusinessCommand> updateBusinessValidator,
     IStringLocalizer<IamMessages> localizer)
     : IBusinessCommandService
 {
     public async Task<Result<Business>> Handle(UpdateBusinessCommand command, CancellationToken cancellationToken)
     {
+        if (!(await updateBusinessValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<Business>.Failure(IamError.InvalidBusinessData, localizer[nameof(IamError.InvalidBusinessData)]);
+
         var business = await businessRepository.FindByIdAsync(command.BusinessId, cancellationToken);
         if (business == null)
             return Result<Business>.Failure(IamError.BusinessNotFound, localizer[nameof(IamError.BusinessNotFound)]);

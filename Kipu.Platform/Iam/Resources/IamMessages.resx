@@ -65,6 +65,9 @@
   <data name="InvalidUserData" xml:space="preserve">
     <value>Check the name, last name, phone number and email — one of them is invalid or too long.</value>
   </data>
+  <data name="InvalidBusinessData" xml:space="preserve">
+    <value>Check the business name, type, address and RUC — one of them is missing, invalid or too long.</value>
+  </data>
   <data name="OperationCancelled" xml:space="preserve">
     <value>The operation was cancelled.</value>
   </data>
