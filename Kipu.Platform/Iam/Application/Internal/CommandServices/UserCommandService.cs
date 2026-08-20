@@ -480,11 +480,36 @@ public class UserCommandService(
         // double-click/double-submit retry) — re-checking the same correct
         // code should succeed again, not fail just because it was already
         // marked verified. Only a genuinely different/wrong code is rejected.
+        //
+        // CanBeAttempted() (below, for the not-yet-verified branch) excludes
+        // verified codes on purpose — a correct repeat guess must not count
+        // against the budget. But that also used to mean a WRONG guess here
+        // was free forever once any single request verified the code: this
+        // branch returned a Failure without ever calling RegisterFailedAttempt,
+        // so nothing ever stopped it being retried against all one million
+        // 6-digit codes once the 5-attempt gate on the line below had already
+        // been passed once, legitimately, by someone who did know the code.
         if (resetCode.IsVerified)
         {
-            return hashingService.VerifyPassword(command.Code, resetCode.CodeHash)
-                ? Result.Success()
-                : Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+            if (hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+                return Result.Success();
+
+            if (resetCode.HasExceededAttempts())
+                return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+            try
+            {
+                resetCode.RegisterFailedAttempt();
+                passwordResetCodeRepository.Update(resetCode);
+                await unitOfWork.CompleteAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Two wrong guesses landed at once — the count is off by one
+                // at worst, not a security gap; the guess itself was still wrong.
+            }
+
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
         }
 
         if (!resetCode.CanBeAttempted(timeProvider.GetUtcNow()))
@@ -540,9 +565,32 @@ public class UserCommandService(
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
 
         var resetCode = await passwordResetCodeRepository.FindLatestByUserIdAsync(user.Id, cancellationToken);
-        if (resetCode == null || !resetCode.IsVerified || resetCode.IsExpired(timeProvider.GetUtcNow()) ||
-            !hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+        if (resetCode == null || !resetCode.IsVerified || resetCode.IsExpired(timeProvider.GetUtcNow()))
             return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        // Same gap as VerifyPasswordResetCodeCommand's own verified-branch,
+        // and the same fix: this re-check of the code is the only thing
+        // stopping someone who doesn't know it from resetting the password
+        // once it's verified, so a wrong guess here has to cost an attempt
+        // too, or it's an unlimited-retries oracle against the code hash.
+        if (resetCode.HasExceededAttempts())
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+
+        if (!hashingService.VerifyPassword(command.Code, resetCode.CodeHash))
+        {
+            try
+            {
+                resetCode.RegisterFailedAttempt();
+                passwordResetCodeRepository.Update(resetCode);
+                await unitOfWork.CompleteAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Same reasoning as the verified-branch above — the guess was wrong regardless.
+            }
+
+            return Result.Failure(IamError.InvalidResetCode, localizer[nameof(IamError.InvalidResetCode)]);
+        }
 
         user.UpdatePasswordHash(hashingService.HashPassword(command.NewPassword));
         userRepository.Update(user);

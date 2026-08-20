@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using System.Threading.RateLimiting;
 using Cortex.Mediator.DependencyInjection;
 using FluentValidation;
@@ -116,6 +117,9 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // CORS — allows the Vue frontend (a different origin) to call this API.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+CorsAllowedOriginsGuard.EnsureUsable(allowedOrigins, builder.Environment.IsProduction());
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("KipuFrontend",
@@ -158,6 +162,38 @@ if (knownProxies.Length > 0)
     });
 }
 
+// KnownProxies only works for a proxy with a fixed, known address (e.g. a
+// self-hosted nginx). A PaaS edge like Railway's terminates every connection
+// from a rotating address it never publishes, so KnownProxies can never be
+// populated for it and UseForwardedHeaders() above never activates — every
+// caller then shares the edge's own address, collapsing both rate limiters
+// into one global bucket (see the partition key below).
+//
+// This is a narrower, explicit opt-in for exactly that case: trust the
+// right-most X-Forwarded-For entry unconditionally, with no IP allowlist.
+// It is only safe because of Railway's specific topology — the container
+// port is never reachable except through Railway's own edge, so nothing
+// can inject that right-most hop except Railway itself. It must stay off
+// (the default) for any deployment where the app's port might be reached
+// directly, since a direct caller could then set X-Forwarded-For itself and
+// get a fresh bucket on every request — worse than not forwarding at all.
+var trustLastProxyHop = builder.Configuration.GetValue("ForwardedHeaders:TrustLastProxyHop", false);
+
+// Shared by both limiters below so a caller's global and auth-specific
+// budgets are keyed on the same address.
+string ResolveClientAddress(HttpContext context)
+{
+    if (trustLastProxyHop)
+    {
+        var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
+        var lastHop = forwardedFor.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .LastOrDefault();
+        if (!string.IsNullOrEmpty(lastHop)) return lastHop;
+    }
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
+
 // Rate limiting — a global per-IP budget for the whole API, plus a much
 // stricter policy for authentication endpoints specifically (sign-in/sign-up
 // are the classic brute-force/credential-stuffing target).
@@ -175,7 +211,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            partitionKey: ResolveClientAddress(context),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
@@ -185,7 +221,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("auth", context =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            partitionKey: ResolveClientAddress(context),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
@@ -316,6 +352,21 @@ builder.Services.AddScoped<ISessionCookieService, SessionCookieService>();
 builder.Services.AddHttpClient();
 var resendSettings = builder.Configuration.GetSection("Resend").Get<ResendSettings>() ?? new ResendSettings();
 resendSettings.ApiKey = Environment.ExpandEnvironmentVariables(resendSettings.ApiKey);
+// FromEmail used to skip this expansion entirely — in an environment where
+// RESEND_FROM_EMAIL wasn't set, the literal "%RESEND_FROM_EMAIL%" shipped as
+// the sender address, which Resend rejects outright, silently killing every
+// password-reset email.
+resendSettings.FromEmail = Environment.ExpandEnvironmentVariables(resendSettings.FromEmail);
+
+// ExpandEnvironmentVariables leaves the literal "%VAR%" in place rather than
+// returning empty when the variable isn't set. That string is not blank, so
+// it used to slip past the IsNullOrWhiteSpace check below and register the
+// real ResendEmailService with a garbage API key instead of falling back to
+// LoggingEmailService — the same class of bug JwtSecretGuard/BootstrapKeyGuard
+// exist to catch, just for a setting that's allowed to be genuinely unset.
+if (UnexpandedPlaceholderPattern().IsMatch(resendSettings.ApiKey))
+    resendSettings.ApiKey = string.Empty;
+
 builder.Services.Configure<ResendSettings>(settings =>
 {
     settings.ApiKey = resendSettings.ApiKey;
@@ -413,9 +464,20 @@ builder.Services.AddScoped<IReportQueryService, ReportQueryService>();
 
 var app = builder.Build();
 
-// Apply pending migrations on startup (safe to call even when schema is up to date).
-using (var scope = app.Services.CreateScope())
+// Apply pending migrations on startup (safe to call even when schema is up to
+// date) — but only where that's actually convenient rather than dangerous.
+// Outside Production (local dev against a fresh Docker MySQL, the
+// integration suite's disposable database) this default stays on, same as
+// always. In Production it now defaults off: a redeploy with a bad migration
+// used to alter live schema automatically on every boot, with no review step
+// and no rollback, and it required the app's own DB user to hold permanent
+// DDL permissions just for this. Migrating there is now an explicit,
+// deliberate action — set Database__MigrateOnStartup=true for the one deploy
+// that needs it, then unset it again.
+var migrateOnStartup = app.Configuration.GetValue("Database:MigrateOnStartup", !app.Environment.IsProduction());
+if (migrateOnStartup)
 {
+    using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     context.Database.Migrate();
 }
@@ -494,7 +556,16 @@ app.UseRateLimiter();
 
 app.UseRequestAuthorization();
 
-app.UseHttpsRedirection();
+// Only meaningful when this app itself terminates TLS (a direct Kestrel
+// deployment with no edge in front). Behind Railway's edge, TLS is already
+// terminated before the request reaches here — the connection Kestrel sees
+// is always plain HTTP, ASPNETCORE_HTTPS_PORT is never legitimately set, and
+// if it ever were, this would issue a 307 to every single request (the
+// request already looks like HTTP from Kestrel's side, so it "redirects" to
+// HTTPS on this same host, which still looks like HTTP once it arrives —
+// an infinite loop, total outage). Redirecting to HTTPS behind such an edge
+// is the edge's job, not this app's.
+if (knownProxies.Length == 0 && !trustLastProxyHop) app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
@@ -507,4 +578,9 @@ app.Run();
 ///     through WebApplicationFactory&lt;Program&gt; — top-level statements would
 ///     otherwise leave this class internal.
 /// </summary>
-public partial class Program;
+public partial class Program
+{
+    /// <summary>Same convention as JwtSecretGuard/BootstrapKeyGuard's own copy of this pattern — an env-var placeholder that never got expanded.</summary>
+    [GeneratedRegex(@"^%[A-Za-z_][A-Za-z0-9_]*%$")]
+    private static partial Regex UnexpandedPlaceholderPattern();
+}
