@@ -108,6 +108,28 @@ public class PrivilegeEscalationTests(KipuApiFactory factory) : IntegrationTestB
         AssertForbidden(response, "a cashier silencing the alert engine");
     }
 
+    /// <summary>
+    ///     X3 "Endurecer tests": SaleDetailsController had no role-denial
+    ///     coverage at all — its class-level [Authorize(Admin, Cashier)]
+    ///     means WAREHOUSE is the one real role it excludes.
+    /// </summary>
+    [Fact]
+    public async Task Warehouse_CannotListSaleDetails()
+    {
+        var admin = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(admin);
+        var warehouseId = await GetDefaultWarehouseIdAsync(admin);
+        (await RegisterStockIntakeAsync(admin, productId, warehouseId, quantity: 5)).EnsureSuccessStatusCode();
+        var sale = await CreateSaleAsync(admin, SaleLine(productId, quantity: 1, unitPrice: 10m));
+        sale.EnsureSuccessStatusCode();
+        var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
+
+        var warehouseRole = await InviteAndSignInAsync(admin, WarehouseRoleId);
+        var response = await warehouseRole.GetAsync($"/api/v1/sale-details?saleId={saleId}");
+
+        AssertForbidden(response, "a Warehouse role reading sale lines");
+    }
+
     /// <summary>A colleague's profile is not the caller's to read, even inside the same bodega.</summary>
     [Fact]
     public async Task Cashier_CannotReadAnotherEmployeesAccount()
