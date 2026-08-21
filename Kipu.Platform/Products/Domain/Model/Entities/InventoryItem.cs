@@ -83,13 +83,6 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
         return this;
     }
 
-    public InventoryItem ReassignWarehouse(int warehouseId)
-    {
-        WarehouseId = warehouseId;
-        UpdatedAt = DateTimeOffset.UtcNow;
-        return this;
-    }
-
     public InventoryItem UpdateMinimumStock(int minimumStock)
     {
         MinimumStock = minimumStock;

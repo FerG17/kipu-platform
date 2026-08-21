@@ -91,9 +91,9 @@ public class SaleCommandService(
         // quantity exceed what actually exists.
         //
         // The admin-set BasePrice is also captured here, per product, and used
-        // below instead of whatever UnitPrice the client submitted — the UI
-        // never lets a cashier edit it, but the API must not take a client-sent
-        // price on faith either.
+        // below to price every line — the wire contract has no UnitPrice field
+        // at all (see SaleLineResource), so there is no client-sent price to
+        // even consider trusting.
         var basePriceByProductId = new Dictionary<int, decimal>();
         foreach (var productLines in command.Lines.GroupBy(line => line.ProductId))
         {

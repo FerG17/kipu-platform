@@ -92,6 +92,29 @@ public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(f
     }
 
     /// <summary>
+    ///     X4 Bloque 6: unitPrice was removed from the wire contract entirely
+    ///     (SaleLineResource/SaleLineCommand) — it always priced from the
+    ///     product's own BasePrice server-side and never actually read the
+    ///     client-submitted value, so it only ever looked editable. A client
+    ///     that still sends the field anyway (an unupdated caller, or one
+    ///     probing the API) must have it silently dropped, not honored.
+    /// </summary>
+    [Fact]
+    public async Task Sale_WithUnitPriceFieldInRequestBody_IgnoresItAndUsesTheProductsBasePrice()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client, basePrice: 25m);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
+
+        var response = await CreateSaleAsync(client, SaleLine(productId, quantity: 2, unitPrice: 1m));
+
+        response.EnsureSuccessStatusCode();
+        var totalAmount = (await ReadJsonAsync(response)).GetProperty("totalAmount").GetDecimal();
+        Assert.Equal(50m, totalAmount);
+    }
+
+    /// <summary>
     ///     Cancelling a sale means the goods came back, so the stock has to
     ///     come back with them. It used to just flip the status: the units
     ///     stayed deducted forever while the revenue disappeared, so the
