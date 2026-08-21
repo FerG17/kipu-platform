@@ -84,6 +84,10 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.InvalidPurchasePrice,
                 localizer[nameof(ProductError.InvalidPurchasePrice)]);
 
+        if (await HasUnsafeExpirationOverwriteAsync(command.ProductId, command.Expiration, cancellationToken))
+            return Result<InventoryItem>.Failure(ProductError.BatchExpirationConflict,
+                localizer[nameof(ProductError.BatchExpirationConflict)]);
+
         // Both reads go through the tenant-scoped repositories (AppDbContext's
         // BusinessId query filter), so a ProductId/WarehouseId belonging to
         // another business resolves to null here — without this check
@@ -198,10 +202,7 @@ public class InventoryCommandService(
         }
 
         if (pendingBatchEvent != null)
-            await mediator.PublishAsync(
-                new BatchRegisteredEvent(pendingBatchEvent.Id, pendingBatchEvent.ProductId, product.Name,
-                    pendingBatchEvent.BusinessId, pendingBatchEvent.Expiration),
-                cancellationToken);
+            await PublishBatchRegisteredEventSafely(pendingBatchEvent, product.Name, cancellationToken);
 
         await PublishStockLevelChangedEvent(item, cancellationToken);
 
@@ -460,15 +461,41 @@ public class InventoryCommandService(
             return Result<Batch>.Failure(ProductError.InvalidExpirationDate,
                 localizer[nameof(ProductError.InvalidExpirationDate)]);
 
+        if (await HasUnsafeExpirationOverwriteAsync(command.ProductId, command.Expiration, cancellationToken))
+            return Result<Batch>.Failure(ProductError.BatchExpirationConflict,
+                localizer[nameof(ProductError.BatchExpirationConflict)]);
+
         var batch = await UpsertBatchWithoutCommitOrPublish(command.ProductId, command.BusinessId, command.Expiration,
             command.PurchasePrice, command.InventoryId, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
 
-        await mediator.PublishAsync(
-            new BatchRegisteredEvent(batch.Id, batch.ProductId, product.Name, batch.BusinessId, batch.Expiration),
-            cancellationToken);
+        await PublishBatchRegisteredEventSafely(batch, product.Name, cancellationToken);
 
         return Result<Batch>.Success(batch);
+    }
+
+    /// <summary>
+    ///     Cheap guardrail for X5 #2/#9: Batch has no real lot tracking yet
+    ///     (UpsertBatchWithoutCommitOrPublish below overwrites the active
+    ///     batch's Expiration in place), so silently accepting a later
+    ///     expiration date while the earlier-expiring stock is still on the
+    ///     shelf would hide that near-term stock from every expiration
+    ///     alert/report until it's already gone bad. Only blocks the
+    ///     specific unsafe case — an earlier or equal new expiration, or a
+    ///     batch with no stock left, is still allowed through unchanged.
+    /// </summary>
+    private async Task<bool> HasUnsafeExpirationOverwriteAsync(int productId, DateOnly? newExpiration,
+        CancellationToken cancellationToken)
+    {
+        if (!newExpiration.HasValue) return false;
+
+        var existingBatch = await batchRepository.FindActiveByProductIdAsync(productId, cancellationToken);
+        if (existingBatch?.Expiration == null) return false;
+        if (newExpiration.Value <= existingBatch.Expiration.Value) return false;
+        if (existingBatch.InventoryId == null) return false;
+
+        var inventoryItem = await inventoryItemRepository.FindByIdAsync(existingBatch.InventoryId.Value, cancellationToken);
+        return inventoryItem is { StockUnit: > 0 };
     }
 
     /// <summary>
@@ -521,12 +548,49 @@ public class InventoryCommandService(
         return Result<Batch>.Success(batch);
     }
 
+    /// <summary>
+    ///     Always called after the InventoryItem change it reports on has
+    ///     already committed — so a failure here (e.g. an alert handler
+    ///     throwing) is caught and logged rather than propagated, instead of
+    ///     turning an already-successful stock change into an HTTP failure
+    ///     the caller reasonably reads as "nothing was saved" (X5 #8).
+    /// </summary>
     private async Task PublishStockLevelChangedEvent(InventoryItem item, CancellationToken cancellationToken)
     {
-        var product = await productRepository.FindByIdAsync(item.ProductId, cancellationToken);
-        await mediator.PublishAsync(
-            new StockLevelChangedEvent(item.ProductId, product?.Name ?? string.Empty, item.WarehouseId, item.BusinessId,
-                item.StockUnit, item.MinimumStock),
-            cancellationToken);
+        try
+        {
+            var product = await productRepository.FindByIdAsync(item.ProductId, cancellationToken);
+            await mediator.PublishAsync(
+                new StockLevelChangedEvent(item.ProductId, product?.Name ?? string.Empty, item.WarehouseId, item.BusinessId,
+                    item.StockUnit, item.MinimumStock),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception,
+                "StockLevelChangedEvent handling failed for product {ProductId} in warehouse {WarehouseId}, business {BusinessId} — the stock change itself already committed",
+                item.ProductId, item.WarehouseId, item.BusinessId);
+        }
+    }
+
+    /// <summary>
+    ///     Always called after the batch change it reports on has already
+    ///     committed — same rationale as PublishStockLevelChangedEvent above
+    ///     (X5 #8).
+    /// </summary>
+    private async Task PublishBatchRegisteredEventSafely(Batch batch, string productName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await mediator.PublishAsync(
+                new BatchRegisteredEvent(batch.Id, batch.ProductId, productName, batch.BusinessId, batch.Expiration),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception,
+                "BatchRegisteredEvent handling failed for batch {BatchId} (product {ProductId}, business {BusinessId}) — the batch itself already committed",
+                batch.Id, batch.ProductId, batch.BusinessId);
+        }
     }
 }
