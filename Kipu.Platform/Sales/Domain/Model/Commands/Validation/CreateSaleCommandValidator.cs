@@ -4,15 +4,17 @@ using Kipu.Platform.Sales.Domain.Model.Aggregates;
 namespace Kipu.Platform.Sales.Domain.Model.Commands.Validation;
 
 /// <summary>
-///     Guards the money and quantity fields of a sale.
+///     Guards the quantity and other fields of a sale.
 ///
 ///     Without this, the only check a line ever faced was "is there enough
-///     stock", which a negative quantity trivially passes. Since Subtotal is
-///     Quantity × UnitPrice, a negative quantity or a negative price would
-///     otherwise produce a negative sale total that is then counted as
-///     revenue in the dashboard. Discount is no longer part of this input
-///     contract at all (see SaleLineCommand) — the UI never offered it, so
-///     the only real fix was to remove the lever, not cap it.
+///     stock", which a negative quantity trivially passes — and since
+///     Subtotal is Quantity × the product's own BasePrice, a negative
+///     quantity would otherwise produce a negative sale total that is then
+///     counted as revenue in the dashboard. Discount and UnitPrice are no
+///     longer part of this input contract at all (see SaleLineCommand) — the
+///     UI never offered discount, and UnitPrice was always silently ignored
+///     in favor of the server's own BasePrice, so the only real fix for
+///     either was to remove the lever, not cap it.
 /// </summary>
 public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
 {
@@ -36,7 +38,6 @@ public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
         RuleForEach(command => command.Lines).ChildRules(line =>
         {
             line.RuleFor(l => l.Quantity).GreaterThan(0).LessThanOrEqualTo(MaxQuantityPerLine);
-            line.RuleFor(l => l.UnitPrice).GreaterThanOrEqualTo(0);
         });
 
         RuleFor(command => command.PaymentMethod).Must(method => AllowedPaymentMethods.Contains(method));

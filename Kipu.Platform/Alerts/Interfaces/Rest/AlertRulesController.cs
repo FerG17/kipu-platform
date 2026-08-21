@@ -53,12 +53,4 @@ public class AlertRulesController(
         return AlertsActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             rule => Ok(AlertRuleResourceFromEntityAssembler.ToResourceFromEntity(rule)));
     }
-
-    [HttpPatch]
-    [Authorize(RoleNames.Admin)]
-    [SwaggerOperation(Summary = "Update an alert rule (alias for POST — same upsert semantics)", OperationId = "UpdateAlertRule")]
-    public Task<IActionResult> UpdateAlertRule([FromBody] CreateOrUpdateAlertRuleResource resource, CancellationToken cancellationToken)
-    {
-        return CreateOrUpdateAlertRule(resource, cancellationToken);
-    }
 }

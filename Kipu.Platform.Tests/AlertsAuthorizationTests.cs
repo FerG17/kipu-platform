@@ -56,20 +56,6 @@ public class AlertsAuthorizationTests(KipuApiFactory factory) : IntegrationTestB
     }
 
     [Fact]
-    public async Task ConfiguringAnAlertRule_ViaPatch_AsCashier_IsForbidden()
-    {
-        var cashier = await InviteAndSignInAsync(await CreateBusinessAsync(), CashierRoleId);
-
-        var request = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/alert-rules")
-        {
-            Content = JsonContent.Create(new { alertType = "LOW_STOCK", thresholdValue = 0, enabled = false })
-        };
-        var response = await cashier.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
     public async Task ConfiguringAnAlertRule_AsWarehouse_IsForbidden()
     {
         var admin = await CreateBusinessAsync();

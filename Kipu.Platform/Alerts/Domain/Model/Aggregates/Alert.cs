@@ -100,16 +100,4 @@ public class Alert(
         ResolvedAt = DateTimeOffset.UtcNow;
         return this;
     }
-
-    /// <summary>
-    ///     Data model only — push/email dispatch itself is out of scope for
-    ///     this version (§8.7). Left here so a future notifier has
-    ///     somewhere to record that it fired.
-    /// </summary>
-    public Alert MarkNotified()
-    {
-        Notified = true;
-        NotifiedAt = DateTimeOffset.UtcNow;
-        return this;
-    }
 }
