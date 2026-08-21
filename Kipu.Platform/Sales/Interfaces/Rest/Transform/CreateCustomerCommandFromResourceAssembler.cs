@@ -7,7 +7,7 @@ public static class CreateCustomerCommandFromResourceAssembler
 {
     public static CreateCustomerCommand ToCommandFromResource(CreateCustomerResource resource, int businessId)
     {
-        return new CreateCustomerCommand(businessId, resource.FullName, resource.DocumentNumber, resource.PhoneNumber,
-            resource.Email);
+        return new CreateCustomerCommand(businessId, resource.FullName, resource.DocumentNumber ?? string.Empty,
+            resource.PhoneNumber ?? string.Empty, resource.Email ?? string.Empty);
     }
 }

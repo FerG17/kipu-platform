@@ -438,6 +438,7 @@ builder.Services.AddScoped<IAlertRuleRepository, AlertRuleRepository>();
 
 builder.Services.AddScoped<IAlertCommandService, AlertCommandService>();
 builder.Services.AddScoped<IAlertRuleCommandService, AlertRuleCommandService>();
+builder.Services.AddScoped<IExpirationAlertSweepService, ExpirationAlertSweepService>();
 builder.Services.AddScoped<IAlertQueryService, AlertQueryService>();
 builder.Services.AddScoped<IAlertRuleQueryService, AlertRuleQueryService>();
 
