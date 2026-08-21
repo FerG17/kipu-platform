@@ -45,7 +45,8 @@ public class StockMovement(
     string type,
     string supplier,
     string note,
-    int? supplierId = null)
+    int? supplierId = null,
+    Batch? batch = null)
 {
     public StockMovement() : this(0, 0, 0, 0, StockMovementType.Intake, string.Empty, string.Empty)
     {
@@ -79,4 +80,15 @@ public class StockMovement(
 
     public string Note { get; private set; } = note;
     public DateTimeOffset RegisteredAt { get; private set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    ///     Which lot this movement touched (X5 Bloque C) — null for movements
+    ///     that predate per-lot tracking, and for adjustments, which correct
+    ///     the aggregate rather than a specific batch. Set through the
+    ///     navigation, same EF Core key-fixup reason as Batch.InventoryItem:
+    ///     an intake creates the StockMovement and its new Batch in the same
+    ///     SaveChanges call, so the batch's real id isn't known yet when this
+    ///     object is constructed.
+    /// </summary>
+    public Batch? Batch { get; private set; } = batch;
 }

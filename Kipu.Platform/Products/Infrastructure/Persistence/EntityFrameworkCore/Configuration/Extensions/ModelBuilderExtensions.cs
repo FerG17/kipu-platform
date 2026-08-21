@@ -82,11 +82,21 @@ public static class ModelBuilderExtensions
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Business>().WithMany().HasForeignKey(batch => batch.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
-            // InventoryId intentionally has no FK constraint: it's set before
-            // an InventoryItem may exist yet (product registration can create
-            // a batch before any stock intake happens), so it's an
-            // application-level reference only, same treatment as
-            // Business.UserId in IAM.
+
+            // X5 Bloque C: a real FK via the InventoryItem navigation (not a
+            // plain `int` copied by hand) — every batch is now always
+            // created together with a real InventoryItem in the same
+            // SaveChanges call, so EF Core's own key fixup resolves the id
+            // correctly even before the InventoryItem is persisted. This
+            // also fixes the InventoryId=0 bug (X5 #9) that the old
+            // hand-copied `int?` had. The shadow column is named
+            // InventoryItemId (not InventoryId) to avoid colliding with the
+            // entity's read-only InventoryId convenience property, which is
+            // unmapped below.
+            entity.Ignore(batch => batch.InventoryId);
+            entity.HasOne(batch => batch.InventoryItem).WithMany()
+                .HasForeignKey("InventoryItemId").IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<StockMovement>(entity =>
@@ -103,6 +113,15 @@ public static class ModelBuilderExtensions
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Business>().WithMany().HasForeignKey(movement => movement.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // X5 Bloque C: which lot this movement touched, nullable (old
+            // rows, and Adjustment movements, have none). Same "assign via
+            // navigation, not a hand-copied int" reasoning as Batch.InventoryItem
+            // above — an intake's StockMovement and its new Batch commit in
+            // the same SaveChanges call.
+            entity.HasOne(movement => movement.Batch).WithMany()
+                .HasForeignKey("BatchId").IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<ProductSupplier>(entity =>

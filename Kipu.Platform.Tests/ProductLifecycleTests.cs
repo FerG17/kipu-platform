@@ -37,13 +37,14 @@ public class ProductLifecycleTests(KipuApiFactory factory) : IntegrationTestBase
     }
 
     /// <summary>
-    ///     Batch.UpdateDetails used to overwrite Expiration unconditionally
-    ///     while InventoryId already used `?? existing` to stay put when null
-    ///     — an asymmetry found in the 2026-08-18 audit. In practice: a second
-    ///     stock intake for the same product that only sets a purchase price
-    ///     (the normal shape of receiving a purchase order, which doesn't
-    ///     re-send the expiration) silently wiped the date the first intake
-    ///     had already recorded.
+    ///     Originally caught a real bug where a second stock intake that only
+    ///     set a purchase price (the normal shape of receiving a purchase
+    ///     order, which doesn't re-send the expiration) silently wiped the
+    ///     date the first intake had already recorded — Batch used to be
+    ///     overwritten in place. X5 Bloque C removed that overwrite entirely
+    ///     (each intake opens its own lot instead), so this now holds simply
+    ///     because a batch's Expiration never changes after creation — kept
+    ///     as regression coverage for that.
     /// </summary>
     [Fact]
     public async Task StockIntake_WithOnlyAPurchasePrice_DoesNotClearAnAlreadyRecordedExpiration()

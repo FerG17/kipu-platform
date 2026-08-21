@@ -68,7 +68,6 @@ public static class ProductActionResultAssembler
             ProductError.InvalidAdjustmentReason => StatusCodes.Status400BadRequest,
             ProductError.InvalidStockIntakeData => StatusCodes.Status400BadRequest,
             ProductError.WarehouseInactive => StatusCodes.Status409Conflict,
-            ProductError.BatchExpirationConflict => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

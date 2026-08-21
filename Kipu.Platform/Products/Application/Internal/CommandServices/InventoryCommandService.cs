@@ -29,7 +29,6 @@ public class InventoryCommandService(
     IWarehouseRepository warehouseRepository,
     IUnitOfWork unitOfWork,
     IMediator mediator,
-    IValidator<CreateOrUpdateBatchCommand> createOrUpdateBatchValidator,
     IValidator<RegisterStockIntakeCommand> registerStockIntakeValidator,
     IValidator<AdjustStockCommand> adjustStockValidator,
     IStringLocalizer<ProductMessages> localizer,
@@ -83,10 +82,6 @@ public class InventoryCommandService(
         if (command.PurchasePrice.HasValue && command.PurchasePrice.Value < 0)
             return Result<InventoryItem>.Failure(ProductError.InvalidPurchasePrice,
                 localizer[nameof(ProductError.InvalidPurchasePrice)]);
-
-        if (await HasUnsafeExpirationOverwriteAsync(command.ProductId, command.Expiration, cancellationToken))
-            return Result<InventoryItem>.Failure(ProductError.BatchExpirationConflict,
-                localizer[nameof(ProductError.BatchExpirationConflict)]);
 
         // Both reads go through the tenant-scoped repositories (AppDbContext's
         // BusinessId query filter), so a ProductId/WarehouseId belonging to
@@ -151,27 +146,31 @@ public class InventoryCommandService(
             await inventoryItemRepository.AddAsync(item, cancellationToken);
         }
 
+        // X5 Bloque C: every intake that carries an expiration/cost opens a
+        // NEW lot instead of overwriting whatever batch the product already
+        // had — a product can now have several active lots at once (e.g. an
+        // early restock that expires later than stock already on the
+        // shelf). Linked via the InventoryItem navigation, not `item.Id`
+        // copied by hand — item may not be persisted yet when item is a
+        // brand-new InventoryItem, and EF Core's key fixup only resolves the
+        // real id through a tracked navigation (X5 #9's InventoryId=0 bug).
+        // Queued on the tracker only (no commit yet) so it lands in the SAME
+        // SaveChanges call as the InventoryItem/StockMovement below.
+        Batch? newBatch = null;
+        if (command.Quantity > 0 && (command.Expiration.HasValue || command.PurchasePrice.HasValue))
+        {
+            newBatch = new Batch(command.ProductId, command.BusinessId, command.Expiration, command.PurchasePrice ?? 0m,
+                command.Quantity).LinkToInventoryItem(item);
+            await batchRepository.AddAsync(newBatch, cancellationToken);
+        }
+
         if (command.Quantity > 0)
         {
             await stockMovementRepository.AddAsync(
                 new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, command.Quantity,
                     StockMovementType.Intake, command.Supplier ?? string.Empty, command.Note ?? string.Empty,
-                    command.SupplierId),
+                    command.SupplierId, newBatch),
                 cancellationToken);
-        }
-
-        // Batch data the caller supplied used to be accepted and then thrown
-        // away: this handler never touched batchRepository, so registering
-        // goods through the natural "stock intake" path left no batch, no
-        // traceability, and no expiration alert could ever fire for them —
-        // breaking the core "every product has an expiration date" rule.
-        // Queued on the tracker only (no commit yet) so it lands in the SAME
-        // SaveChanges call as the InventoryItem/StockMovement above.
-        Batch? pendingBatchEvent = null;
-        if (command.Expiration.HasValue || command.PurchasePrice.HasValue)
-        {
-            pendingBatchEvent = await UpsertBatchWithoutCommitOrPublish(command.ProductId, command.BusinessId,
-                command.Expiration, command.PurchasePrice, item.Id, cancellationToken);
         }
 
         try
@@ -201,8 +200,8 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.InvalidQuantity, localizer[nameof(ProductError.InvalidQuantity)]);
         }
 
-        if (pendingBatchEvent != null)
-            await PublishBatchRegisteredEventSafely(pendingBatchEvent, product.Name, cancellationToken);
+        if (newBatch != null)
+            await PublishBatchRegisteredEventSafely(newBatch, product.Name, cancellationToken);
 
         await PublishStockLevelChangedEvent(item, cancellationToken);
 
@@ -224,7 +223,14 @@ public class InventoryCommandService(
     ///     covers the sale (IProductContextFacade.GetAvailableStock) before
     ///     calling this; only decrementing a single item here would silently
     ///     under-deduct whenever no single warehouse alone holds the full
-    ///     quantity. Records one StockMovement per warehouse actually touched.
+    ///     quantity.
+    ///
+    ///     X5 Bloque C: within each InventoryItem touched, also draws down
+    ///     its active batches earliest-expiration-first (FEFO), recording one
+    ///     StockMovement per lot actually touched — plus one more, with no
+    ///     BatchId, for any portion not covered by a tracked lot (stock that
+    ///     predates per-lot tracking). A product with no batches at all keeps
+    ///     behaving exactly as before this block existed.
     /// </summary>
     public async Task<Result<InventoryItem>> Handle(RegisterStockSaleCommand command, CancellationToken cancellationToken)
     {
@@ -249,13 +255,33 @@ public class InventoryCommandService(
             item.RemoveStock(deducted);
             inventoryItemRepository.Update(item);
             touchedItems.Add(item);
-
-            await stockMovementRepository.AddAsync(
-                new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, deducted,
-                    StockMovementType.Sale, string.Empty, string.Empty),
-                cancellationToken);
-
             remaining -= deducted;
+
+            var batchRemaining = deducted;
+            var activeBatches = await batchRepository.FindActiveByInventoryItemIdAsync(item.Id, cancellationToken);
+            foreach (var batch in activeBatches)
+            {
+                if (batchRemaining <= 0) break;
+                if (batch.RemainingQuantity <= 0) continue;
+
+                var deductedFromBatch = Math.Min(batchRemaining, batch.RemainingQuantity);
+                batch.Reduce(deductedFromBatch);
+                batchRepository.Update(batch);
+                batchRemaining -= deductedFromBatch;
+
+                await stockMovementRepository.AddAsync(
+                    new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, deductedFromBatch,
+                        StockMovementType.Sale, string.Empty, string.Empty, batch: batch),
+                    cancellationToken);
+            }
+
+            if (batchRemaining > 0)
+            {
+                await stockMovementRepository.AddAsync(
+                    new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, batchRemaining,
+                        StockMovementType.Sale, string.Empty, string.Empty),
+                    cancellationToken);
+            }
         }
 
         await unitOfWork.CompleteAsync(cancellationToken);
@@ -278,6 +304,13 @@ public class InventoryCommandService(
     ///     shift, because a Sale does not record which warehouses it took
     ///     from; making that exact would mean storing the split on the sale
     ///     itself, which is not worth the schema for this shop.
+    ///
+    ///     X5 Bloque C: restores into the batch closest to expiring first,
+    ///     same approximation as the warehouse split above and for the same
+    ///     reason — RestoreStock only carries ProductId + Quantity, not which
+    ///     lot the original sale line actually drew from (Sales doesn't
+    ///     track that), so this can't trace back to the exact batch. A batch
+    ///     already at full Quantity, or discarded, is skipped.
     /// </summary>
     public async Task<Result<InventoryItem>> Handle(RegisterStockReturnCommand command, CancellationToken cancellationToken)
     {
@@ -295,10 +328,33 @@ public class InventoryCommandService(
         item.AddStock(command.Quantity);
         inventoryItemRepository.Update(item);
 
-        await stockMovementRepository.AddAsync(
-            new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, command.Quantity,
-                StockMovementType.Return, string.Empty, "Venta cancelada"),
-            cancellationToken);
+        var remaining = command.Quantity;
+        var activeBatches = await batchRepository.FindActiveByInventoryItemIdAsync(item.Id, cancellationToken);
+        foreach (var batch in activeBatches)
+        {
+            if (remaining <= 0) break;
+
+            var capacity = batch.Quantity - batch.RemainingQuantity;
+            if (capacity <= 0) continue;
+
+            var restored = Math.Min(remaining, capacity);
+            batch.Restore(restored);
+            batchRepository.Update(batch);
+            remaining -= restored;
+
+            await stockMovementRepository.AddAsync(
+                new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, restored,
+                    StockMovementType.Return, string.Empty, "Venta cancelada", batch: batch),
+                cancellationToken);
+        }
+
+        if (remaining > 0)
+        {
+            await stockMovementRepository.AddAsync(
+                new StockMovement(command.ProductId, command.BusinessId, item.WarehouseId, remaining,
+                    StockMovementType.Return, string.Empty, "Venta cancelada"),
+                cancellationToken);
+        }
 
         await unitOfWork.CompleteAsync(cancellationToken);
 
@@ -434,92 +490,6 @@ public class InventoryCommandService(
         await PublishStockLevelChangedEvent(item, cancellationToken);
 
         return Result<InventoryItem>.Success(item);
-    }
-
-    /// <summary>
-    ///     The product form only captures one expiration date per product (no
-    ///     batch selector UI), so if the product already has an ACTIVE batch,
-    ///     it's updated in place instead of piling up batches — otherwise
-    ///     re-editing a product would keep creating new batches and the
-    ///     "nearest expiration" calculation would keep surfacing the oldest
-    ///     one instead of what the user just entered.
-    /// </summary>
-    public async Task<Result<Batch>> Handle(CreateOrUpdateBatchCommand command, CancellationToken cancellationToken)
-    {
-        if (!(await createOrUpdateBatchValidator.ValidateAsync(command, cancellationToken)).IsValid)
-            return Result<Batch>.Failure(ProductError.InvalidPurchasePrice, localizer[nameof(ProductError.InvalidPurchasePrice)]);
-
-        // Tenant-scoped read (AppDbContext's BusinessId query filter), so a
-        // ProductId belonging to another business resolves to null here —
-        // without this check, a batch tagged with command.BusinessId could
-        // otherwise get created pointing at a product it doesn't own.
-        var product = await productRepository.FindByIdAsync(command.ProductId, cancellationToken);
-        if (product == null)
-            return Result<Batch>.Failure(ProductError.ProductNotFound, localizer[nameof(ProductError.ProductNotFound)]);
-
-        if (command.Expiration.HasValue && command.Expiration.Value < businessClock.Today)
-            return Result<Batch>.Failure(ProductError.InvalidExpirationDate,
-                localizer[nameof(ProductError.InvalidExpirationDate)]);
-
-        if (await HasUnsafeExpirationOverwriteAsync(command.ProductId, command.Expiration, cancellationToken))
-            return Result<Batch>.Failure(ProductError.BatchExpirationConflict,
-                localizer[nameof(ProductError.BatchExpirationConflict)]);
-
-        var batch = await UpsertBatchWithoutCommitOrPublish(command.ProductId, command.BusinessId, command.Expiration,
-            command.PurchasePrice, command.InventoryId, cancellationToken);
-        await unitOfWork.CompleteAsync(cancellationToken);
-
-        await PublishBatchRegisteredEventSafely(batch, product.Name, cancellationToken);
-
-        return Result<Batch>.Success(batch);
-    }
-
-    /// <summary>
-    ///     Cheap guardrail for X5 #2/#9: Batch has no real lot tracking yet
-    ///     (UpsertBatchWithoutCommitOrPublish below overwrites the active
-    ///     batch's Expiration in place), so silently accepting a later
-    ///     expiration date while the earlier-expiring stock is still on the
-    ///     shelf would hide that near-term stock from every expiration
-    ///     alert/report until it's already gone bad. Only blocks the
-    ///     specific unsafe case — an earlier or equal new expiration, or a
-    ///     batch with no stock left, is still allowed through unchanged.
-    /// </summary>
-    private async Task<bool> HasUnsafeExpirationOverwriteAsync(int productId, DateOnly? newExpiration,
-        CancellationToken cancellationToken)
-    {
-        if (!newExpiration.HasValue) return false;
-
-        var existingBatch = await batchRepository.FindActiveByProductIdAsync(productId, cancellationToken);
-        if (existingBatch?.Expiration == null) return false;
-        if (newExpiration.Value <= existingBatch.Expiration.Value) return false;
-        if (existingBatch.InventoryId == null) return false;
-
-        var inventoryItem = await inventoryItemRepository.FindByIdAsync(existingBatch.InventoryId.Value, cancellationToken);
-        return inventoryItem is { StockUnit: > 0 };
-    }
-
-    /// <summary>
-    ///     Shared upsert-in-place logic behind Handle(CreateOrUpdateBatchCommand)
-    ///     and the batch step of Handle(RegisterStockIntakeCommand) — queues the
-    ///     change on the change tracker only; the caller is responsible for
-    ///     committing and publishing BatchRegisteredEvent (X4 A9: the stock-intake
-    ///     caller defers both until its own transaction commits).
-    /// </summary>
-    private async Task<Batch> UpsertBatchWithoutCommitOrPublish(int productId, int businessId, DateOnly? expiration,
-        decimal? purchasePrice, int? inventoryId, CancellationToken cancellationToken)
-    {
-        var existingBatch = await batchRepository.FindActiveByProductIdAsync(productId, cancellationToken);
-
-        if (existingBatch != null)
-        {
-            existingBatch.UpdateDetails(expiration, purchasePrice, inventoryId);
-            batchRepository.Update(existingBatch);
-            return existingBatch;
-        }
-
-        var newBatch = new Batch(productId, businessId, expiration, purchasePrice ?? 0m, inventoryId);
-        await batchRepository.AddAsync(newBatch, cancellationToken);
-        return newBatch;
     }
 
     /// <summary>

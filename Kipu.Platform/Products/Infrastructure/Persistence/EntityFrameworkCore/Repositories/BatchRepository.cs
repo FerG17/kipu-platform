@@ -13,10 +13,15 @@ public class BatchRepository(AppDbContext context) : BaseRepository<Batch>(conte
         return await Context.Set<Batch>().Where(batch => batch.ProductId == productId).ToListAsync(cancellationToken);
     }
 
-    public async Task<Batch?> FindActiveByProductIdAsync(int productId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Batch>> FindActiveByInventoryItemIdAsync(int inventoryItemId, CancellationToken cancellationToken = default)
     {
         return await Context.Set<Batch>()
-            .FirstOrDefaultAsync(batch => batch.ProductId == productId && batch.Status == BatchStatus.Active, cancellationToken);
+            .Where(batch => EF.Property<int>(batch, "InventoryItemId") == inventoryItemId && batch.Status == BatchStatus.Active)
+            // Nulls last: a batch with no expiration carries no urgency, so
+            // FEFO should exhaust every dated lot before touching it.
+            .OrderBy(batch => batch.Expiration == null)
+            .ThenBy(batch => batch.Expiration)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<Batch>> FindAllByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default)

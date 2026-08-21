@@ -9,19 +9,23 @@ public static class BatchStatus
 }
 
 /// <summary>
-///     Tracks a product's expiration date and purchase price. The frontend's
-///     product form only captures one expiration date per product (no batch
-///     selector UI), so there's at most one ACTIVE batch per product at a
-///     time — re-editing updates it in place instead of piling up batches.
+///     Tracks one physical lot of a product: the quantity received, how much
+///     of it is still on the shelf, its expiration date, and its purchase
+///     price. A product can have several ACTIVE batches at once (X5 Bloque
+///     C) — e.g. 10 units expiring in a week plus 50 units from an early
+///     restock expiring in 4 months — so a batch is never rewritten in place
+///     once created; each stock intake that carries an expiration/cost opens
+///     a new one instead. Sales draw down RemainingQuantity across a
+///     product's active batches earliest-expiration-first (FEFO).
 ///
 ///     BusinessId is a deliberate addition over the original mock schema
 ///     (which had none, forcing the frontend to scope batches by joining
 ///     against the already-loaded, business-scoped products list) — a real
 ///     backend can and should scope directly.
 /// </summary>
-public class Batch(int productId, int businessId, DateOnly? expiration, decimal purchasePrice, int? inventoryId)
+public class Batch(int productId, int businessId, DateOnly? expiration, decimal purchasePrice, int quantity)
 {
-    public Batch() : this(0, 0, null, 0, null)
+    public Batch() : this(0, 0, null, 0, 0)
     {
     }
 
@@ -31,7 +35,32 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     public DateOnly? Expiration { get; private set; } = expiration;
     public decimal PurchasePrice { get; private set; } = purchasePrice;
     public string Status { get; private set; } = BatchStatus.Active;
-    public int? InventoryId { get; private set; } = inventoryId;
+
+    /// <summary>Units originally received into this lot — fixed at creation, never changes.</summary>
+    public int Quantity { get; private set; } = quantity;
+
+    /// <summary>Units of this lot still on the shelf — decremented by FEFO sales, restored by returns into this same lot.</summary>
+    public int RemainingQuantity { get; private set; } = quantity;
+
+    /// <summary>
+    ///     Real EF Core relationship (see ModelBuilderExtensions), not a
+    ///     plain `int` copied by hand — a batch is always created together
+    ///     with (or against an already-existing) InventoryItem in the same
+    ///     SaveChanges call, so assigning through the navigation lets EF
+    ///     Core's own key fixup resolve the real id even when the
+    ///     InventoryItem hasn't been persisted yet. Copying `item.Id`
+    ///     directly used to read 0 in that case (X5 #9's InventoryId=0 bug).
+    /// </summary>
+    public InventoryItem? InventoryItem { get; private set; }
+
+    /// <summary>Read-only convenience for callers that only need the id (e.g. the API resource) — always sourced from the navigation, so it can never drift out of sync with it.</summary>
+    public int? InventoryId => InventoryItem?.Id;
+
+    public Batch LinkToInventoryItem(InventoryItem inventoryItem)
+    {
+        InventoryItem = inventoryItem;
+        return this;
+    }
 
     /// <summary>Days until expiration; negative when already expired. Null when no expiration date is set.</summary>
     public int? DaysToExpiry(DateOnly today)
@@ -55,19 +84,23 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
         return ExpirationRules.IsExpiringSoon(Expiration, today, thresholdDays);
     }
 
-    /// <summary>
-    ///     purchasePrice is nullable and preserved when omitted, symmetric
-    ///     with Expiration/InventoryId — it used to be a plain `decimal`
-    ///     assigned unconditionally, so registering a stock intake that only
-    ///     set an expiration date (no price) silently zeroed out whatever
-    ///     cost the batch already had (X4 A7, same class of bug as X3's C4 on
-    ///     Expiration in this same method).
-    /// </summary>
-    public Batch UpdateDetails(DateOnly? expiration, decimal? purchasePrice, int? inventoryId)
+    public bool HasStock => Status == BatchStatus.Active && RemainingQuantity > 0;
+
+    /// <summary>FEFO sale deduction — `checked` for the same reason InventoryItem.AddStock is: a caller bug should throw loudly instead of wrapping RemainingQuantity negative and silently under-reporting this lot's stock.</summary>
+    public Batch Reduce(int units)
     {
-        Expiration = expiration ?? Expiration;
-        PurchasePrice = purchasePrice ?? PurchasePrice;
-        InventoryId = inventoryId ?? InventoryId;
+        checked
+        {
+            RemainingQuantity -= units;
+        }
+
+        return this;
+    }
+
+    /// <summary>Returns units to this specific lot (a cancelled sale that drew from it) — capped at Quantity, since a lot can never hold more than it originally received.</summary>
+    public Batch Restore(int units)
+    {
+        RemainingQuantity = Math.Min(Quantity, RemainingQuantity + units);
         return this;
     }
 

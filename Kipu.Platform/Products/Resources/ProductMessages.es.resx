@@ -74,9 +74,6 @@
   <data name="InvalidPurchasePrice" xml:space="preserve">
     <value>El precio de compra no puede ser negativo.</value>
   </data>
-  <data name="BatchExpirationConflict" xml:space="preserve">
-    <value>Este producto todavía tiene stock que vence antes que la fecha que ingresaste. Descarta ese lote primero, o mantén la fecha de vencimiento más próxima, para no perder el rastro del stock que vence pronto.</value>
-  </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>Ocurrió un error de base de datos al completar la operación.</value>
   </data>

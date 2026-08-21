@@ -45,24 +45,6 @@ public class BatchesController(
         return Ok(batches.Select(batch => BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today, thresholdDays)));
     }
 
-    /// <summary>Creates a batch, or updates the product's existing ACTIVE batch in place — see CreateOrUpdateBatchCommand.</summary>
-    [HttpPost]
-    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
-    [SwaggerOperation(Summary = "Create or update a product's active batch", OperationId = "CreateOrUpdateBatch")]
-    public async Task<IActionResult> CreateOrUpdateBatch([FromBody] CreateOrUpdateBatchResource resource,
-        CancellationToken cancellationToken)
-    {
-        var businessId = currentUserAccessor.CurrentBusinessId;
-        if (businessId == null) return Unauthorized();
-
-        var command = CreateOrUpdateBatchCommandFromResourceAssembler.ToCommandFromResource(resource, businessId.Value);
-        var result = await inventoryCommandService.Handle(command, cancellationToken);
-        var thresholdDays = await alertsContextFacade.GetExpirationThresholdDays(businessId.Value, cancellationToken);
-
-        return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
-            batch => Ok(BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today, thresholdDays)));
-    }
-
     /// <summary>
     ///     Retires a batch whose goods left the shelf (thrown out, returned).
     ///     This is what stops an expired batch from alerting forever, and it
