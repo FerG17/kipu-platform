@@ -51,6 +51,14 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Bootstrap__Key", TestBootstrapKey);
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 
+        // SessionCookieTests/CsrfProtectionTests send Origin: http://localhost:5173
+        // to exercise the real trusted-origin check — previously only true
+        // because every dev machine's untracked appsettings.Development.json
+        // happens to list it too. Set explicitly so the suite doesn't
+        // silently depend on a file that isn't checked in (found when this
+        // ran in CI, which has no such file, for the first time).
+        Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", "http://localhost:5173");
+
         // The alerts sweep runs once on startup and then on this interval —
         // pushed far out so it can't fire mid-test and mutate alert state
         // underneath an assertion.
