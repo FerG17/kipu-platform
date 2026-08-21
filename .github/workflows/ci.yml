@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          # CI-only, ephemeral container — never the real dev/prod password.
+          MYSQL_ROOT_PASSWORD: ci_test_password
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -pci_test_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # KipuApiFactory reads this directly; it points the suite at the
+      # service container above on the same port compose.yaml uses locally.
+      BODEGA_DB_PASSWORD: ci_test_password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore kipu-platform.sln
+
+      - name: Build
+        run: dotnet build kipu-platform.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test kipu-platform.sln --no-build --configuration Release --verbosity normal
