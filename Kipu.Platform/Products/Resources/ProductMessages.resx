@@ -71,6 +71,9 @@
   <data name="BatchAlreadyDiscarded" xml:space="preserve">
     <value>This batch was already discarded.</value>
   </data>
+  <data name="BatchNotEditable" xml:space="preserve">
+    <value>A discarded batch's expiration cannot be edited.</value>
+  </data>
   <data name="InvalidPurchasePrice" xml:space="preserve">
     <value>Purchase price cannot be negative.</value>
   </data>

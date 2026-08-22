@@ -71,6 +71,9 @@
   <data name="BatchAlreadyDiscarded" xml:space="preserve">
     <value>Este lote ya fue dado de baja.</value>
   </data>
+  <data name="BatchNotEditable" xml:space="preserve">
+    <value>No se puede editar el vencimiento de un lote dado de baja.</value>
+  </data>
   <data name="InvalidPurchasePrice" xml:space="preserve">
     <value>El precio de compra no puede ser negativo.</value>
   </data>

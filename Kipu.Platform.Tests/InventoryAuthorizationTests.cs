@@ -52,6 +52,26 @@ public class InventoryAuthorizationTests(KipuApiFactory factory) : IntegrationTe
     }
 
     [Fact]
+    public async Task UpdatingABatchExpiration_AsCashier_IsForbidden()
+    {
+        var admin = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(admin);
+        var warehouseId = await GetDefaultWarehouseIdAsync(admin);
+        var expiration = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
+        (await RegisterStockIntakeAsync(admin, productId, warehouseId, quantity: 5, expiration: expiration))
+            .EnsureSuccessStatusCode();
+
+        var batches = await ReadJsonAsync(await admin.GetAsync($"/api/v1/batches?productId={productId}"));
+        var batchId = batches.EnumerateArray().First().GetProperty("id").GetInt32();
+
+        var cashier = await InviteAndSignInAsync(admin, CashierRoleId);
+        var response = await cashier.PatchAsJsonAsync($"/api/v1/batches/{batchId}/expiration",
+            new { expiration = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(60)) });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task UpdatingMinimumStock_AsCashier_IsForbidden()
     {
         var admin = await CreateBusinessAsync();

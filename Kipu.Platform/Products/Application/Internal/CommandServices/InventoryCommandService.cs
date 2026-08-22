@@ -519,6 +519,37 @@ public class InventoryCommandService(
     }
 
     /// <summary>
+    ///     Sets/corrects a batch's expiration after the fact — a purchase
+    ///     order's RECEIVED intake creates a batch with no expiration at all
+    ///     (a PO line carries a quantity and unit price, never an
+    ///     expiration; see PurchaseOrderCommandService.MarkReceived), so this
+    ///     is how the owner records it once the delivery is checked, or
+    ///     corrects a typo from a manual intake (X5 feedback #3). Batches are
+    ///     ranked by Expiration at query time for FEFO (see
+    ///     BatchRepository.FindActiveByInventoryItemIdAsync), so this alone
+    ///     is enough to move a lot earlier or later in the draw-down order —
+    ///     no separate re-ranking step needed.
+    /// </summary>
+    public async Task<Result<Batch>> Handle(UpdateBatchExpirationCommand command, CancellationToken cancellationToken)
+    {
+        var batch = await batchRepository.FindByIdAsync(command.BatchId, cancellationToken);
+        if (batch == null)
+            return Result<Batch>.Failure(ProductError.BatchNotFound, localizer[nameof(ProductError.BatchNotFound)]);
+
+        if (batch.Status == BatchStatus.Inactive)
+            return Result<Batch>.Failure(ProductError.BatchNotEditable, localizer[nameof(ProductError.BatchNotEditable)]);
+
+        if (command.Expiration.HasValue && command.Expiration.Value < businessClock.Today)
+            return Result<Batch>.Failure(ProductError.InvalidExpirationDate, localizer[nameof(ProductError.InvalidExpirationDate)]);
+
+        batch.UpdateExpiration(command.Expiration);
+        batchRepository.Update(batch);
+        await unitOfWork.CompleteAsync(cancellationToken);
+
+        return Result<Batch>.Success(batch);
+    }
+
+    /// <summary>
     ///     Always called after the InventoryItem change it reports on has
     ///     already committed — so a failure here (e.g. an alert handler
     ///     throwing) is caught and logged rather than propagated, instead of

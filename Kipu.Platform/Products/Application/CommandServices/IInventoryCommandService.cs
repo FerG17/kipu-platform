@@ -12,4 +12,5 @@ public interface IInventoryCommandService
     Task<Result<InventoryItem>> Handle(UpdateMinimumStockCommand command, CancellationToken cancellationToken);
     Task<Result<InventoryItem>> Handle(AdjustStockCommand command, CancellationToken cancellationToken);
     Task<Result<Batch>> Handle(DiscardBatchCommand command, CancellationToken cancellationToken);
+    Task<Result<Batch>> Handle(UpdateBatchExpirationCommand command, CancellationToken cancellationToken);
 }

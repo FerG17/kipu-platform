@@ -105,6 +105,22 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     }
 
     /// <summary>
+    ///     Corrects/sets this lot's expiration after the fact — a purchase
+    ///     order's RECEIVED intake creates a batch with no expiration at all
+    ///     (a PO line has no such field), so this is how the owner records
+    ///     it once the delivery is checked (X5 feedback #3). FEFO reads
+    ///     Expiration straight from the batch at query time (see
+    ///     BatchRepository.FindActiveByInventoryItemIdAsync's ORDER BY), so
+    ///     correcting it here is enough to change draw-down order on the
+    ///     next sale — no separate re-ranking step needed.
+    /// </summary>
+    public Batch UpdateExpiration(DateOnly? expiration)
+    {
+        Expiration = expiration;
+        return this;
+    }
+
+    /// <summary>
     ///     Retires the batch — the goods were thrown out, returned to the
     ///     supplier, or otherwise taken off the shelf.
     ///

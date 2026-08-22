@@ -56,6 +56,7 @@ public static class ProductActionResultAssembler
             ProductError.InvalidPurchasePrice => StatusCodes.Status400BadRequest,
             ProductError.BatchNotFound => StatusCodes.Status404NotFound,
             ProductError.BatchAlreadyDiscarded => StatusCodes.Status409Conflict,
+            ProductError.BatchNotEditable => StatusCodes.Status409Conflict,
             ProductError.ProductInactive => StatusCodes.Status409Conflict,
             ProductError.InvalidAdjustmentQuantity => StatusCodes.Status400BadRequest,
             ProductError.AdjustmentReasonRequired => StatusCodes.Status400BadRequest,

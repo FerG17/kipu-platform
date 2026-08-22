@@ -144,6 +144,119 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
         Assert.Equal(5, batch.GetProperty("remainingQuantity").GetInt32());
     }
 
+    /// <summary>
+    ///     X5 feedback #3: a purchase order's RECEIVED intake has no
+    ///     expiration field (see PurchaseOrderCommandService.MarkReceived),
+    ///     so the batch it creates starts with none — the owner sets it
+    ///     later via PATCH once the delivery is checked.
+    /// </summary>
+    [Fact]
+    public async Task ReceivingAPurchaseOrder_OpensABatchWithNoExpiration_EditableAfterTheFact()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var supplierId = await CreateSupplierAsync(client);
+
+        var order = await ReadJsonAsync(await CreatePurchaseOrderAsync(client, supplierId, productId, quantity: 20));
+        var orderId = order.GetProperty("id").GetInt32();
+        (await client.PatchAsJsonAsync($"/api/v1/purchases/{orderId}", new { status = "RECEIVED" }))
+            .EnsureSuccessStatusCode();
+
+        var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        Assert.Equal(1, batches.GetArrayLength());
+        var batch = batches[0];
+        Assert.Equal(JsonValueKind.Null, batch.GetProperty("expiration").ValueKind);
+        var batchId = batch.GetProperty("id").GetInt32();
+
+        var newExpiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(45);
+        var updateResponse = await client.PatchAsJsonAsync($"/api/v1/batches/{batchId}/expiration",
+            new { expiration = newExpiration });
+        updateResponse.EnsureSuccessStatusCode();
+        var updatedExpiration = DateOnly.Parse((await ReadJsonAsync(updateResponse)).GetProperty("expiration").GetString()!);
+        Assert.Equal(newExpiration, updatedExpiration);
+    }
+
+    /// <summary>
+    ///     X5 feedback #3's second half: once a replenishment-order batch's
+    ///     expiration is filled in, FEFO must pick it up immediately — no
+    ///     separate re-ranking step, since the sale-time query ranks by
+    ///     Expiration directly off the batch row.
+    /// </summary>
+    [Fact]
+    public async Task EditingABatchExpirationToBeEarlierThanAnotherLot_MakesItConsumedFirst()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+
+        var existingExpiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5, expiration: existingExpiration))
+            .EnsureSuccessStatusCode();
+
+        // Simulates a replenishment order received with no expiration yet.
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5, purchasePrice: 4m))
+            .EnsureSuccessStatusCode();
+
+        var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        var undated = FindBatchByExpiration(batches, null);
+        var undatedId = undated.GetProperty("id").GetInt32();
+
+        // Edited to expire sooner than the batch that already had a date —
+        // it must now be the one FEFO drains first.
+        var soonerExpiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5);
+        (await client.PatchAsJsonAsync($"/api/v1/batches/{undatedId}/expiration", new { expiration = soonerExpiration }))
+            .EnsureSuccessStatusCode();
+
+        (await CreateSaleAsync(client, SaleLine(productId, quantity: 3, unitPrice: 10m))).EnsureSuccessStatusCode();
+
+        batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        var editedBatch = FindBatchByExpiration(batches, soonerExpiration);
+        var untouchedBatch = FindBatchByExpiration(batches, existingExpiration);
+
+        Assert.Equal(2, editedBatch.GetProperty("remainingQuantity").GetInt32());
+        Assert.Equal(5, untouchedBatch.GetProperty("remainingQuantity").GetInt32());
+    }
+
+    [Fact]
+    public async Task EditingADiscardedBatchExpiration_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        var expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
+
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5, expiration: expiration))
+            .EnsureSuccessStatusCode();
+        var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        var batchId = batches[0].GetProperty("id").GetInt32();
+
+        (await client.PostAsync($"/api/v1/batches/{batchId}/discard", null)).EnsureSuccessStatusCode();
+
+        var response = await client.PatchAsJsonAsync($"/api/v1/batches/{batchId}/expiration",
+            new { expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(20) });
+
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task EditingABatchExpirationToAPastDate_IsRejected()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        var expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
+
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5, expiration: expiration))
+            .EnsureSuccessStatusCode();
+        var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        var batchId = batches[0].GetProperty("id").GetInt32();
+
+        var response = await client.PatchAsJsonAsync($"/api/v1/batches/{batchId}/expiration",
+            new { expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1) });
+
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     /// <summary>X5 #2: each lot keeps its own cost — a later intake with a different price no longer overwrites the earlier lot's.</summary>
     [Fact]
     public async Task TwoIntakesWithDifferentCosts_KeepIndependentPurchasePricesPerLot()

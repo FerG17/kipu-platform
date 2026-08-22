@@ -14,6 +14,9 @@ public enum ProductError
     BatchNotFound,
     BatchAlreadyDiscarded,
 
+    /// <summary>A discarded batch's expiration can no longer be edited — it's no longer on the shelf.</summary>
+    BatchNotEditable,
+
     /// <summary>The product is deactivated — it cannot receive a stock intake until it's reactivated.</summary>
     ProductInactive,
 
