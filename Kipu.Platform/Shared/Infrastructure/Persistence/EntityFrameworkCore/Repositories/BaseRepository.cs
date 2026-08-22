@@ -29,7 +29,7 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : 
     ///     re-applying global query filters (see AppDbContext's
     ///     BusinessId-scoped filters), which would be a tenant-isolation gap.
     /// </summary>
-    public async Task<TEntity?> FindByIdAsync(int id, CancellationToken cancellationToken = default)
+    public virtual async Task<TEntity?> FindByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await Context.Set<TEntity>()
             .FirstOrDefaultAsync(entity => EF.Property<int>(entity, "Id") == id, cancellationToken);

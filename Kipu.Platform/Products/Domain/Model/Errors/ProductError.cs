@@ -14,6 +14,9 @@ public enum ProductError
     BatchNotFound,
     BatchAlreadyDiscarded,
 
+    /// <summary>A discarded batch's expiration can no longer be edited — it's no longer on the shelf.</summary>
+    BatchNotEditable,
+
     /// <summary>The product is deactivated — it cannot receive a stock intake until it's reactivated.</summary>
     ProductInactive,
 
@@ -50,12 +53,5 @@ public enum ProductError
     /// <summary>Another request changed the same row first — a conflict the caller can retry (409), not a server fault (500).</summary>
     ConcurrentModification,
 
-    /// <summary>
-    ///     A stock intake/batch edit would silently push the active batch's
-    ///     expiration date later while it still has stock, hiding the
-    ///     nearer-term expiration that stock is tracked against. Cheap
-    ///     mitigation for X5 #2/#9 (no per-lot tracking yet) — see Batch.cs.
-    /// </summary>
-    BatchExpirationConflict,
     DatabaseError
 }

@@ -71,11 +71,11 @@
   <data name="BatchAlreadyDiscarded" xml:space="preserve">
     <value>This batch was already discarded.</value>
   </data>
+  <data name="BatchNotEditable" xml:space="preserve">
+    <value>A discarded batch's expiration cannot be edited.</value>
+  </data>
   <data name="InvalidPurchasePrice" xml:space="preserve">
     <value>Purchase price cannot be negative.</value>
-  </data>
-  <data name="BatchExpirationConflict" xml:space="preserve">
-    <value>This product still has stock expiring sooner than the date you entered. Discard that batch first, or keep the earlier expiration date, so the near-term stock isn't lost from tracking.</value>
   </data>
   <data name="DatabaseError" xml:space="preserve">
     <value>A database error occurred while completing the operation.</value>

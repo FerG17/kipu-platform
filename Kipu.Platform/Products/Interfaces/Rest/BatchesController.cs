@@ -45,24 +45,6 @@ public class BatchesController(
         return Ok(batches.Select(batch => BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today, thresholdDays)));
     }
 
-    /// <summary>Creates a batch, or updates the product's existing ACTIVE batch in place — see CreateOrUpdateBatchCommand.</summary>
-    [HttpPost]
-    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
-    [SwaggerOperation(Summary = "Create or update a product's active batch", OperationId = "CreateOrUpdateBatch")]
-    public async Task<IActionResult> CreateOrUpdateBatch([FromBody] CreateOrUpdateBatchResource resource,
-        CancellationToken cancellationToken)
-    {
-        var businessId = currentUserAccessor.CurrentBusinessId;
-        if (businessId == null) return Unauthorized();
-
-        var command = CreateOrUpdateBatchCommandFromResourceAssembler.ToCommandFromResource(resource, businessId.Value);
-        var result = await inventoryCommandService.Handle(command, cancellationToken);
-        var thresholdDays = await alertsContextFacade.GetExpirationThresholdDays(businessId.Value, cancellationToken);
-
-        return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
-            batch => Ok(BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today, thresholdDays)));
-    }
-
     /// <summary>
     ///     Retires a batch whose goods left the shelf (thrown out, returned).
     ///     This is what stops an expired batch from alerting forever, and it
@@ -80,6 +62,33 @@ public class BatchesController(
         if (businessId == null) return Unauthorized();
 
         var result = await inventoryCommandService.Handle(new DiscardBatchCommand(id), cancellationToken);
+        var thresholdDays = await alertsContextFacade.GetExpirationThresholdDays(businessId.Value, cancellationToken);
+
+        return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
+            batch => Ok(BatchResourceFromEntityAssembler.ToResourceFromEntity(batch, businessClock.Today, thresholdDays)));
+    }
+
+    /// <summary>
+    ///     Sets/corrects a batch's expiration after the fact — most useful
+    ///     right after a purchase order is received, since that intake path
+    ///     has no expiration field of its own (X5 feedback #3). PATCH, not
+    ///     POST: unlike discard this isn't a one-way domain action, just a
+    ///     field correction — and it changes FEFO order for free, since
+    ///     sales re-query batches by Expiration on every draw.
+    /// </summary>
+    [HttpPatch("{id:int}/expiration")]
+    [Authorize(RoleNames.Admin, RoleNames.Warehouse)]
+    [SwaggerOperation(Summary = "Update a batch's expiration date", OperationId = "UpdateBatchExpiration")]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "The batch was not found")]
+    [SwaggerResponse(StatusCodes.Status409Conflict, "The batch was already discarded")]
+    public async Task<IActionResult> UpdateBatchExpiration([FromRoute] int id, [FromBody] UpdateBatchExpirationResource resource,
+        CancellationToken cancellationToken)
+    {
+        var businessId = currentUserAccessor.CurrentBusinessId;
+        if (businessId == null) return Unauthorized();
+
+        var command = UpdateBatchExpirationCommandFromResourceAssembler.ToCommandFromResource(resource, id);
+        var result = await inventoryCommandService.Handle(command, cancellationToken);
         var thresholdDays = await alertsContextFacade.GetExpirationThresholdDays(businessId.Value, cancellationToken);
 
         return ProductActionResultAssembler.ToActionResult(result, problemDetailsFactory,
