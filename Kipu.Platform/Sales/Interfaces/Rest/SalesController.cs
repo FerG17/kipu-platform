@@ -4,6 +4,7 @@ using Kipu.Platform.Iam.Domain.Model.Entities;
 using Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Attributes;
 using Kipu.Platform.Sales.Application.CommandServices;
 using Kipu.Platform.Sales.Application.QueryServices;
+using Kipu.Platform.Sales.Domain.Model.Aggregates;
 using Kipu.Platform.Sales.Domain.Model.Commands;
 using Kipu.Platform.Sales.Domain.Model.Queries;
 using Kipu.Platform.Sales.Interfaces.Rest.Resources;
@@ -24,6 +25,7 @@ namespace Kipu.Platform.Sales.Interfaces.Rest;
 public class SalesController(
     ISaleCommandService saleCommandService,
     ISaleQueryService saleQueryService,
+    IPaymentPlanQueryService paymentPlanQueryService,
     ICurrentUserAccessor currentUserAccessor,
     ProblemDetailsFactory problemDetailsFactory)
     : ControllerBase
@@ -39,7 +41,18 @@ public class SalesController(
         var pageRequest = PageRequest.Create(page, pageSize);
         var result = await saleQueryService.Handle(new GetSalesPageByBusinessIdQuery(businessId.Value, dateFrom, dateTo, pageRequest),
             cancellationToken);
-        return Ok(new PagedResource<SaleResource>(result.Items.Select(SaleResourceFromEntityAssembler.ToResourceFromEntity),
+
+        // X5 #5: batched, not one PaymentPlan lookup per credit sale on the
+        // page — see GetPaymentPlansBySaleIdsQuery.
+        var creditSaleIds = result.Items.Where(sale => sale.Status == SaleStatus.Credit).Select(sale => sale.Id).ToList();
+        var fullyPaidBySaleId = creditSaleIds.Count > 0
+            ? (await paymentPlanQueryService.Handle(new GetPaymentPlansBySaleIdsQuery(creditSaleIds), cancellationToken))
+            .ToDictionary(plan => plan.SaleId, plan => plan.IsFullyPaid)
+            : new Dictionary<int, bool>();
+
+        return Ok(new PagedResource<SaleResource>(
+            result.Items.Select(sale => SaleResourceFromEntityAssembler.ToResourceFromEntity(sale,
+                fullyPaidBySaleId.GetValueOrDefault(sale.Id, false))),
             result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
 
@@ -72,7 +85,14 @@ public class SalesController(
         var sale = await saleQueryService.Handle(new GetSaleByIdQuery(id), cancellationToken);
         if (sale == null || sale.BusinessId != currentUserAccessor.CurrentBusinessId) return NotFound();
 
-        return Ok(SaleResourceFromEntityAssembler.ToResourceFromEntity(sale));
+        var isFullyPaid = false;
+        if (sale.Status == SaleStatus.Credit)
+        {
+            var plan = await paymentPlanQueryService.Handle(new GetPaymentPlanBySaleIdQuery(sale.Id), cancellationToken);
+            isFullyPaid = plan?.IsFullyPaid ?? false;
+        }
+
+        return Ok(SaleResourceFromEntityAssembler.ToResourceFromEntity(sale, isFullyPaid));
     }
 
     /// <summary>Creates and confirms a sale atomically: validates stock per line, persists, decrements stock — todo o nada.</summary>

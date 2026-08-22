@@ -89,6 +89,72 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         Assert.Equal(before + 100m, await TotalSalesAsync(client));
     }
 
+    /// <summary>
+    ///     X5 #5: a credit sale that's fully paid off must report that on
+    ///     SaleResource itself — this is what lets the frontend show
+    ///     "Completada" instead of "A crédito" forever. Covers both the
+    ///     list endpoint (batched PaymentPlan lookup) and the single-sale
+    ///     one, and confirms reverting the last payment flips it back.
+    /// </summary>
+    [Fact]
+    public async Task IsFullyPaid_ReflectsThePlanAcrossListAndSingleEndpoints_AndFlipsBackOnRevert()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client, basePrice: 100m);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
+
+        var sale = await CreateSaleAsync(client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
+        sale.EnsureSuccessStatusCode();
+        var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
+
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        plan.EnsureSuccessStatusCode();
+        var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
+
+        async Task<bool> IsFullyPaidInListAsync()
+        {
+            var sales = await ReadJsonAsync(await client.GetAsync("/api/v1/sales"));
+            return sales.EnumerateArray().First(item => item.GetProperty("id").GetInt32() == saleId)
+                .GetProperty("isFullyPaid").GetBoolean();
+        }
+
+        async Task<bool> IsFullyPaidByIdAsync()
+        {
+            var single = await ReadJsonAsync(await client.GetAsync($"/api/v1/sales/{saleId}"));
+            return single.GetProperty("isFullyPaid").GetBoolean();
+        }
+
+        Assert.False(await IsFullyPaidInListAsync());
+        Assert.False(await IsFullyPaidByIdAsync());
+
+        (await client.PostAsync($"/api/v1/payment-plans/{planId}/register-payment", null)).EnsureSuccessStatusCode();
+        Assert.False(await IsFullyPaidInListAsync());
+
+        (await client.PostAsync($"/api/v1/payment-plans/{planId}/register-payment", null)).EnsureSuccessStatusCode();
+        Assert.True(await IsFullyPaidInListAsync());
+        Assert.True(await IsFullyPaidByIdAsync());
+
+        (await client.PostAsync($"/api/v1/payment-plans/{planId}/revert-last-payment", null)).EnsureSuccessStatusCode();
+        Assert.False(await IsFullyPaidInListAsync());
+        Assert.False(await IsFullyPaidByIdAsync());
+    }
+
+    /// <summary>A cash sale never reports isFullyPaid, even though the field always defaults false anyway — asserted explicitly so a future change can't silently start reporting true for a Paid sale.</summary>
+    [Fact]
+    public async Task PaidSale_NeverReportsIsFullyPaid()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
+
+        var sale = await CreateSaleAsync(client, SaleLine(productId, quantity: 1, unitPrice: 10m));
+        sale.EnsureSuccessStatusCode();
+
+        Assert.False((await ReadJsonAsync(sale)).GetProperty("isFullyPaid").GetBoolean());
+    }
+
     [Fact]
     public async Task PaymentPlan_CannotBeAttachedToAPaidSale()
     {

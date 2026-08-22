@@ -12,6 +12,11 @@ public class PaymentPlanQueryService(IPaymentPlanRepository paymentPlanRepositor
         return await paymentPlanRepository.FindBySaleIdAsync(query.SaleId, cancellationToken);
     }
 
+    public async Task<IEnumerable<PaymentPlan>> Handle(GetPaymentPlansBySaleIdsQuery query, CancellationToken cancellationToken)
+    {
+        return await paymentPlanRepository.FindBySaleIdsAsync(query.SaleIds, cancellationToken);
+    }
+
     public async Task<IEnumerable<PaymentPlan>> Handle(GetPendingPaymentPlansByBusinessIdQuery query,
         CancellationToken cancellationToken)
     {
