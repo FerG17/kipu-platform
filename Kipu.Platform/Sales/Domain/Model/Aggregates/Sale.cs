@@ -102,7 +102,7 @@ public class Sale : IVersionedEntity
 
     public IReadOnlyCollection<SaleDetail> SaleDetails => _saleDetails.AsReadOnly();
 
-    public Sale AddLine(int productId, int quantity, decimal unitPrice, decimal discount)
+    public Sale AddLine(int productId, decimal quantity, decimal unitPrice, decimal discount)
     {
         _saleDetails.Add(new SaleDetail(Id, productId, quantity, unitPrice, discount));
         RecalculateTotal();

@@ -5,4 +5,4 @@ namespace Kipu.Platform.Products.Domain.Model.Commands;
 ///     RegisterStockSaleCommand. Not exposed as its own REST endpoint; Sales
 ///     reaches it through IProductContextFacade when a sale is cancelled.
 /// </summary>
-public record RegisterStockReturnCommand(int ProductId, int BusinessId, int Quantity);
+public record RegisterStockReturnCommand(int ProductId, int BusinessId, decimal Quantity);

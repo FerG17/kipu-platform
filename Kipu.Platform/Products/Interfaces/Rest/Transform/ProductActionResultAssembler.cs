@@ -51,6 +51,7 @@ public static class ProductActionResultAssembler
             ProductError.CannotDeleteWithStock => StatusCodes.Status409Conflict,
             ProductError.InsufficientStock => StatusCodes.Status409Conflict,
             ProductError.InvalidQuantity => StatusCodes.Status400BadRequest,
+            ProductError.FractionalQuantityNotAllowed => StatusCodes.Status400BadRequest,
             ProductError.WarehouseRequired => StatusCodes.Status400BadRequest,
             ProductError.InvalidExpirationDate => StatusCodes.Status400BadRequest,
             ProductError.InvalidPurchasePrice => StatusCodes.Status400BadRequest,

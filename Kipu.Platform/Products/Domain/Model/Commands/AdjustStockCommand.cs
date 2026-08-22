@@ -5,4 +5,4 @@ namespace Kipu.Platform.Products.Domain.Model.Commands;
 ///     theft, or fixing a physical count (I25). Delta is signed: negative
 ///     removes units, positive adds them.
 /// </summary>
-public record AdjustStockCommand(int ProductId, int WarehouseId, int BusinessId, int Delta, string Reason);
+public record AdjustStockCommand(int ProductId, int WarehouseId, int BusinessId, decimal Delta, string Reason);

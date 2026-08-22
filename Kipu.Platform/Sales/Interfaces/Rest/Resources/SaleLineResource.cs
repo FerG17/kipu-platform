@@ -7,4 +7,4 @@ namespace Kipu.Platform.Sales.Interfaces.Rest.Resources;
 ///     wire shape alone while silently being ignored server-side the whole
 ///     time.
 /// </summary>
-public record SaleLineResource(int ProductId, int Quantity);
+public record SaleLineResource(int ProductId, decimal Quantity);

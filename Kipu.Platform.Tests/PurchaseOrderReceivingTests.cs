@@ -49,7 +49,7 @@ public class PurchaseOrderReceivingTests(KipuApiFactory factory) : IntegrationTe
         var items = (await ReadJsonAsync(inventoryResponse)).EnumerateArray().ToList();
 
         Assert.Single(items);
-        Assert.Equal(146, items[0].GetProperty("stockUnit").GetInt32());
+        Assert.Equal(146, items[0].GetProperty("stockUnit").GetDecimal());
         Assert.Equal(secondWarehouseId, items[0].GetProperty("warehouseId").GetInt32());
 
         var alertsResponse = await client.GetAsync("/api/v1/alerts");

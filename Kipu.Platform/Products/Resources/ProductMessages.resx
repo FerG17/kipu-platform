@@ -62,6 +62,9 @@
   <data name="InvalidQuantity" xml:space="preserve">
     <value>Quantity must be a positive integer.</value>
   </data>
+  <data name="FractionalQuantityNotAllowed" xml:space="preserve">
+    <value>This product is sold by unit — quantity must be a whole number. Mark it as sold by weight to allow decimals.</value>
+  </data>
   <data name="InvalidExpirationDate" xml:space="preserve">
     <value>Expiration date cannot be in the past.</value>
   </data>

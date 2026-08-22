@@ -22,17 +22,17 @@ public interface IProductContextFacade
     ///     inventory permanently out of step with what was sold. The caller is
     ///     expected to abort its transaction when this comes back false.
     /// </summary>
-    Task<bool> DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken);
+    Task<bool> DecrementStock(int productId, int businessId, decimal quantity, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Puts units back after a sale is cancelled — the goods returned to
     ///     the shelf, so the stock has to return with them. Called by Sales &amp;
     ///     POS when a sale is cancelled.
     /// </summary>
-    Task<bool> RestoreStock(int productId, int businessId, int quantity, CancellationToken cancellationToken);
+    Task<bool> RestoreStock(int productId, int businessId, decimal quantity, CancellationToken cancellationToken);
 
     /// <summary>Total stock for a product across every warehouse — used by Sales &amp; POS to validate a line before confirming a sale.</summary>
-    Task<int> GetAvailableStock(int productId, CancellationToken cancellationToken);
+    Task<decimal> GetAvailableStock(int productId, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Registers a real stock intake tagged with a supplier — called by
@@ -47,13 +47,23 @@ public interface IProductContextFacade
     ///     permanently understated what the supplier delivered. The caller is
     ///     expected to abort its transaction when this comes back false.
     /// </summary>
-    Task<bool> RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice, string? supplier,
+    Task<bool> RegisterStockIntake(int productId, int businessId, decimal quantity, decimal? purchasePrice, string? supplier,
         string? note, int? supplierId, CancellationToken cancellationToken);
 
     Task<bool> ProductExists(int productId, CancellationToken cancellationToken);
 
     /// <summary>False for both a deactivated product and one that doesn't exist — used by Sales &amp; POS to reject selling a discontinued product.</summary>
     Task<bool> IsProductActive(int productId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Whether the product is sold by weight (fractional Quantity allowed)
+    ///     rather than in whole units — used by Sales &amp; POS to reject a
+    ///     fractional line quantity against a product that isn't marked
+    ///     "se vende por peso" (X5 Bloque D). False (the safe default) for a
+    ///     product that doesn't exist — the existence/active checks already
+    ///     cover that case with their own, more specific errors.
+    /// </summary>
+    Task<bool> IsSoldByWeight(int productId, CancellationToken cancellationToken);
 
     /// <summary>
     ///     The admin-set sale price for a product, straight from the product
@@ -96,7 +106,7 @@ public interface IProductContextFacade
 
 public record ProductKpisSnapshot(int TotalProducts, int LowStockCount, int ExpiringSoonCount, decimal InventoryValue);
 
-public record TopStockProductInfo(int ProductId, string ProductName, int TotalStock);
+public record TopStockProductInfo(int ProductId, string ProductName, decimal TotalStock);
 
-public record StockMovementReportLine(int ProductId, string ProductName, string Type, int Quantity, string Supplier,
+public record StockMovementReportLine(int ProductId, string ProductName, string Type, decimal Quantity, string Supplier,
     string Note, DateTimeOffset RegisteredAt);

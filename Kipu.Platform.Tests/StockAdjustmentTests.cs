@@ -28,7 +28,7 @@ public class StockAdjustmentTests(KipuApiFactory factory) : IntegrationTestBase(
 
         var movements = (await ReadJsonAsync(await client.GetAsync("/api/v1/stock-movements"))).EnumerateArray().ToList();
         var adjustment = Assert.Single(movements, movement => movement.GetProperty("type").GetString() == "ADJUSTMENT");
-        Assert.Equal(-5, adjustment.GetProperty("quantity").GetInt32());
+        Assert.Equal(-5, adjustment.GetProperty("quantity").GetDecimal());
         Assert.Equal("Merma: se cayó y rompió", adjustment.GetProperty("note").GetString());
     }
 

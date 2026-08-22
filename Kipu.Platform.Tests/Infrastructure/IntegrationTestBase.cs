@@ -149,23 +149,24 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
     }
 
     protected static async Task<int> CreateProductAsync(HttpClient client, decimal basePrice = 10m,
-        string name = "Producto de prueba")
+        string name = "Producto de prueba", string unitOfSale = "UNIDAD")
     {
-        var response = await CreateProductResponseAsync(client, basePrice, name);
+        var response = await CreateProductResponseAsync(client, basePrice, name, unitOfSale);
         response.EnsureSuccessStatusCode();
         return (await ReadJsonAsync(response)).GetProperty("id").GetInt32();
     }
 
     /// <summary>The raw response, for tests that assert on how a bad product payload is rejected.</summary>
     protected static async Task<HttpResponseMessage> CreateProductResponseAsync(HttpClient client,
-        decimal basePrice = 10m, string name = "Producto de prueba")
+        decimal basePrice = 10m, string name = "Producto de prueba", string unitOfSale = "UNIDAD")
     {
         return await client.PostAsJsonAsync("/api/v1/products", new
         {
             name,
             description = "creado por un test",
             category = "ABARROTES",
-            basePrice
+            basePrice,
+            unitOfSale
         });
     }
 
@@ -178,8 +179,8 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
     }
 
     protected static async Task<HttpResponseMessage> RegisterStockIntakeAsync(HttpClient client, int productId,
-        int warehouseId, int quantity, DateOnly? expiration = null, decimal? purchasePrice = null,
-        string? supplier = null, int? minimumStock = null)
+        int warehouseId, decimal quantity, DateOnly? expiration = null, decimal? purchasePrice = null,
+        string? supplier = null, decimal? minimumStock = null)
     {
         return await client.PostAsJsonAsync($"/api/v1/products/{productId}/stock-intake", new
         {
@@ -211,20 +212,20 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
         });
     }
 
-    protected static object SaleLine(int productId, int quantity, decimal unitPrice, decimal discount = 0m)
+    protected static object SaleLine(int productId, decimal quantity, decimal unitPrice, decimal discount = 0m)
     {
         return new { productId, quantity, unitPrice, discount };
     }
 
     /// <summary>Total units of a product across every warehouse.</summary>
-    protected static async Task<int> GetTotalStockAsync(HttpClient client, int productId)
+    protected static async Task<decimal> GetTotalStockAsync(HttpClient client, int productId)
     {
         var response = await client.GetAsync($"/api/v1/inventories?productId={productId}");
         response.EnsureSuccessStatusCode();
 
-        var total = 0;
+        var total = 0m;
         foreach (var item in (await ReadJsonAsync(response)).EnumerateArray())
-            total += item.GetProperty("stockUnit").GetInt32();
+            total += item.GetProperty("stockUnit").GetDecimal();
 
         return total;
     }

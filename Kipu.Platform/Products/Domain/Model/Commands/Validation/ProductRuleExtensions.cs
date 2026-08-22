@@ -1,4 +1,5 @@
 using FluentValidation;
+using Kipu.Platform.Products.Domain.Model.Aggregates;
 
 namespace Kipu.Platform.Products.Domain.Model.Commands.Validation;
 
@@ -33,5 +34,12 @@ public static class ProductRuleExtensions
     public static IRuleBuilderOptions<T, decimal> MustBeAMoneyAmount<T>(this IRuleBuilder<T, decimal> ruleBuilder)
     {
         return ruleBuilder.GreaterThan(0m).LessThanOrEqualTo(MaxMoney);
+    }
+
+    private static readonly string[] AllowedUnitsOfSale = [ProductUnitOfSale.Unit, ProductUnitOfSale.Weight];
+
+    public static IRuleBuilderOptions<T, string> MustBeAUnitOfSale<T>(this IRuleBuilder<T, string> ruleBuilder)
+    {
+        return ruleBuilder.Must(value => AllowedUnitsOfSale.Contains(value));
     }
 }

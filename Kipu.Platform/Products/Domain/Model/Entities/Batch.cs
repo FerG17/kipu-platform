@@ -23,7 +23,7 @@ public static class BatchStatus
 ///     against the already-loaded, business-scoped products list) — a real
 ///     backend can and should scope directly.
 /// </summary>
-public class Batch(int productId, int businessId, DateOnly? expiration, decimal purchasePrice, int quantity)
+public class Batch(int productId, int businessId, DateOnly? expiration, decimal purchasePrice, decimal quantity)
 {
     public Batch() : this(0, 0, null, 0, 0)
     {
@@ -37,10 +37,10 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     public string Status { get; private set; } = BatchStatus.Active;
 
     /// <summary>Units originally received into this lot — fixed at creation, never changes.</summary>
-    public int Quantity { get; private set; } = quantity;
+    public decimal Quantity { get; private set; } = quantity;
 
     /// <summary>Units of this lot still on the shelf — decremented by FEFO sales, restored by returns into this same lot.</summary>
-    public int RemainingQuantity { get; private set; } = quantity;
+    public decimal RemainingQuantity { get; private set; } = quantity;
 
     /// <summary>
     ///     Real EF Core relationship (see ModelBuilderExtensions), not a
@@ -87,7 +87,7 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     public bool HasStock => Status == BatchStatus.Active && RemainingQuantity > 0;
 
     /// <summary>FEFO sale deduction — `checked` for the same reason InventoryItem.AddStock is: a caller bug should throw loudly instead of wrapping RemainingQuantity negative and silently under-reporting this lot's stock.</summary>
-    public Batch Reduce(int units)
+    public Batch Reduce(decimal units)
     {
         checked
         {
@@ -98,7 +98,7 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     }
 
     /// <summary>Returns units to this specific lot (a cancelled sale that drew from it) — capped at Quantity, since a lot can never hold more than it originally received.</summary>
-    public Batch Restore(int units)
+    public Batch Restore(decimal units)
     {
         RemainingQuantity = Math.Min(Quantity, RemainingQuantity + units);
         return this;

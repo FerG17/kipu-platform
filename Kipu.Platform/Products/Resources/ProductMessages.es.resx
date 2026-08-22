@@ -62,6 +62,9 @@
   <data name="InvalidQuantity" xml:space="preserve">
     <value>La cantidad debe ser un entero positivo.</value>
   </data>
+  <data name="FractionalQuantityNotAllowed" xml:space="preserve">
+    <value>Este producto se vende por unidad — la cantidad debe ser un número entero. Marca el producto como "se vende por peso" para permitir decimales.</value>
+  </data>
   <data name="InvalidExpirationDate" xml:space="preserve">
     <value>La fecha de vencimiento no puede estar en el pasado.</value>
   </data>

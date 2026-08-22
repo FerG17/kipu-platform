@@ -14,5 +14,7 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
 
         RuleFor(command => command.Barcode).MaximumLength(ProductRuleExtensions.MaxBarcodeLength)
             .When(command => !string.IsNullOrEmpty(command.Barcode));
+
+        RuleFor(command => command.UnitOfSale).MustBeAUnitOfSale();
     }
 }

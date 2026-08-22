@@ -9,6 +9,9 @@ public enum ProductError
     InventoryItemNotFound,
     InsufficientStock,
     InvalidQuantity,
+
+    /// <summary>A fractional Quantity/Delta was given for a product not marked "se vende por peso" — only weight-sold products may carry a fractional stock quantity (X5 Bloque D).</summary>
+    FractionalQuantityNotAllowed,
     InvalidExpirationDate,
     InvalidPurchasePrice,
     BatchNotFound,

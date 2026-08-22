@@ -20,6 +20,12 @@ public class RegisterStockIntakeCommandValidator : AbstractValidator<RegisterSto
     public RegisterStockIntakeCommandValidator()
     {
         RuleFor(command => command.Quantity).GreaterThanOrEqualTo(0).LessThanOrEqualTo(MaxQuantity);
+        // Whether a fractional value is actually allowed for this product
+        // depends on its UnitOfSale (checked in InventoryCommandService,
+        // which already loads the Product) — this only bounds precision to
+        // what inventory_items.stock_unit (decimal(10,2)) can hold.
+        RuleFor(command => command.Quantity).Must(quantity => quantity == Math.Round(quantity, 2))
+            .WithMessage("Quantity can have at most 2 decimal places.");
         RuleFor(command => command.Supplier).MaximumLength(150);
         RuleFor(command => command.Note).MaximumLength(500);
     }

@@ -5,7 +5,7 @@ namespace Kipu.Platform.Sales.Domain.Model.Entities;
 ///     always created/updated together with its parent Sale, never
 ///     independently, so the sale's total stays consistent with its lines.
 /// </summary>
-public class SaleDetail(int saleId, int productId, int quantity, decimal unitPrice, decimal discount)
+public class SaleDetail(int saleId, int productId, decimal quantity, decimal unitPrice, decimal discount)
 {
     public SaleDetail() : this(0, 0, 0, 0, 0)
     {
@@ -14,7 +14,7 @@ public class SaleDetail(int saleId, int productId, int quantity, decimal unitPri
     public int Id { get; }
     public int SaleId { get; private set; } = saleId;
     public int ProductId { get; private set; } = productId;
-    public int Quantity { get; private set; } = quantity;
+    public decimal Quantity { get; private set; } = quantity;
     public decimal UnitPrice { get; private set; } = unitPrice;
     public decimal Discount { get; private set; } = discount;
 

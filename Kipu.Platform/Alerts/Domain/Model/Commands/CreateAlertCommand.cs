@@ -14,7 +14,7 @@ public record CreateAlertCommand(
     string Type,
     string Severity,
     string Message,
-    int CurrentStock,
-    int MinStock,
+    decimal CurrentStock,
+    decimal MinStock,
     int? DaysToExpiry,
     int? WarehouseId = null);

@@ -7,7 +7,7 @@ namespace Kipu.Platform.Shared.Domain.Model.Services;
 /// </summary>
 public static class StockRules
 {
-    public static bool IsLowStock(int stock, int minimumStock)
+    public static bool IsLowStock(decimal stock, decimal minimumStock)
     {
         return stock > 0 && stock <= minimumStock;
     }
@@ -19,7 +19,7 @@ public static class StockRules
     ///     read as "out of stock" rather than as neither low nor out, which
     ///     silences every alert for it (see X4 A6).
     /// </summary>
-    public static bool IsOutOfStock(int stock)
+    public static bool IsOutOfStock(decimal stock)
     {
         return stock <= 0;
     }

@@ -14,6 +14,9 @@ public enum SalesError
     EmptySaleLines,
     InvalidSaleLine,
 
+    /// <summary>A sale line asked for a fractional quantity against a product not marked "se vende por peso" (X5 Bloque D).</summary>
+    FractionalQuantityNotAllowed,
+
     /// <summary>PaymentMethod/Currency outside their allowed values, or Description too long.</summary>
     InvalidSaleData,
     PaymentPlanNotFound,

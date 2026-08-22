@@ -11,7 +11,7 @@ namespace Kipu.Platform.Products.Domain.Model.Entities;
 ///     original 1:1 model, but a multi-warehouse business (US10, Plan Pro+)
 ///     is already supported without a future migration.
 /// </summary>
-public class InventoryItem(int productId, int warehouseId, int businessId, int stockUnit, int minimumStock)
+public class InventoryItem(int productId, int warehouseId, int businessId, decimal stockUnit, decimal minimumStock)
     : IVersionedEntity
 {
     public InventoryItem() : this(0, 0, 0, 0, 0)
@@ -22,8 +22,8 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
     public int ProductId { get; private set; } = productId;
     public int WarehouseId { get; private set; } = warehouseId;
     public int BusinessId { get; private set; } = businessId;
-    public int StockUnit { get; private set; } = stockUnit;
-    public int MinimumStock { get; private set; } = minimumStock;
+    public decimal StockUnit { get; private set; } = stockUnit;
+    public decimal MinimumStock { get; private set; } = minimumStock;
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
@@ -45,7 +45,7 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
     ///     Throwing here turns that into a loud, caught failure instead
     ///     (see InventoryCommandService's OverflowException handling).
     /// </summary>
-    public InventoryItem AddStock(int quantity)
+    public InventoryItem AddStock(decimal quantity)
     {
         checked
         {
@@ -56,7 +56,7 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
         return this;
     }
 
-    public InventoryItem RemoveStock(int quantity)
+    public InventoryItem RemoveStock(decimal quantity)
     {
         StockUnit = Math.Max(0, StockUnit - quantity);
         UpdatedAt = DateTimeOffset.UtcNow;
@@ -72,7 +72,7 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
     ///     actual stock allows is exactly the kind of mistake it should be
     ///     rejected for, not truncated.
     /// </summary>
-    public InventoryItem AdjustStock(int delta)
+    public InventoryItem AdjustStock(decimal delta)
     {
         checked
         {
@@ -83,7 +83,7 @@ public class InventoryItem(int productId, int warehouseId, int businessId, int s
         return this;
     }
 
-    public InventoryItem UpdateMinimumStock(int minimumStock)
+    public InventoryItem UpdateMinimumStock(decimal minimumStock)
     {
         MinimumStock = minimumStock;
         UpdatedAt = DateTimeOffset.UtcNow;

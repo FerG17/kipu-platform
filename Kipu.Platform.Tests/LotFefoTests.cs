@@ -54,8 +54,8 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
 
         var soonBatch = FindBatchByExpiration(batches, soonExpiration);
         var laterBatch = FindBatchByExpiration(batches, laterExpiration);
-        Assert.Equal(10, soonBatch.GetProperty("remainingQuantity").GetInt32());
-        Assert.Equal(50, laterBatch.GetProperty("remainingQuantity").GetInt32());
+        Assert.Equal(10, soonBatch.GetProperty("remainingQuantity").GetDecimal());
+        Assert.Equal(50, laterBatch.GetProperty("remainingQuantity").GetDecimal());
 
         Assert.Equal(60, await GetTotalStockAsync(client, productId));
     }
@@ -81,8 +81,8 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
         var soonBatch = FindBatchByExpiration(batches, soonExpiration);
         var laterBatch = FindBatchByExpiration(batches, laterExpiration);
 
-        Assert.Equal(2, soonBatch.GetProperty("remainingQuantity").GetInt32());
-        Assert.Equal(5, laterBatch.GetProperty("remainingQuantity").GetInt32());
+        Assert.Equal(2, soonBatch.GetProperty("remainingQuantity").GetDecimal());
+        Assert.Equal(5, laterBatch.GetProperty("remainingQuantity").GetDecimal());
     }
 
     [Fact]
@@ -106,8 +106,8 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
         var soonBatch = FindBatchByExpiration(batches, soonExpiration);
         var laterBatch = FindBatchByExpiration(batches, laterExpiration);
 
-        Assert.Equal(0, soonBatch.GetProperty("remainingQuantity").GetInt32());
-        Assert.Equal(3, laterBatch.GetProperty("remainingQuantity").GetInt32());
+        Assert.Equal(0, soonBatch.GetProperty("remainingQuantity").GetDecimal());
+        Assert.Equal(3, laterBatch.GetProperty("remainingQuantity").GetDecimal());
     }
 
     /// <summary>
@@ -141,7 +141,7 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
 
         var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
         var batch = FindBatchByExpiration(batches, expiration);
-        Assert.Equal(5, batch.GetProperty("remainingQuantity").GetInt32());
+        Assert.Equal(5, batch.GetProperty("remainingQuantity").GetDecimal());
     }
 
     /// <summary>
@@ -213,8 +213,8 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
         var editedBatch = FindBatchByExpiration(batches, soonerExpiration);
         var untouchedBatch = FindBatchByExpiration(batches, existingExpiration);
 
-        Assert.Equal(2, editedBatch.GetProperty("remainingQuantity").GetInt32());
-        Assert.Equal(5, untouchedBatch.GetProperty("remainingQuantity").GetInt32());
+        Assert.Equal(2, editedBatch.GetProperty("remainingQuantity").GetDecimal());
+        Assert.Equal(5, untouchedBatch.GetProperty("remainingQuantity").GetDecimal());
     }
 
     [Fact]

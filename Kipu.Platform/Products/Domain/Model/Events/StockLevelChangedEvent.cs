@@ -12,5 +12,5 @@ public record StockLevelChangedEvent(
     string ProductName,
     int WarehouseId,
     int BusinessId,
-    int NewQuantity,
-    int MinimumStock) : IEvent;
+    decimal NewQuantity,
+    decimal MinimumStock) : IEvent;
