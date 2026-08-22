@@ -8,9 +8,26 @@ namespace Kipu.Platform.Products.Infrastructure.Persistence.EntityFrameworkCore.
 
 public class BatchRepository(AppDbContext context) : BaseRepository<Batch>(context), IBatchRepository
 {
+    /// <summary>
+    ///     Overrides the base lookup to eager-load InventoryItem — without it,
+    ///     BatchResource's InventoryId (Batch.InventoryItem?.Id) always came
+    ///     back null for anything read outside the SaveChanges call that
+    ///     created the batch, since EF Core never lazy-loads it on its own.
+    ///     Callers here (DiscardBatchCommand, UpdateBatchExpirationCommand)
+    ///     both return their Batch straight into a BatchResource.
+    /// </summary>
+    public override async Task<Batch?> FindByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<Batch>()
+            .Include(batch => batch.InventoryItem)
+            .FirstOrDefaultAsync(batch => batch.Id == id, cancellationToken);
+    }
+
     public async Task<IEnumerable<Batch>> FindAllByProductIdAsync(int productId, CancellationToken cancellationToken = default)
     {
-        return await Context.Set<Batch>().Where(batch => batch.ProductId == productId).ToListAsync(cancellationToken);
+        return await Context.Set<Batch>()
+            .Include(batch => batch.InventoryItem)
+            .Where(batch => batch.ProductId == productId).ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<Batch>> FindActiveByInventoryItemIdAsync(int inventoryItemId, CancellationToken cancellationToken = default)
@@ -26,7 +43,9 @@ public class BatchRepository(AppDbContext context) : BaseRepository<Batch>(conte
 
     public async Task<IEnumerable<Batch>> FindAllByBusinessIdAsync(int businessId, CancellationToken cancellationToken = default)
     {
-        return await Context.Set<Batch>().Where(batch => batch.BusinessId == businessId).ToListAsync(cancellationToken);
+        return await Context.Set<Batch>()
+            .Include(batch => batch.InventoryItem)
+            .Where(batch => batch.BusinessId == businessId).ToListAsync(cancellationToken);
     }
 
     /// <summary>IgnoreQueryFilters() deliberately — the alerts expiration sweep runs outside any authenticated business and needs every business's active batches, see IBatchRepository.</summary>

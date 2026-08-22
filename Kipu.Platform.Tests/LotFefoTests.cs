@@ -257,6 +257,33 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    /// <summary>
+    ///     BatchRepository's list/lookup queries used to never Include
+    ///     InventoryItem, so BatchResource.InventoryId (Batch.InventoryItem?.Id)
+    ///     always came back null for anything read outside the SaveChanges
+    ///     call that created the batch — a real API-contract bug (unused by
+    ///     the frontend today, but wrong data for any future consumer),
+    ///     found while investigating X5 feedback #1. Covers both the list
+    ///     endpoint and a single-batch response (via discard).
+    /// </summary>
+    [Fact]
+    public async Task GetBatches_ResolvesInventoryId_NotJustAfterCreation()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5,
+            expiration: DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10))).EnsureSuccessStatusCode();
+
+        var listed = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        var batchId = listed[0].GetProperty("id").GetInt32();
+        Assert.True(listed[0].GetProperty("inventoryId").GetInt32() > 0);
+
+        var discarded = await ReadJsonAsync(await client.PostAsync($"/api/v1/batches/{batchId}/discard", null));
+        Assert.True(discarded.GetProperty("inventoryId").GetInt32() > 0);
+    }
+
     /// <summary>X5 #2: each lot keeps its own cost — a later intake with a different price no longer overwrites the earlier lot's.</summary>
     [Fact]
     public async Task TwoIntakesWithDifferentCosts_KeepIndependentPurchasePricesPerLot()
