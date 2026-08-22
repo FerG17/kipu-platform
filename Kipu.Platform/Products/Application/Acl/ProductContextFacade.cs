@@ -31,21 +31,21 @@ public class ProductContextFacade(
         return result.IsSuccess ? result.Value!.Id : 0;
     }
 
-    public async Task<bool> DecrementStock(int productId, int businessId, int quantity, CancellationToken cancellationToken)
+    public async Task<bool> DecrementStock(int productId, int businessId, decimal quantity, CancellationToken cancellationToken)
     {
         var result = await inventoryCommandService.Handle(new RegisterStockSaleCommand(productId, businessId, quantity),
             cancellationToken);
         return result.IsSuccess;
     }
 
-    public async Task<bool> RestoreStock(int productId, int businessId, int quantity, CancellationToken cancellationToken)
+    public async Task<bool> RestoreStock(int productId, int businessId, decimal quantity, CancellationToken cancellationToken)
     {
         var result = await inventoryCommandService.Handle(new RegisterStockReturnCommand(productId, businessId, quantity),
             cancellationToken);
         return result.IsSuccess;
     }
 
-    public async Task<int> GetAvailableStock(int productId, CancellationToken cancellationToken)
+    public async Task<decimal> GetAvailableStock(int productId, CancellationToken cancellationToken)
     {
         var items = await inventoryQueryService.Handle(new GetInventoryByProductIdQuery(productId), cancellationToken);
         return items.Sum(item => item.StockUnit);
@@ -64,7 +64,7 @@ public class ProductContextFacade(
     ///     InventoryItem anywhere yet (never stocked before) falls back to the
     ///     business's first warehouse.
     /// </summary>
-    public async Task<bool> RegisterStockIntake(int productId, int businessId, int quantity, decimal? purchasePrice,
+    public async Task<bool> RegisterStockIntake(int productId, int businessId, decimal quantity, decimal? purchasePrice,
         string? supplier, string? note, int? supplierId, CancellationToken cancellationToken)
     {
         // X4 M10: nothing checked warehouse status before — a purchase order
@@ -109,6 +109,12 @@ public class ProductContextFacade(
     {
         var product = await productQueryService.Handle(new GetProductByIdQuery(productId), cancellationToken);
         return product?.IsActive ?? false;
+    }
+
+    public async Task<bool> IsSoldByWeight(int productId, CancellationToken cancellationToken)
+    {
+        var product = await productQueryService.Handle(new GetProductByIdQuery(productId), cancellationToken);
+        return product?.IsSoldByWeight ?? false;
     }
 
     /// <summary>

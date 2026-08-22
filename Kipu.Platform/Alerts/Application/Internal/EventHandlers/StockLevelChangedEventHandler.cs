@@ -67,7 +67,8 @@ public class StockLevelChangedEventHandler(
         }
         else if (isLowStock && lowStockEnabled)
         {
-            var message = $"{domainEvent.ProductName} tiene stock bajo ({domainEvent.NewQuantity} unidades, mínimo {domainEvent.MinimumStock}).";
+            var message =
+                $"{domainEvent.ProductName} tiene stock bajo ({domainEvent.NewQuantity:0.##} unidades, mínimo {domainEvent.MinimumStock:0.##}).";
             if (existingLowStock != null)
             {
                 existingLowStock.RefreshStockInfo(AlertSeverity.Medium, message, domainEvent.NewQuantity);

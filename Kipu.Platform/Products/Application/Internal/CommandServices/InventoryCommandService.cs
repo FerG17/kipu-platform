@@ -97,6 +97,13 @@ public class InventoryCommandService(
         if (!product.IsActive)
             return Result<InventoryItem>.Failure(ProductError.ProductInactive, localizer[nameof(ProductError.ProductInactive)]);
 
+        // X5 Bloque D: only a product marked "se vende por peso" may receive
+        // a fractional intake — otherwise a typo'd "10.5" would leave a
+        // unit-sold product with half a unit nobody can actually shelve.
+        if (!product.IsSoldByWeight && command.Quantity != Math.Truncate(command.Quantity))
+            return Result<InventoryItem>.Failure(ProductError.FractionalQuantityNotAllowed,
+                localizer[nameof(ProductError.FractionalQuantityNotAllowed)]);
+
         var warehouse = await warehouseRepository.FindByIdAsync(command.WarehouseId, cancellationToken);
         if (warehouse == null)
             return Result<InventoryItem>.Failure(ProductError.WarehouseNotFound, localizer[nameof(ProductError.WarehouseNotFound)]);
@@ -440,6 +447,11 @@ public class InventoryCommandService(
 
         if (!product.IsActive)
             return Result<InventoryItem>.Failure(ProductError.ProductInactive, localizer[nameof(ProductError.ProductInactive)]);
+
+        // X5 Bloque D — same reasoning as the intake guard above.
+        if (!product.IsSoldByWeight && command.Delta != Math.Truncate(command.Delta))
+            return Result<InventoryItem>.Failure(ProductError.FractionalQuantityNotAllowed,
+                localizer[nameof(ProductError.FractionalQuantityNotAllowed)]);
 
         // X4 M10: an adjustment against a deactivated warehouse used to go
         // through with no check at all — nothing here ever looked the

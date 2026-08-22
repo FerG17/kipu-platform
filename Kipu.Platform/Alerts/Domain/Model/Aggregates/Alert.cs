@@ -40,8 +40,8 @@ public class Alert(
     string type,
     string severity,
     string message,
-    int currentStock,
-    int minStock,
+    decimal currentStock,
+    decimal minStock,
     int? daysToExpiry,
     int? warehouseId = null)
 {
@@ -69,15 +69,15 @@ public class Alert(
     public string Message { get; private set; } = message;
     public string Status { get; private set; } = AlertStatus.Active;
     public DateTimeOffset Date { get; private set; } = DateTimeOffset.UtcNow;
-    public int CurrentStock { get; private set; } = currentStock;
-    public int MinStock { get; private set; } = minStock;
+    public decimal CurrentStock { get; private set; } = currentStock;
+    public decimal MinStock { get; private set; } = minStock;
     public int? DaysToExpiry { get; private set; } = daysToExpiry;
     public bool Notified { get; private set; }
     public DateTimeOffset? NotifiedAt { get; private set; }
     public DateTimeOffset? ResolvedAt { get; private set; }
 
     /// <summary>Refreshes the snapshot fields of a still-ACTIVE alert as stock keeps changing — a no-op once RESOLVED.</summary>
-    public Alert RefreshStockInfo(string severity, string message, int currentStock)
+    public Alert RefreshStockInfo(string severity, string message, decimal currentStock)
     {
         if (Status == AlertStatus.Resolved) return this;
 

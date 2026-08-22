@@ -27,6 +27,7 @@ public static class ModelBuilderExtensions
             entity.Property(product => product.BasePrice).HasColumnType("decimal(10,2)");
             entity.Property(product => product.Status).IsRequired().HasMaxLength(20);
             entity.Property(product => product.Barcode).HasMaxLength(64);
+            entity.Property(product => product.UnitOfSale).IsRequired().HasMaxLength(20);
 
             entity.HasOne<Business>().WithMany().HasForeignKey(product => product.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -57,6 +58,11 @@ public static class ModelBuilderExtensions
             // overwriting the winner's decrement. See IVersionedEntity.
             entity.Property(item => item.Version).IsConcurrencyToken();
 
+            // X5 Bloque D: decimal so a "se vende por peso" product can carry
+            // a fractional stock (e.g. 2.35 kg on the shelf).
+            entity.Property(item => item.StockUnit).HasColumnType("decimal(10,2)");
+            entity.Property(item => item.MinimumStock).HasColumnType("decimal(10,2)");
+
             // Real N:M — one product can have independent stock per
             // warehouse (architecture doc §8.1).
             entity.HasIndex(item => new { item.ProductId, item.WarehouseId }).IsUnique();
@@ -75,6 +81,8 @@ public static class ModelBuilderExtensions
             entity.Property(batch => batch.Id).ValueGeneratedOnAdd();
             entity.Property(batch => batch.PurchasePrice).HasColumnType("decimal(10,2)");
             entity.Property(batch => batch.Status).IsRequired().HasMaxLength(20);
+            entity.Property(batch => batch.Quantity).HasColumnType("decimal(10,2)");
+            entity.Property(batch => batch.RemainingQuantity).HasColumnType("decimal(10,2)");
 
             entity.Property(batch => batch.Expiration).HasDateOnlyConversion();
 
@@ -103,6 +111,7 @@ public static class ModelBuilderExtensions
         {
             entity.HasKey(movement => movement.Id);
             entity.Property(movement => movement.Id).ValueGeneratedOnAdd();
+            entity.Property(movement => movement.Quantity).HasColumnType("decimal(10,2)");
             entity.Property(movement => movement.Type).IsRequired().HasMaxLength(20);
             entity.Property(movement => movement.Supplier).HasMaxLength(150);
             entity.Property(movement => movement.Note).HasMaxLength(500);

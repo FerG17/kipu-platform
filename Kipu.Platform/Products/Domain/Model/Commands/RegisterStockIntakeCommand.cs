@@ -10,10 +10,10 @@ public record RegisterStockIntakeCommand(
     int ProductId,
     int BusinessId,
     int WarehouseId,
-    int Quantity,
+    decimal Quantity,
     decimal? PurchasePrice,
     DateOnly? Expiration,
     string? Supplier,
     string? Note,
-    int? MinimumStock,
+    decimal? MinimumStock,
     int? SupplierId = null);

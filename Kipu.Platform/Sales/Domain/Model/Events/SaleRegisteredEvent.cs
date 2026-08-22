@@ -9,4 +9,4 @@ namespace Kipu.Platform.Sales.Domain.Model.Events;
 ///     atomically); this event is for other, non-transactional consumers
 ///     (Alerts, Dashboard) that only need to react afterward.
 /// </summary>
-public record SaleRegisteredEvent(int SaleId, int BusinessId, IReadOnlyCollection<(int ProductId, int Quantity)> Lines) : IEvent;
+public record SaleRegisteredEvent(int SaleId, int BusinessId, IReadOnlyCollection<(int ProductId, decimal Quantity)> Lines) : IEvent;

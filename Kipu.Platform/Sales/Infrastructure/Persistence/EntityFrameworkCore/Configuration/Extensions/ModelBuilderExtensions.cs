@@ -52,6 +52,7 @@ public static class ModelBuilderExtensions
         {
             entity.HasKey(detail => detail.Id);
             entity.Property(detail => detail.Id).ValueGeneratedOnAdd();
+            entity.Property(detail => detail.Quantity).HasColumnType("decimal(10,2)");
             entity.Property(detail => detail.UnitPrice).HasColumnType("decimal(10,2)");
             entity.Property(detail => detail.Discount).HasColumnType("decimal(5,4)");
 

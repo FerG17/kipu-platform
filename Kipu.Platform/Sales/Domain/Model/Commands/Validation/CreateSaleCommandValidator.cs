@@ -38,6 +38,13 @@ public class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
         RuleForEach(command => command.Lines).ChildRules(line =>
         {
             line.RuleFor(l => l.Quantity).GreaterThan(0).LessThanOrEqualTo(MaxQuantityPerLine);
+            // Whether a fractional value is actually allowed depends on the
+            // product's UnitOfSale (a per-product business rule that needs a
+            // repository lookup, done in SaleCommandService) — this only
+            // bounds precision to what the sale_details.quantity column
+            // (decimal(10,2)) can hold, same reasoning as money amounts.
+            line.RuleFor(l => l.Quantity).Must(quantity => quantity == Math.Round(quantity, 2))
+                .WithMessage("Quantity can have at most 2 decimal places.");
         });
 
         RuleFor(command => command.PaymentMethod).Must(method => AllowedPaymentMethods.Contains(method));

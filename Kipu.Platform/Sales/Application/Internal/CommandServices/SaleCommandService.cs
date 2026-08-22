@@ -108,6 +108,14 @@ public class SaleCommandService(
             if (!await productContextFacade.IsProductActive(productLines.Key, cancellationToken))
                 return Result<Sale>.Failure(SalesError.ProductInactive, localizer[nameof(SalesError.ProductInactive)]);
 
+            // X5 Bloque D: a fractional quantity is only meaningful for a
+            // product marked "se vende por peso" — otherwise "2.5 latas de
+            // gaseosa" would reach the shelf with no way to actually pick it.
+            if (!await productContextFacade.IsSoldByWeight(productLines.Key, cancellationToken) &&
+                productLines.Any(line => line.Quantity != Math.Truncate(line.Quantity)))
+                return Result<Sale>.Failure(SalesError.FractionalQuantityNotAllowed,
+                    localizer[nameof(SalesError.FractionalQuantityNotAllowed)]);
+
             basePriceByProductId[productLines.Key] = basePrice.Value;
 
             var requestedQuantity = productLines.Sum(line => line.Quantity);

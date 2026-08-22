@@ -68,6 +68,9 @@
   <data name="InvalidSaleLine" xml:space="preserve">
     <value>Every sale line needs a quantity above zero, a non-negative unit price, and a discount between 0 and 1.</value>
   </data>
+  <data name="FractionalQuantityNotAllowed" xml:space="preserve">
+    <value>One of the products in this sale is sold by unit — its quantity must be a whole number.</value>
+  </data>
   <data name="InvalidSaleData" xml:space="preserve">
     <value>Check the payment method, currency and description — one of them is invalid or too long.</value>
   </data>

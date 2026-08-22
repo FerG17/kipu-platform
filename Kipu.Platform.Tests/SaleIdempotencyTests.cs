@@ -43,7 +43,7 @@ public class SaleIdempotencyTests(KipuApiFactory factory) : IntegrationTestBase(
 
         var inventoryResponse = await client.GetAsync($"/api/v1/inventories?productId={productId}");
         inventoryResponse.EnsureSuccessStatusCode();
-        var stock = (await ReadJsonAsync(inventoryResponse)).EnumerateArray().Single().GetProperty("stockUnit").GetInt32();
+        var stock = (await ReadJsonAsync(inventoryResponse)).EnumerateArray().Single().GetProperty("stockUnit").GetDecimal();
         Assert.Equal(7, stock);
     }
 

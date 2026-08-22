@@ -8,5 +8,5 @@ namespace Kipu.Platform.Products.Interfaces.Rest.Resources;
 ///     risking timezone/off-by-one drift from what actually triggers alerts.
 /// </summary>
 public record BatchResource(int Id, int ProductId, int BusinessId, DateOnly? Expiration, decimal PurchasePrice,
-    string Status, int? InventoryId, int Quantity, int RemainingQuantity, int? DaysToExpiry, bool IsExpired,
+    string Status, int? InventoryId, decimal Quantity, decimal RemainingQuantity, int? DaysToExpiry, bool IsExpired,
     bool IsExpiringSoon);

@@ -5,6 +5,6 @@ public record InventoryItemResource(
     int ProductId,
     int WarehouseId,
     int BusinessId,
-    int StockUnit,
-    int MinimumStock,
+    decimal StockUnit,
+    decimal MinimumStock,
     DateTimeOffset UpdatedAt);

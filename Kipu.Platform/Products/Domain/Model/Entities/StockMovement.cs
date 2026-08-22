@@ -21,7 +21,7 @@ public static class StockMovementType
     public const string Adjustment = "ADJUSTMENT";
 
     /// <summary>Whether a movement added stock (true) or removed it (false) — Intake/Return always add, Sale always removes, Adjustment depends on its signed quantity.</summary>
-    public static bool IsInbound(string type, int quantity)
+    public static bool IsInbound(string type, decimal quantity)
     {
         return type switch
         {
@@ -41,7 +41,7 @@ public class StockMovement(
     int productId,
     int businessId,
     int warehouseId,
-    int quantity,
+    decimal quantity,
     string type,
     string supplier,
     string note,
@@ -56,7 +56,7 @@ public class StockMovement(
     public int ProductId { get; private set; } = productId;
     public int BusinessId { get; private set; } = businessId;
     public int WarehouseId { get; private set; } = warehouseId;
-    public int Quantity { get; private set; } = quantity;
+    public decimal Quantity { get; private set; } = quantity;
     public string Type { get; private set; } = type;
 
     /// <summary>
