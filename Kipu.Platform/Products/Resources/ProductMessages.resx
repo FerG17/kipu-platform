@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>Product not found.</value>
+  </data>
+  <data name="CannotDeleteWithStock" xml:space="preserve">
+    <value>Cannot delete a product that still has stock.</value>
+  </data>
+  <data name="WarehouseNotFound" xml:space="preserve">
+    <value>Warehouse not found.</value>
+  </data>
+  <data name="WarehouseRequired" xml:space="preserve">
+    <value>A warehouse is required.</value>
+  </data>
+  <data name="InventoryItemNotFound" xml:space="preserve">
+    <value>Inventory record not found.</value>
+  </data>
+  <data name="InsufficientStock" xml:space="preserve">
+    <value>Insufficient stock for this operation.</value>
+  </data>
+  <data name="InvalidQuantity" xml:space="preserve">
+    <value>Quantity must be a positive integer.</value>
+  </data>
+  <data name="InvalidExpirationDate" xml:space="preserve">
+    <value>Expiration date cannot be in the past.</value>
+  </data>
+  <data name="BatchNotFound" xml:space="preserve">
+    <value>Batch not found.</value>
+  </data>
+  <data name="BatchAlreadyDiscarded" xml:space="preserve">
+    <value>This batch was already discarded.</value>
+  </data>
+  <data name="BatchNotEditable" xml:space="preserve">
+    <value>A discarded batch's expiration cannot be edited.</value>
+  </data>
+  <data name="InvalidPurchasePrice" xml:space="preserve">
+    <value>Purchase price cannot be negative.</value>
+  </data>
+  <data name="DatabaseError" xml:space="preserve">
+    <value>A database error occurred while completing the operation.</value>
+  </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>The record was changed by another operation while this one was running. Please try again.</value>
+  </data>
+  <data name="InvalidProductData" xml:space="preserve">
+    <value>Product name is required and must fit its field lengths; the price must be between 0 and 99,999,999.99.</value>
+  </data>
+  <data name="InvalidWarehouseData" xml:space="preserve">
+    <value>Warehouse name is required and must fit its field lengths.</value>
+  </data>
+  <data name="DuplicateBarcode" xml:space="preserve">
+    <value>This barcode is already registered on another product.</value>
+  </data>
+  <data name="SupplierNotFound" xml:space="preserve">
+    <value>One of the supplier tags does not exist for this business.</value>
+  </data>
+  <data name="ProductInactive" xml:space="preserve">
+    <value>This product is deactivated. Reactivate it before registering a stock intake.</value>
+  </data>
+  <data name="InvalidAdjustmentQuantity" xml:space="preserve">
+    <value>The adjustment must add or remove at least one unit.</value>
+  </data>
+  <data name="AdjustmentReasonRequired" xml:space="preserve">
+    <value>A reason is required for a stock adjustment.</value>
+  </data>
+  <data name="AdjustmentExceedsAvailableStock" xml:space="preserve">
+    <value>This adjustment would leave the stock below zero.</value>
+  </data>
+  <data name="InvalidAdjustmentReason" xml:space="preserve">
+    <value>The adjustment reason is too long, or the quantity is implausibly large.</value>
+  </data>
+  <data name="InvalidStockIntakeData" xml:space="preserve">
+    <value>The supplier name or note is too long.</value>
+  </data>
+  <data name="WarehouseInactive" xml:space="preserve">
+    <value>This warehouse is deactivated and cannot receive or hold stock.</value>
+  </data>
+</root>

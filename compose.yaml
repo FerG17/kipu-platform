@@ -1,7 +1,51 @@
-﻿services:
-  bodega.platform:
-    image: bodega.platform
+# Explicit project name — Compose otherwise derives it from the checkout
+# folder's name, which would silently drift from "kipu-platform" (and from
+# the "kipu-platform_kipu-mysql-data" volume this rebrand already
+# populated by cloning the old data) if the folder itself is never renamed.
+name: kipu-platform
+
+services:
+  kipu.platform:
+    image: kipu.platform
     build:
       context: .
-      dockerfile: Bodega.Platform/Dockerfile
+      dockerfile: Kipu.Platform/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # No ASPNETCORE_ENVIRONMENT set — the container runs as Production
+      # (the ASP.NET Core default when unset), loading appsettings.Production.json.
+      # That file's placeholders are filled in from these three, read from
+      # the untracked .env (see .env.example). "mysql" below is this
+      # Compose file's own service name, not "localhost" — the app and the
+      # database are different containers on the Compose network.
+      BODEGA_DB_CONNECTION_STRING: "server=mysql;port=3306;user=root;password=${BODEGA_DB_PASSWORD:?set BODEGA_DB_PASSWORD in .env, see .env.example};database=kipu_platform"
+      BODEGA_JWT_SECRET: ${BODEGA_JWT_SECRET:?set BODEGA_JWT_SECRET in .env, see .env.example}
+      BODEGA_BOOTSTRAP_KEY: ${BODEGA_BOOTSTRAP_KEY:?set BODEGA_BOOTSTRAP_KEY in .env, see .env.example}
 
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      # Read from the untracked .env in this directory (Compose loads it
+      # automatically) — see .env.example. The value used to sit here in
+      # plain text, in a public repository.
+      MYSQL_ROOT_PASSWORD: ${BODEGA_DB_PASSWORD:?set BODEGA_DB_PASSWORD in .env, see .env.example}
+      MYSQL_DATABASE: kipu_platform
+    ports:
+      - "3307:3306"
+    volumes:
+      - kipu-mysql-data:/var/lib/mysql
+    healthcheck:
+      # $$ escapes the $ so Compose passes it through and the shell inside the
+      # container expands it, keeping the password out of the compose file.
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kipu-mysql-data:

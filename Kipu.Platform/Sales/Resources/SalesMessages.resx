@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SaleNotFound" xml:space="preserve">
+    <value>Sale not found.</value>
+  </data>
+  <data name="CustomerNotFound" xml:space="preserve">
+    <value>Customer not found.</value>
+  </data>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>One or more products in the sale were not found.</value>
+  </data>
+  <data name="ProductInactive" xml:space="preserve">
+    <value>One or more products in the sale are deactivated and can no longer be sold.</value>
+  </data>
+  <data name="InsufficientStock" xml:space="preserve">
+    <value>One or more lines do not have sufficient stock.</value>
+  </data>
+  <data name="SaleAlreadyCancelled" xml:space="preserve">
+    <value>This sale has already been cancelled.</value>
+  </data>
+  <data name="EmptySaleLines" xml:space="preserve">
+    <value>A sale must have at least one line.</value>
+  </data>
+  <data name="InvalidStatusTransition" xml:space="preserve">
+    <value>The only status a sale can be moved to is CANCELLED.</value>
+  </data>
+  <data name="InvalidSaleLine" xml:space="preserve">
+    <value>Every sale line needs a quantity above zero, a non-negative unit price, and a discount between 0 and 1.</value>
+  </data>
+  <data name="InvalidSaleData" xml:space="preserve">
+    <value>Check the payment method, currency and description — one of them is invalid or too long.</value>
+  </data>
+  <data name="PaymentPlanNotFound" xml:space="preserve">
+    <value>Payment plan not found.</value>
+  </data>
+  <data name="PaymentPlanAlreadyExists" xml:space="preserve">
+    <value>This sale already has a payment plan.</value>
+  </data>
+  <data name="InstallmentsFullyPaid" xml:space="preserve">
+    <value>All installments have already been paid.</value>
+  </data>
+  <data name="InvalidInstallmentCount" xml:space="preserve">
+    <value>Total installments must be at least 1.</value>
+  </data>
+  <data name="PaymentPlanCancelled" xml:space="preserve">
+    <value>This payment plan was cancelled along with its sale.</value>
+  </data>
+  <data name="SaleIsNotACreditSale" xml:space="preserve">
+    <value>A payment plan can only be attached to a sale sold on credit.</value>
+  </data>
+  <data name="NoPaymentToRevert" xml:space="preserve">
+    <value>There is no payment left to revert on this plan.</value>
+  </data>
+  <data name="DatabaseError" xml:space="preserve">
+    <value>A database error occurred while completing the operation.</value>
+  </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>The record was changed by another operation while this one was running. Please try again.</value>
+  </data>
+  <data name="InvalidCustomerData" xml:space="preserve">
+    <value>Customer name is required and must fit its field lengths.</value>
+  </data>
+  <data name="DuplicateCustomerDocument" xml:space="preserve">
+    <value>Another customer already has this document number.</value>
+  </data>
+</root>

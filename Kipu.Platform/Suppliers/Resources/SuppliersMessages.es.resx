@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SupplierNotFound" xml:space="preserve">
+    <value>Proveedor no encontrado.</value>
+  </data>
+  <data name="PurchaseOrderNotFound" xml:space="preserve">
+    <value>Orden de compra no encontrada.</value>
+  </data>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>Uno o más productos de la orden de compra no fueron encontrados.</value>
+  </data>
+  <data name="InvalidStatusTransition" xml:space="preserve">
+    <value>Estado inválido para esta orden de compra.</value>
+  </data>
+  <data name="EmptyPurchaseOrderLines" xml:space="preserve">
+    <value>Una orden de compra debe tener al menos una línea.</value>
+  </data>
+  <data name="DatabaseError" xml:space="preserve">
+    <value>Ocurrió un error de base de datos al completar la operación.</value>
+  </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>Otro proceso modificó el registro mientras se ejecutaba esta operación. Inténtalo de nuevo.</value>
+  </data>
+  <data name="InvalidPurchaseOrderLine" xml:space="preserve">
+    <value>Cada línea de la orden de compra debe tener cantidad positiva, precio unitario no negativo y descuento entre 0 y 1.</value>
+  </data>
+  <data name="InvalidSupplierData" xml:space="preserve">
+    <value>El nombre del proveedor es obligatorio y debe respetar el largo permitido.</value>
+  </data>
+  <data name="SupplierHasPendingOrders" xml:space="preserve">
+    <value>Este proveedor tiene órdenes de compra pendientes o retrasadas. Recíbelas o cancélalas antes de desactivar al proveedor.</value>
+  </data>
+  <data name="InvalidPurchaseOrderDate" xml:space="preserve">
+    <value>La fecha de la orden y la fecha esperada de entrega deben ser válidas, estar dentro de un rango razonable, y la fecha de entrega no puede ser anterior a la fecha de la orden.</value>
+  </data>
+  <data name="InvalidPurchaseOrderData" xml:space="preserve">
+    <value>Revisa la moneda y la descripción — alguna es inválida o demasiado larga.</value>
+  </data>
+</root>

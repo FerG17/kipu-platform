@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="InvalidCredentials" xml:space="preserve">
+    <value>Correo o contraseña inválidos.</value>
+  </data>
+  <data name="EmailAlreadyTaken" xml:space="preserve">
+    <value>El correo '{0}' ya está registrado.</value>
+  </data>
+  <data name="UserNotFound" xml:space="preserve">
+    <value>Usuario no encontrado.</value>
+  </data>
+  <data name="BusinessNotFound" xml:space="preserve">
+    <value>Negocio no encontrado.</value>
+  </data>
+  <data name="CurrentPasswordInvalid" xml:space="preserve">
+    <value>La contraseña actual es incorrecta.</value>
+  </data>
+  <data name="RoleNotFound" xml:space="preserve">
+    <value>El rol seleccionado no existe.</value>
+  </data>
+  <data name="WeakPassword" xml:space="preserve">
+    <value>La contraseña debe tener al menos 8 caracteres e incluir al menos una letra y un número.</value>
+  </data>
+  <data name="InvalidUserData" xml:space="preserve">
+    <value>Revisa el nombre, apellido, teléfono y correo — alguno es inválido o demasiado largo.</value>
+  </data>
+  <data name="InvalidBusinessData" xml:space="preserve">
+    <value>Revisa el nombre, tipo, dirección y RUC del negocio — alguno falta, es inválido o demasiado largo.</value>
+  </data>
+  <data name="OperationCancelled" xml:space="preserve">
+    <value>La operación fue cancelada.</value>
+  </data>
+  <data name="DatabaseError" xml:space="preserve">
+    <value>Ocurrió un error de base de datos al completar la operación.</value>
+  </data>
+  <data name="InternalServerError" xml:space="preserve">
+    <value>Ocurrió un error inesperado.</value>
+  </data>
+  <data name="CannotRemoveLastAdmin" xml:space="preserve">
+    <value>Un negocio debe conservar al menos un administrador activo; este es el último.</value>
+  </data>
+  <data name="CannotRemoveOwnAccess" xml:space="preserve">
+    <value>No puedes eliminar ni suspender tu propia cuenta. Pide a otro administrador que lo haga.</value>
+  </data>
+  <data name="InvalidResetCode" xml:space="preserve">
+    <value>Código inválido o expirado. Solicita uno nuevo.</value>
+  </data>
+  <data name="ConcurrentModification" xml:space="preserve">
+    <value>Esto cambió en otro lugar recién. Actualiza e intenta de nuevo.</value>
+  </data>
+</root>
