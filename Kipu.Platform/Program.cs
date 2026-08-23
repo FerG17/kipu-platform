@@ -235,10 +235,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
 {
     var connectionStringTemplate = builder.Configuration.GetConnectionString("DefaultConnection");
-    if (string.IsNullOrWhiteSpace(connectionStringTemplate))
-        throw new InvalidOperationException("Database connection string is not set in the configuration.");
-
-    var connectionString = Environment.ExpandEnvironmentVariables(connectionStringTemplate);
+    var connectionString = Environment.ExpandEnvironmentVariables(connectionStringTemplate ?? string.Empty);
+    DatabaseConnectionStringGuard.EnsureUsable(connectionString);
 
     options.UseMySQL(connectionString)
         .UseLoggerFactory(serviceProvider.GetRequiredService<ILoggerFactory>());
