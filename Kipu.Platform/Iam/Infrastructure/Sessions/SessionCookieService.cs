@@ -5,18 +5,16 @@ using Kipu.Platform.Iam.Infrastructure.Tokens.Jwt.Configuration;
 namespace Kipu.Platform.Iam.Infrastructure.Sessions;
 
 /// <summary>
-///     SameSite=Strict only works when the frontend and API share a site
-///     (same registrable domain). The chosen hosting — Railway for the API,
-///     Cloudflare Pages for the frontend, no shared custom domain yet — puts
-///     them on two different sites by the Public Suffix List, so a Strict
-///     cookie would simply never be sent and login would loop forever.
-///     None is scoped to non-Development only: the dev cookie stays Strict
-///     because frontend and API are both http://localhost there, same-site
-///     by definition, and a None cookie requires Secure — which plain http
-///     can't satisfy anyway. Downgrading to None removes the browser's own
-///     CSRF defense for this cookie, so RequestAuthorizationMiddleware
-///     compensates with an Origin/Referer check on every cookie-authenticated
-///     state-changing request.
+///     SameSite=Strict requires the frontend and API to share a site (same
+///     registrable domain) — production does, via api.kipuapp.co.uk serving
+///     the API alongside kipuapp.co.uk's frontend, so the cookie is always
+///     Strict regardless of environment. This used to be None in production
+///     (API on Railway's own subdomain, frontend on Cloudflare Pages — two
+///     different sites by the Public Suffix List, so Strict would never have
+///     been sent), which is why RequestAuthorizationMiddleware still layers
+///     an Origin/Referer check on top of SameSite for cookie-authenticated
+///     state-changing requests — kept as defense in depth even now that
+///     SameSite alone would block a genuine cross-site forgery.
 /// </summary>
 public class SessionCookieService(IOptions<TokenSettings> tokenSettings, IWebHostEnvironment environment)
     : ISessionCookieService
@@ -30,7 +28,7 @@ public class SessionCookieService(IOptions<TokenSettings> tokenSettings, IWebHos
         {
             HttpOnly = true,
             Secure = isProduction,
-            SameSite = isProduction ? SameSiteMode.None : SameSiteMode.Strict,
+            SameSite = SameSiteMode.Strict,
             Path = "/",
             Expires = DateTimeOffset.UtcNow.AddDays(tokenSettings.Value.ExpirationDays)
         });

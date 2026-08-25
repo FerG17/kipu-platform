@@ -28,13 +28,15 @@ namespace Kipu.Platform.Iam.Infrastructure.Pipeline.Middleware.Components;
 ///     must be one of them, or the request is rejected with 403 — see
 ///     AuthorizeAttribute for the full role matrix rationale.
 ///
-///     Finally, guards against CSRF on the cookie path: the session cookie
-///     moved to SameSite=None in production (Railway's backend and Cloudflare
-///     Pages' frontend are different sites by the Public Suffix List, so
-///     Strict/Lax would never send it), which drops the browser's own
-///     cross-site defense. The header path doesn't need this — a script on
-///     another site has no way to read this API's cookie into an
-///     Authorization header, so there's nothing ambient for it to ride on.
+///     Finally, guards against CSRF on the cookie path: the session cookie is
+///     SameSite=Strict in production (frontend and API now share a site via
+///     api.kipuapp.co.uk), but this check stays as defense in depth from when
+///     the cookie was SameSite=None (API on Railway's own subdomain, a
+///     different site from the Cloudflare Pages frontend by the Public
+///     Suffix List, so Strict/Lax would never have been sent). The header
+///     path doesn't need this — a script on another site has no way to read
+///     this API's cookie into an Authorization header, so there's nothing
+///     ambient for it to ride on.
 /// </summary>
 public class RequestAuthorizationMiddleware(RequestDelegate next)
 {

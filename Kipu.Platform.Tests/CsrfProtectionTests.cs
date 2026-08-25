@@ -5,17 +5,15 @@ using Kipu.Platform.Tests.Infrastructure;
 namespace Kipu.Platform.Tests;
 
 /// <summary>
-///     The session cookie moved to SameSite=None in production (see
-///     AuthenticationController.SetSessionCookie) — required so it still
-///     reaches the API from a Cloudflare Pages frontend calling a Railway
-///     backend, two different sites by the Public Suffix List. That trades
-///     away the browser's own cross-site defense for this cookie, so
-///     RequestAuthorizationMiddleware.HasTrustedOrigin picks it back up by
-///     requiring a trusted Origin/Referer on every cookie-authenticated
-///     state-changing request. The test host is Development, where the
-///     cookie is still SameSite=Strict, but the Origin/Referer check itself
-///     runs regardless of environment — these tests exercise it directly by
-///     driving requests with the cookie the way a browser actually would.
+///     The session cookie is SameSite=Strict everywhere now (see
+///     SessionCookieService.SetSessionCookie) — frontend and API share a site
+///     via api.kipuapp.co.uk. RequestAuthorizationMiddleware.HasTrustedOrigin
+///     still requires a trusted Origin/Referer on every cookie-authenticated
+///     state-changing request, kept as defense in depth from when the cookie
+///     was SameSite=None (API on Railway's own subdomain, a different site
+///     from the frontend, so Strict would never have been sent). These tests
+///     exercise that check directly by driving requests with the cookie the
+///     way a browser actually would.
 /// </summary>
 [Collection(KipuApiCollection.Name)]
 public class CsrfProtectionTests(KipuApiFactory factory) : IntegrationTestBase(factory)
