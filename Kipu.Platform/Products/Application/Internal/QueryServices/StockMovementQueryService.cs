@@ -13,4 +13,11 @@ public class StockMovementQueryService(IStockMovementRepository stockMovementRep
     {
         return await stockMovementRepository.FindAllByBusinessIdAsync(query.BusinessId, query.Page, cancellationToken);
     }
+
+    public async Task<IEnumerable<StockMovement>> Handle(GetFilteredStockMovementsQuery query,
+        CancellationToken cancellationToken)
+    {
+        return await stockMovementRepository.FindFilteredByBusinessIdAsync(query.BusinessId, query.DateFrom,
+            query.DateTo, query.ProductId, supplierId: null, query.Category, query.Ascending, cancellationToken);
+    }
 }

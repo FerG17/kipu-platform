@@ -9,4 +9,6 @@ public record StockMovementResource(
     string Type,
     string Supplier,
     string Note,
-    DateTimeOffset RegisteredAt);
+    DateTimeOffset RegisteredAt,
+    int? BatchId,
+    decimal? UnitCost);

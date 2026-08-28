@@ -7,4 +7,6 @@ namespace Kipu.Platform.Products.Application.QueryServices;
 public interface IStockMovementQueryService
 {
     Task<PagedResult<StockMovement>> Handle(GetAllStockMovementsByBusinessIdQuery query, CancellationToken cancellationToken);
+
+    Task<IEnumerable<StockMovement>> Handle(GetFilteredStockMovementsQuery query, CancellationToken cancellationToken);
 }
