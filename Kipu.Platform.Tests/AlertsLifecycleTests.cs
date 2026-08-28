@@ -86,6 +86,38 @@ public class AlertsLifecycleTests(KipuApiFactory factory) : IntegrationTestBase(
     }
 
     /// <summary>
+    ///     X6 #13: a batch a normal sale drains to zero used to stay ACTIVE
+    ///     forever (only a manual /discard call, or the owner's own action,
+    ///     ever called Batch.Discard()) — so the expiration sweep kept
+    ///     re-raising/refreshing its alert on every run with no way to stop
+    ///     it, since the batch had no stock left to discard by hand. Selling
+    ///     out the last unit must now retire the batch itself, exactly like
+    ///     an explicit discard does.
+    /// </summary>
+    [Fact]
+    public async Task DepletingABatchThroughANormalSale_ClosesTheExpirationAlertItRaised()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client);
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+
+        // Expiring in 2 days trips the default 7-day warning threshold.
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 5,
+            expiration: DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2))).EnsureSuccessStatusCode();
+
+        var batchId = await GetFirstBatchIdAsync(client, productId);
+        Assert.Contains(await GetActiveAlertsAsync(client), alert => alert.GetProperty("type").GetString() == "EXPIRATION");
+
+        (await CreateSaleAsync(client, SaleLine(productId, quantity: 5, unitPrice: 10m))).EnsureSuccessStatusCode();
+
+        Assert.DoesNotContain(await GetActiveAlertsAsync(client),
+            alert => alert.GetProperty("batchId").ValueKind != JsonValueKind.Null && alert.GetProperty("batchId").GetInt32() == batchId);
+
+        var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
+        Assert.Equal("INACTIVE", batches[0].GetProperty("status").GetString());
+    }
+
+    /// <summary>
     ///     Deactivating a product must close its alerts, or a low-stock
     ///     warning outlives the product and sits in the list pointing at
     ///     something already removed from the catalog.
