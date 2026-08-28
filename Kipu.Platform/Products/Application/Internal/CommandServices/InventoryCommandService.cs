@@ -254,6 +254,7 @@ public class InventoryCommandService(
 
         var remaining = command.Quantity;
         var touchedItems = new List<InventoryItem>();
+        var depletedBatches = new List<Batch>();
         foreach (var item in items)
         {
             if (remaining <= 0) break;
@@ -273,6 +274,19 @@ public class InventoryCommandService(
 
                 var deductedFromBatch = Math.Min(batchRemaining, batch.RemainingQuantity);
                 batch.Reduce(deductedFromBatch);
+
+                // A batch a normal sale exhausts must retire itself just like a
+                // manual Discard does — otherwise it stays ACTIVE at
+                // RemainingQuantity 0 and the expiration sweep (see
+                // ProductContextFacade.GetAllActiveBatchesForExpirationSweep)
+                // keeps re-raising/refreshing its EXPIRATION/EXPIRED alert
+                // forever, since nothing ever calls Resolve() on it (X6 #13).
+                if (batch.RemainingQuantity <= 0)
+                {
+                    batch.Discard();
+                    depletedBatches.Add(batch);
+                }
+
                 batchRepository.Update(batch);
                 batchRemaining -= deductedFromBatch;
 
@@ -295,6 +309,9 @@ public class InventoryCommandService(
 
         foreach (var item in touchedItems)
             await PublishStockLevelChangedEvent(item, cancellationToken);
+
+        foreach (var batch in depletedBatches)
+            await mediator.PublishAsync(new BatchDiscardedEvent(batch.Id, batch.ProductId, batch.BusinessId), cancellationToken);
 
         return Result<InventoryItem>.Success(touchedItems[0]);
     }

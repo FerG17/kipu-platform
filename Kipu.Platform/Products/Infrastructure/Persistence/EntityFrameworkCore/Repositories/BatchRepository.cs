@@ -48,10 +48,16 @@ public class BatchRepository(AppDbContext context) : BaseRepository<Batch>(conte
             .Where(batch => batch.BusinessId == businessId).ToListAsync(cancellationToken);
     }
 
-    /// <summary>IgnoreQueryFilters() deliberately — the alerts expiration sweep runs outside any authenticated business and needs every business's active batches, see IBatchRepository.</summary>
+    /// <summary>
+    ///     IgnoreQueryFilters() deliberately — the alerts expiration sweep runs outside any authenticated business
+    ///     and needs every business's active batches, see IBatchRepository. RemainingQuantity > 0 excludes batches a
+    ///     sale has emptied down to zero: those should already be Discard()ed (see
+    ///     InventoryCommandService.Handle(RegisterStockSaleCommand)), but this filter keeps the sweep correct even
+    ///     if some other path ever zeroes a batch out without discarding it (X6 #13).
+    /// </summary>
     public async Task<IEnumerable<Batch>> FindAllActiveAsync(CancellationToken cancellationToken = default)
     {
         return await Context.Set<Batch>().IgnoreQueryFilters()
-            .Where(batch => batch.Status == BatchStatus.Active).ToListAsync(cancellationToken);
+            .Where(batch => batch.Status == BatchStatus.Active && batch.RemainingQuantity > 0).ToListAsync(cancellationToken);
     }
 }
