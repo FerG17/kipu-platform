@@ -32,6 +32,29 @@ public class StockAdjustmentTests(KipuApiFactory factory) : IntegrationTestBase(
         Assert.Equal("Merma: se cayó y rompió", adjustment.GetProperty("note").GetString());
     }
 
+    /// <summary>
+    ///     X6 Kardex: the "Pérdida rápida" entry point was the first thing to
+    ///     ever exercise this flow with a fractional delta — surfacing that
+    ///     AdjustStockResource.Delta was typed `int` while AdjustStockCommand
+    ///     is `decimal`, so ASP.NET's JSON deserializer rejected any
+    ///     non-integral value with a 400 before the command ever ran. The
+    ///     original per-row "Ajustar stock" button in Inventario carried the
+    ///     same latent bug for any product sold by weight.
+    /// </summary>
+    [Fact]
+    public async Task AdjustStock_WithAFractionalDelta_SucceedsForAProductSoldByWeight()
+    {
+        var client = await CreateBusinessAsync();
+        var productId = await CreateProductAsync(client, unitOfSale: "PESO");
+        var warehouseId = await GetDefaultWarehouseIdAsync(client);
+        (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 12.5m)).EnsureSuccessStatusCode();
+
+        var response = await AdjustStockAsync(client, productId, warehouseId, delta: -0.5m, reason: "Merma: se derramó al pesar");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(12, await GetTotalStockAsync(client, productId));
+    }
+
     [Fact]
     public async Task AdjustStock_WithAPositiveDelta_IncreasesStock()
     {
@@ -120,7 +143,7 @@ public class StockAdjustmentTests(KipuApiFactory factory) : IntegrationTestBase(
     }
 
     private static async Task<HttpResponseMessage> AdjustStockAsync(HttpClient client, int productId, int warehouseId,
-        int delta, string reason)
+        decimal delta, string reason)
     {
         return await client.PostAsJsonAsync($"/api/v1/inventories/{productId}/adjustment", new { warehouseId, delta, reason });
     }
