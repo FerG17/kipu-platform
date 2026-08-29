@@ -251,8 +251,14 @@ public class LotFefoTests(KipuApiFactory factory) : IntegrationTestBase(factory)
         var batches = await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
         var batchId = batches[0].GetProperty("id").GetInt32();
 
+        // -1 day isn't safely "in the past": the rejection compares against
+        // IBusinessClock.Today (America/Lima, UTC-5, see BusinessClock's own
+        // doc comment on this exact gap), which trails UTC's calendar date by
+        // up to a day. Between 00:00-05:00 UTC, "UTC yesterday" equals
+        // "Lima today", so the guard's `< Today` never fires and this test
+        // flakes. -2 days clears that one-day skew in every timezone.
         var response = await client.PatchAsJsonAsync($"/api/v1/batches/{batchId}/expiration",
-            new { expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1) });
+            new { expiration = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2) });
 
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
     }
