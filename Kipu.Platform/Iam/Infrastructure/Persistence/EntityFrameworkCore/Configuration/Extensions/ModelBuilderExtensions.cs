@@ -55,6 +55,17 @@ public static class ModelBuilderExtensions
             entity.Property(code => code.CodeHash).IsRequired();
             entity.Property(code => code.Version).IsConcurrencyToken();
 
+            // Plain `datetime` (fsp=0, the project-wide default) rounds a
+            // sub-second value on insert instead of truncating it (MySQL 8+
+            // behavior), which can push RequestedAt up to ~1s into the
+            // future. IsWithinCooldown compares it against a live
+            // DateTimeOffset.UtcNow with a cooldown as low as zero (tests),
+            // so that rounding alone can make a request look like it's still
+            // within cooldown when it isn't, silently keeping a stale code
+            // alive. Microsecond precision here removes the rounding error.
+            entity.Property(code => code.RequestedAt).HasColumnType("datetime(6)");
+            entity.Property(code => code.ExpiresAt).HasColumnType("datetime(6)");
+
             // No enforced FK to User on purpose — same reasoning as everywhere
             // else a lookup happens before a tenant/auth context exists
             // (compare Business.UserId): losing a code row if its user is ever
