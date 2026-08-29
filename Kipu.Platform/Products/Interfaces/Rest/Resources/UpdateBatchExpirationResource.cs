@@ -1,3 +1,3 @@
 namespace Kipu.Platform.Products.Interfaces.Rest.Resources;
 
-public record UpdateBatchExpirationResource(DateOnly? Expiration);
+public record UpdateBatchExpirationResource(DateOnly? Expiration, string? Label = null);

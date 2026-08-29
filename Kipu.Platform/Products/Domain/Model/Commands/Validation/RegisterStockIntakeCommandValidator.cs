@@ -28,5 +28,6 @@ public class RegisterStockIntakeCommandValidator : AbstractValidator<RegisterSto
             .WithMessage("Quantity can have at most 2 decimal places.");
         RuleFor(command => command.Supplier).MaximumLength(150);
         RuleFor(command => command.Note).MaximumLength(500);
+        RuleFor(command => command.Label).MaximumLength(60);
     }
 }

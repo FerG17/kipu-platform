@@ -9,7 +9,8 @@ public static class PurchaseOrderResourceFromEntityAssembler
     {
         var details = purchaseOrder.Details
             .Select(detail => new PurchaseOrderDetailResource(detail.Id, detail.PurchaseId, detail.ProductId, detail.Quantity,
-                detail.UnitPrice, detail.Discount, detail.Subtotal, detail.DeliveryStatus, detail.DeliveryTrackingNum))
+                detail.UnitPrice, detail.Discount, detail.Subtotal, detail.DeliveryStatus, detail.DeliveryTrackingNum,
+                detail.BatchLabel))
             .ToList();
 
         return new PurchaseOrderResource(purchaseOrder.Id, purchaseOrder.BusinessId, purchaseOrder.SupplierId,

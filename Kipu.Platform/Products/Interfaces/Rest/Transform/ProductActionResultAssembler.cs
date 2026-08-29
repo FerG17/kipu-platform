@@ -70,6 +70,7 @@ public static class ProductActionResultAssembler
             ProductError.InvalidAdjustmentReason => StatusCodes.Status400BadRequest,
             ProductError.InvalidStockIntakeData => StatusCodes.Status400BadRequest,
             ProductError.WarehouseInactive => StatusCodes.Status409Conflict,
+            ProductError.InvalidBatchLabel => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
     }

@@ -32,6 +32,8 @@ public class CreatePurchaseOrderCommandValidator : AbstractValidator<CreatePurch
             // Stored as decimal(5,4), i.e. a 0..1 fraction — anything above 1
             // flips the line total negative.
             line.RuleFor(l => l.Discount).InclusiveBetween(0m, 1m);
+
+            line.RuleFor(l => l.BatchLabel).MaximumLength(60);
         });
 
         RuleFor(command => command.Currency).Must(currency => AllowedCurrencies.Contains(currency));

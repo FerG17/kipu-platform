@@ -59,9 +59,10 @@ public class PurchaseOrder : IVersionedEntity
 
     public IReadOnlyCollection<PurchaseOrderDetail> Details => _details.AsReadOnly();
 
-    public PurchaseOrder AddLine(int productId, int quantity, decimal unitPrice, decimal discount)
+    public PurchaseOrder AddLine(int productId, int quantity, decimal unitPrice, decimal discount, string? batchLabel = null)
     {
-        _details.Add(new PurchaseOrderDetail(Id, productId, quantity, unitPrice, discount, string.Empty, string.Empty));
+        _details.Add(new PurchaseOrderDetail(Id, productId, quantity, unitPrice, discount, string.Empty, string.Empty,
+            batchLabel));
         return this;
     }
 

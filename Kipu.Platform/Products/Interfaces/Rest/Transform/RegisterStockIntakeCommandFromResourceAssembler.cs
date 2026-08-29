@@ -10,6 +10,6 @@ public static class RegisterStockIntakeCommandFromResourceAssembler
     {
         return new RegisterStockIntakeCommand(productId, businessId, resource.WarehouseId, resource.Quantity,
             resource.PurchasePrice, resource.Expiration, resource.Supplier, resource.Note, resource.MinimumStock,
-            resource.SupplierId);
+            resource.SupplierId, resource.Label);
     }
 }

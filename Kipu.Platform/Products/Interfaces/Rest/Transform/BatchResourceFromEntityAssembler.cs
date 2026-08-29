@@ -17,6 +17,6 @@ public static class BatchResourceFromEntityAssembler
     {
         return new BatchResource(batch.Id, batch.ProductId, batch.BusinessId, batch.Expiration, batch.PurchasePrice,
             batch.Status, batch.InventoryId, batch.Quantity, batch.RemainingQuantity, batch.DaysToExpiry(today),
-            batch.IsExpired(today), batch.IsExpiringSoon(today, thresholdDays));
+            batch.IsExpired(today), batch.IsExpiringSoon(today, thresholdDays), batch.Label);
     }
 }

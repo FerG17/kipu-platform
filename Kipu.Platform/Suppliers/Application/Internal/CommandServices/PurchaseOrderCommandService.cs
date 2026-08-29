@@ -71,7 +71,7 @@ public class PurchaseOrderCommandService(
         var purchaseOrder = new PurchaseOrder(command.BusinessId, command.SupplierId, command.Date, command.ExpectedDate,
             command.Currency, command.Description);
         foreach (var line in command.Lines)
-            purchaseOrder.AddLine(line.ProductId, line.Quantity, line.UnitPrice, line.Discount);
+            purchaseOrder.AddLine(line.ProductId, line.Quantity, line.UnitPrice, line.Discount, line.BatchLabel);
 
         await purchaseOrderRepository.AddAsync(purchaseOrder, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
@@ -139,7 +139,8 @@ public class PurchaseOrderCommandService(
             {
                 var note = $"Orden de compra #{purchaseOrder.Id}";
                 var stocked = await productContextFacade.RegisterStockIntake(line.ProductId, purchaseOrder.BusinessId,
-                    line.Quantity, line.UnitPrice, supplierName, note, purchaseOrder.SupplierId, cancellationToken);
+                    line.Quantity, line.UnitPrice, supplierName, note, purchaseOrder.SupplierId, line.BatchLabel,
+                    cancellationToken: cancellationToken);
                 if (stocked) continue;
 
                 // RECEIVED is a promise that the goods are on the shelf. This

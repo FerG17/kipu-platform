@@ -82,9 +82,10 @@ public class StockMovement(
     public DateTimeOffset RegisteredAt { get; private set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
-    ///     Which lot this movement touched (X5 Bloque C) — null for movements
-    ///     that predate per-lot tracking, and for adjustments, which correct
-    ///     the aggregate rather than a specific batch. Set through the
+    ///     Which lot this movement touched (X5 Bloque C; adjustments joined
+    ///     in at X6 #10) — null only for a movement that predates per-lot
+    ///     tracking, or the untracked remainder of one whose product has less
+    ///     batched stock than the movement's own quantity. Set through the
     ///     navigation, same EF Core key-fixup reason as Batch.InventoryItem:
     ///     an intake creates the StockMovement and its new Batch in the same
     ///     SaveChanges call, so the batch's real id isn't known yet when this

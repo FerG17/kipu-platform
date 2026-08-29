@@ -83,6 +83,7 @@ public static class ModelBuilderExtensions
             entity.Property(batch => batch.Status).IsRequired().HasMaxLength(20);
             entity.Property(batch => batch.Quantity).HasColumnType("decimal(10,2)");
             entity.Property(batch => batch.RemainingQuantity).HasColumnType("decimal(10,2)");
+            entity.Property(batch => batch.Label).HasMaxLength(60);
 
             entity.Property(batch => batch.Expiration).HasDateOnlyConversion();
 

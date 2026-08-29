@@ -17,5 +17,6 @@ public class AdjustStockCommandValidator : AbstractValidator<AdjustStockCommand>
         RuleFor(command => command.Delta).Must(delta => delta == Math.Round(delta, 2))
             .WithMessage("Delta can have at most 2 decimal places.");
         RuleFor(command => command.Reason).MaximumLength(500);
+        RuleFor(command => command.NewBatchLabel).MaximumLength(60);
     }
 }

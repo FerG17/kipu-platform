@@ -38,6 +38,9 @@ public enum ProductError
     /// <summary>A stock intake's Supplier/Note text exceeds its column length.</summary>
     InvalidStockIntakeData,
 
+    /// <summary>A lot's name (Batch.Label) exceeds its column length (X6 #3+#11).</summary>
+    InvalidBatchLabel,
+
     /// <summary>The warehouse a movement targets is deactivated — it can no longer receive or hold stock.</summary>
     WarehouseInactive,
 

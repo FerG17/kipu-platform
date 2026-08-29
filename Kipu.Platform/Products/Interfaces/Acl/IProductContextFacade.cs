@@ -48,7 +48,7 @@ public interface IProductContextFacade
     ///     expected to abort its transaction when this comes back false.
     /// </summary>
     Task<bool> RegisterStockIntake(int productId, int businessId, decimal quantity, decimal? purchasePrice, string? supplier,
-        string? note, int? supplierId, CancellationToken cancellationToken);
+        string? note, int? supplierId, string? label = null, CancellationToken cancellationToken = default);
 
     Task<bool> ProductExists(int productId, CancellationToken cancellationToken);
 

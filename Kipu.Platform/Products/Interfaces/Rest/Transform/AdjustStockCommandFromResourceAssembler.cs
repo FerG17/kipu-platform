@@ -7,6 +7,7 @@ public static class AdjustStockCommandFromResourceAssembler
 {
     public static AdjustStockCommand ToCommandFromResource(AdjustStockResource resource, int productId, int businessId)
     {
-        return new AdjustStockCommand(productId, resource.WarehouseId, businessId, resource.Delta, resource.Reason);
+        return new AdjustStockCommand(productId, resource.WarehouseId, businessId, resource.Delta, resource.Reason,
+            resource.BatchId, resource.NewBatchExpiration, resource.NewBatchPurchasePrice, resource.NewBatchLabel);
     }
 }

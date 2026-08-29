@@ -23,7 +23,8 @@ public static class BatchStatus
 ///     against the already-loaded, business-scoped products list) — a real
 ///     backend can and should scope directly.
 /// </summary>
-public class Batch(int productId, int businessId, DateOnly? expiration, decimal purchasePrice, decimal quantity)
+public class Batch(int productId, int businessId, DateOnly? expiration, decimal purchasePrice, decimal quantity,
+    string? label = null)
 {
     public Batch() : this(0, 0, null, 0, 0)
     {
@@ -35,6 +36,9 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     public DateOnly? Expiration { get; private set; } = expiration;
     public decimal PurchasePrice { get; private set; } = purchasePrice;
     public string Status { get; private set; } = BatchStatus.Active;
+
+    /// <summary>Free-text name the owner picks to tell lots apart (e.g. by supplier or delivery) — X6 #3+#11, purely descriptive, never used for FEFO ordering or any other logic.</summary>
+    public string? Label { get; private set; } = label;
 
     /// <summary>Units originally received into this lot — fixed at creation, never changes.</summary>
     public decimal Quantity { get; private set; } = quantity;
@@ -117,6 +121,36 @@ public class Batch(int productId, int businessId, DateOnly? expiration, decimal 
     public Batch UpdateExpiration(DateOnly? expiration)
     {
         Expiration = expiration;
+        return this;
+    }
+
+    /// <summary>Renames the lot after the fact — same editing point as UpdateExpiration (X6 #3+#11).</summary>
+    public Batch UpdateLabel(string? label)
+    {
+        Label = label;
+        return this;
+    }
+
+    /// <summary>
+    ///     Adds units the owner says this specific lot actually has — a manual
+    ///     stock adjustment "agregar a lote existente" (X6 #10), not a sale
+    ///     cancellation. Unlike Restore, this raises Quantity itself instead
+    ///     of capping at it: Restore is undoing a debit this same lot already
+    ///     took, so it can never exceed what the lot originally received;
+    ///     this is a correction to how much of the lot exists in the first
+    ///     place, so the lot's own "originally received" total has to grow
+    ///     with it or RemainingQuantity across a product's batches would stop
+    ///     summing to its InventoryItem.StockUnit again — the exact integrity
+    ///     gap this block exists to close.
+    /// </summary>
+    public Batch Replenish(decimal units)
+    {
+        checked
+        {
+            Quantity += units;
+            RemainingQuantity += units;
+        }
+
         return this;
     }
 
