@@ -196,7 +196,7 @@ public class ProductContextFacade(
         DateOnly? dateFrom, DateOnly? dateTo, int? productId, int? supplierId, CancellationToken cancellationToken)
     {
         var movements = await stockMovementRepository.FindFilteredByBusinessIdAsync(businessId, dateFrom, dateTo, productId,
-            supplierId, cancellationToken);
+            supplierId, cancellationToken: cancellationToken);
 
         var products = await productQueryService.Handle(new GetAllProductsByBusinessIdQuery(businessId, null), cancellationToken);
         var nameByProductId = products.ToDictionary(product => product.Id, product => product.Name);

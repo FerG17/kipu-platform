@@ -8,6 +8,7 @@ public static class StockMovementResourceFromEntityAssembler
     public static StockMovementResource ToResourceFromEntity(StockMovement movement)
     {
         return new StockMovementResource(movement.Id, movement.ProductId, movement.BusinessId, movement.WarehouseId,
-            movement.Quantity, movement.Type, movement.Supplier, movement.Note, movement.RegisteredAt);
+            movement.Quantity, movement.Type, movement.Supplier, movement.Note, movement.RegisteredAt,
+            movement.Batch?.Id, movement.Batch?.PurchasePrice);
     }
 }

@@ -39,4 +39,23 @@ public class StockMovementsController(
             result.Items.Select(StockMovementResourceFromEntityAssembler.ToResourceFromEntity),
             result.Page, result.PageSize, result.TotalCount, result.TotalPages));
     }
+
+    /// <summary>
+    ///     Backs Kardex — unpaginated (the frontend needs the whole filtered
+    ///     set at once to compute a running balance), ascending by default so
+    ///     that balance accumulates oldest-first once a product is selected.
+    /// </summary>
+    [HttpGet("filtered")]
+    [SwaggerOperation(Summary = "List stock movements of the current business, filtered and unpaginated (Kardex)", OperationId = "GetFilteredStockMovements")]
+    public async Task<IActionResult> GetFilteredStockMovements([FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo,
+        [FromQuery] int? productId, [FromQuery] string? category, [FromQuery] bool ascending, CancellationToken cancellationToken)
+    {
+        var businessId = currentUserAccessor.CurrentBusinessId;
+        if (businessId == null) return Unauthorized();
+
+        var movements = await stockMovementQueryService.Handle(
+            new GetFilteredStockMovementsQuery(businessId.Value, dateFrom, dateTo, productId, category, ascending),
+            cancellationToken);
+        return Ok(movements.Select(StockMovementResourceFromEntityAssembler.ToResourceFromEntity));
+    }
 }
