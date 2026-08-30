@@ -71,6 +71,8 @@ public static class ProductActionResultAssembler
             ProductError.InvalidStockIntakeData => StatusCodes.Status400BadRequest,
             ProductError.WarehouseInactive => StatusCodes.Status409Conflict,
             ProductError.InvalidBatchLabel => StatusCodes.Status400BadRequest,
+            ProductError.InvalidCategoryData => StatusCodes.Status400BadRequest,
+            ProductError.DuplicateCategoryName => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

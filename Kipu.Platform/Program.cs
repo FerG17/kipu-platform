@@ -390,15 +390,18 @@ builder.Services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
 builder.Services.AddScoped<IBatchRepository, BatchRepository>();
 builder.Services.AddScoped<IStockMovementRepository, StockMovementRepository>();
 builder.Services.AddScoped<IProductSupplierRepository, ProductSupplierRepository>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 
 builder.Services.AddScoped<IProductCommandService, ProductCommandService>();
 builder.Services.AddScoped<IWarehouseCommandService, WarehouseCommandService>();
 builder.Services.AddScoped<IInventoryCommandService, InventoryCommandService>();
+builder.Services.AddScoped<ICategoryCommandService, CategoryCommandService>();
 builder.Services.AddScoped<IProductQueryService, ProductQueryService>();
 builder.Services.AddScoped<IWarehouseQueryService, WarehouseQueryService>();
 builder.Services.AddScoped<IInventoryQueryService, InventoryQueryService>();
 builder.Services.AddScoped<IBatchQueryService, BatchQueryService>();
 builder.Services.AddScoped<IStockMovementQueryService, StockMovementQueryService>();
+builder.Services.AddScoped<ICategoryQueryService, CategoryQueryService>();
 
 builder.Services.AddScoped<IProductContextFacade, ProductContextFacade>();
 
