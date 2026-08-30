@@ -9,4 +9,5 @@ public record PurchaseOrderDetailResource(
     decimal Discount,
     decimal Subtotal,
     string DeliveryStatus,
-    string DeliveryTrackingNum);
+    string DeliveryTrackingNum,
+    string? BatchLabel);

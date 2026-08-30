@@ -7,6 +7,6 @@ public static class UpdateBatchExpirationCommandFromResourceAssembler
 {
     public static UpdateBatchExpirationCommand ToCommandFromResource(UpdateBatchExpirationResource resource, int batchId)
     {
-        return new UpdateBatchExpirationCommand(batchId, resource.Expiration);
+        return new UpdateBatchExpirationCommand(batchId, resource.Expiration, resource.Label);
     }
 }

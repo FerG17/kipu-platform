@@ -17,7 +17,8 @@ public class PurchaseOrderDetail(
     decimal unitPrice,
     decimal discount,
     string deliveryStatus,
-    string deliveryTrackingNum)
+    string deliveryTrackingNum,
+    string? batchLabel = null)
 {
     public PurchaseOrderDetail() : this(0, 0, 0, 0, 0, string.Empty, string.Empty)
     {
@@ -31,6 +32,9 @@ public class PurchaseOrderDetail(
     public decimal Discount { get; private set; } = discount;
     public string DeliveryStatus { get; private set; } = deliveryStatus;
     public string DeliveryTrackingNum { get; private set; } = deliveryTrackingNum;
+
+    /// <summary>Lot name the owner wants the batch opened on RECEIVED to carry (X6 #3+#10+#11) — carried as plain text on the line since a PO's batch doesn't exist yet when the line itself is created.</summary>
+    public string? BatchLabel { get; private set; } = batchLabel;
 
     public decimal Subtotal => Quantity * UnitPrice * (1 - Discount);
 }

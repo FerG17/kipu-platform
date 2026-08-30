@@ -9,4 +9,4 @@ namespace Kipu.Platform.Products.Interfaces.Rest.Resources;
 /// </summary>
 public record BatchResource(int Id, int ProductId, int BusinessId, DateOnly? Expiration, decimal PurchasePrice,
     string Status, int? InventoryId, decimal Quantity, decimal RemainingQuantity, int? DaysToExpiry, bool IsExpired,
-    bool IsExpiringSoon);
+    bool IsExpiringSoon, string? Label);

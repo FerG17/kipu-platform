@@ -9,4 +9,5 @@ public record RegisterStockIntakeResource(
     string? Supplier,
     string? Note,
     decimal? MinimumStock,
-    int? SupplierId = null);
+    int? SupplierId = null,
+    string? Label = null);

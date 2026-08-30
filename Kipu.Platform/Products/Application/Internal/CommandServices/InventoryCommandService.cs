@@ -164,10 +164,11 @@ public class InventoryCommandService(
         // Queued on the tracker only (no commit yet) so it lands in the SAME
         // SaveChanges call as the InventoryItem/StockMovement below.
         Batch? newBatch = null;
-        if (command.Quantity > 0 && (command.Expiration.HasValue || command.PurchasePrice.HasValue))
+        if (command.Quantity > 0 &&
+            (command.Expiration.HasValue || command.PurchasePrice.HasValue || !string.IsNullOrWhiteSpace(command.Label)))
         {
             newBatch = new Batch(command.ProductId, command.BusinessId, command.Expiration, command.PurchasePrice ?? 0m,
-                command.Quantity).LinkToInventoryItem(item);
+                command.Quantity, command.Label).LinkToInventoryItem(item);
             await batchRepository.AddAsync(newBatch, cancellationToken);
         }
 
@@ -440,6 +441,9 @@ public class InventoryCommandService(
     ///     which is always positive and relies on Type alone for direction),
     ///     and re-evaluates LOW_STOCK/OUT_OF_STOCK the same way every other
     ///     stock mutation does.
+    ///
+    ///     X6 #10: every unit this moves is now attributed to a specific
+    ///     Batch — see AdjustStockCommand for BatchId/NewBatch*.
     /// </summary>
     public async Task<Result<InventoryItem>> Handle(AdjustStockCommand command, CancellationToken cancellationToken)
     {
@@ -490,10 +494,101 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.AdjustmentExceedsAvailableStock,
                 localizer[nameof(ProductError.AdjustmentExceedsAvailableStock)]);
 
-        await stockMovementRepository.AddAsync(
-            new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, command.Delta,
-                StockMovementType.Adjustment, string.Empty, command.Reason),
-            cancellationToken);
+        // X6 #10 — only meaningful for a positive Delta creating a brand-new
+        // lot (BatchId == null); validated up front, same "fail before
+        // mutating anything" style as the matching checks in
+        // Handle(RegisterStockIntakeCommand).
+        Batch? targetBatch = null;
+        if (command.Delta > 0 && command.BatchId == null)
+        {
+            if (command.NewBatchExpiration.HasValue && command.NewBatchExpiration.Value < businessClock.Today)
+                return Result<InventoryItem>.Failure(ProductError.InvalidExpirationDate,
+                    localizer[nameof(ProductError.InvalidExpirationDate)]);
+
+            if (command.NewBatchPurchasePrice.HasValue && command.NewBatchPurchasePrice.Value < 0)
+                return Result<InventoryItem>.Failure(ProductError.InvalidPurchasePrice,
+                    localizer[nameof(ProductError.InvalidPurchasePrice)]);
+        }
+        else if (command.Delta > 0 && command.BatchId.HasValue)
+        {
+            // Must resolve to a batch of THIS exact product+warehouse
+            // InventoryItem — BatchNotFound doubles as "wrong owner" here,
+            // same as everywhere else a cross-tenant/cross-item id is
+            // rejected as if it simply didn't exist (see AppDbContext's
+            // BusinessId query filter doc comment).
+            targetBatch = await batchRepository.FindByIdAsync(command.BatchId.Value, cancellationToken);
+            if (targetBatch == null || targetBatch.InventoryId != item.Id)
+                return Result<InventoryItem>.Failure(ProductError.BatchNotFound, localizer[nameof(ProductError.BatchNotFound)]);
+
+            if (targetBatch.Status == BatchStatus.Inactive)
+                return Result<InventoryItem>.Failure(ProductError.BatchNotEditable, localizer[nameof(ProductError.BatchNotEditable)]);
+        }
+
+        // X6 #10 — an adjustment used to only ever touch the aggregate
+        // InventoryItem.StockUnit, never a specific Batch, which let the sum
+        // of a product's RemainingQuantity drift from its actual total
+        // stock. Removal mirrors a sale's own FEFO draw-down exactly
+        // (earliest-expiration-first across active lots); a positive
+        // adjustment always lands in a lot too — the one the owner picked,
+        // or a freshly-opened one — so this gap can no longer reopen.
+        var depletedBatches = new List<Batch>();
+        if (command.Delta < 0)
+        {
+            var toRemove = -command.Delta;
+            var activeBatches = await batchRepository.FindActiveByInventoryItemIdAsync(item.Id, cancellationToken);
+            foreach (var batch in activeBatches)
+            {
+                if (toRemove <= 0) break;
+                if (batch.RemainingQuantity <= 0) continue;
+
+                var deductedFromBatch = Math.Min(toRemove, batch.RemainingQuantity);
+                batch.Reduce(deductedFromBatch);
+
+                if (batch.RemainingQuantity <= 0)
+                {
+                    batch.Discard();
+                    depletedBatches.Add(batch);
+                }
+
+                batchRepository.Update(batch);
+                toRemove -= deductedFromBatch;
+
+                await stockMovementRepository.AddAsync(
+                    new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, -deductedFromBatch,
+                        StockMovementType.Adjustment, string.Empty, command.Reason, batch: batch),
+                    cancellationToken);
+            }
+
+            // Whatever this InventoryItem's total can't attribute to a
+            // tracked lot (stock that predates per-lot tracking) — same
+            // leftover handling as a sale's own FEFO loop.
+            if (toRemove > 0)
+            {
+                await stockMovementRepository.AddAsync(
+                    new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, -toRemove,
+                        StockMovementType.Adjustment, string.Empty, command.Reason),
+                    cancellationToken);
+            }
+        }
+        else
+        {
+            if (targetBatch != null)
+            {
+                targetBatch.Replenish(command.Delta);
+                batchRepository.Update(targetBatch);
+            }
+            else
+            {
+                targetBatch = new Batch(command.ProductId, command.BusinessId, command.NewBatchExpiration,
+                    command.NewBatchPurchasePrice ?? 0m, command.Delta, command.NewBatchLabel).LinkToInventoryItem(item);
+                await batchRepository.AddAsync(targetBatch, cancellationToken);
+            }
+
+            await stockMovementRepository.AddAsync(
+                new StockMovement(command.ProductId, command.BusinessId, command.WarehouseId, command.Delta,
+                    StockMovementType.Adjustment, string.Empty, command.Reason, batch: targetBatch),
+                cancellationToken);
+        }
 
         try
         {
@@ -515,6 +610,9 @@ public class InventoryCommandService(
             return Result<InventoryItem>.Failure(ProductError.InvalidAdjustmentReason,
                 localizer[nameof(ProductError.InvalidAdjustmentReason)]);
         }
+
+        foreach (var batch in depletedBatches)
+            await mediator.PublishAsync(new BatchDiscardedEvent(batch.Id, batch.ProductId, batch.BusinessId), cancellationToken);
 
         await PublishStockLevelChangedEvent(item, cancellationToken);
 
@@ -558,6 +656,10 @@ public class InventoryCommandService(
     ///     BatchRepository.FindActiveByInventoryItemIdAsync), so this alone
     ///     is enough to move a lot earlier or later in the draw-down order —
     ///     no separate re-ranking step needed.
+    ///
+    ///     Also edits the lot's own free-text Label (X6 #3+#11) — same panel,
+    ///     same action, since both are corrections to a lot's own record
+    ///     rather than a stock movement.
     /// </summary>
     public async Task<Result<Batch>> Handle(UpdateBatchExpirationCommand command, CancellationToken cancellationToken)
     {
@@ -571,7 +673,11 @@ public class InventoryCommandService(
         if (command.Expiration.HasValue && command.Expiration.Value < businessClock.Today)
             return Result<Batch>.Failure(ProductError.InvalidExpirationDate, localizer[nameof(ProductError.InvalidExpirationDate)]);
 
+        if (command.Label is { Length: > 60 })
+            return Result<Batch>.Failure(ProductError.InvalidBatchLabel, localizer[nameof(ProductError.InvalidBatchLabel)]);
+
         batch.UpdateExpiration(command.Expiration);
+        batch.UpdateLabel(command.Label);
         batchRepository.Update(batch);
         await unitOfWork.CompleteAsync(cancellationToken);
 

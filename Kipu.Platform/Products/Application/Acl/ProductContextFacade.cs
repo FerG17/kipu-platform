@@ -65,7 +65,7 @@ public class ProductContextFacade(
     ///     business's first warehouse.
     /// </summary>
     public async Task<bool> RegisterStockIntake(int productId, int businessId, decimal quantity, decimal? purchasePrice,
-        string? supplier, string? note, int? supplierId, CancellationToken cancellationToken)
+        string? supplier, string? note, int? supplierId, string? label = null, CancellationToken cancellationToken = default)
     {
         // X4 M10: nothing checked warehouse status before — a purchase order
         // could silently receive into a deactivated warehouse, including one
@@ -88,7 +88,7 @@ public class ProductContextFacade(
         if (targetWarehouseId == null) return false;
 
         var command = new RegisterStockIntakeCommand(productId, businessId, targetWarehouseId.Value, quantity, purchasePrice,
-            null, supplier, note, null, supplierId);
+            null, supplier, note, null, supplierId, label);
         var result = await inventoryCommandService.Handle(command, cancellationToken);
         return result.IsSuccess;
     }

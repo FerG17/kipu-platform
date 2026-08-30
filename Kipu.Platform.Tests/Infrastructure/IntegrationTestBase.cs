@@ -135,7 +135,7 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
     }
 
     protected static async Task<HttpResponseMessage> CreatePurchaseOrderAsync(HttpClient client, int supplierId,
-        int productId, int quantity, decimal unitPrice = 5m, decimal discount = 0m)
+        int productId, int quantity, decimal unitPrice = 5m, decimal discount = 0m, string? batchLabel = null)
     {
         return await client.PostAsJsonAsync("/api/v1/purchases", new
         {
@@ -144,7 +144,7 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
             expectedDate = (DateOnly?)null,
             currency = "PEN",
             description = "orden de prueba",
-            lines = new[] { new { productId, quantity, unitPrice, discount } }
+            lines = new[] { new { productId, quantity, unitPrice, discount, batchLabel } }
         });
     }
 
@@ -180,7 +180,7 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
 
     protected static async Task<HttpResponseMessage> RegisterStockIntakeAsync(HttpClient client, int productId,
         int warehouseId, decimal quantity, DateOnly? expiration = null, decimal? purchasePrice = null,
-        string? supplier = null, decimal? minimumStock = null)
+        string? supplier = null, decimal? minimumStock = null, string? label = null)
     {
         return await client.PostAsJsonAsync($"/api/v1/products/{productId}/stock-intake", new
         {
@@ -190,8 +190,14 @@ public abstract class IntegrationTestBase(KipuApiFactory factory)
             expiration,
             supplier,
             note = (string?)null,
-            minimumStock
+            minimumStock,
+            label
         });
+    }
+
+    protected static async Task<JsonElement> GetBatchesAsync(HttpClient client, int productId)
+    {
+        return await ReadJsonAsync(await client.GetAsync($"/api/v1/batches?productId={productId}"));
     }
 
     protected static async Task<HttpResponseMessage> CreateSaleAsync(HttpClient client, params object[] lines)

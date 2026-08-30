@@ -66,6 +66,7 @@ public static class ModelBuilderExtensions
             entity.Property(detail => detail.Discount).HasColumnType("decimal(5,4)");
             entity.Property(detail => detail.DeliveryStatus).HasMaxLength(20);
             entity.Property(detail => detail.DeliveryTrackingNum).HasMaxLength(50);
+            entity.Property(detail => detail.BatchLabel).HasMaxLength(60);
 
             entity.HasOne<Product>().WithMany().HasForeignKey(detail => detail.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
