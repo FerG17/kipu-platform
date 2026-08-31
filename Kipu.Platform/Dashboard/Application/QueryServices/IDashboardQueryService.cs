@@ -6,5 +6,5 @@ public interface IDashboardQueryService
 {
     Task<BusinessKpisResult> Handle(GetBusinessKpisQuery query, CancellationToken cancellationToken);
     Task<IReadOnlyCollection<SalesByDayResult>> Handle(GetSalesByDayQuery query, CancellationToken cancellationToken);
-    Task<IReadOnlyCollection<TopStockProductResult>> Handle(GetTopStockProductsQuery query, CancellationToken cancellationToken);
+    Task<IReadOnlyCollection<TopSellingProductResult>> Handle(GetTopSellingProductsQuery query, CancellationToken cancellationToken);
 }

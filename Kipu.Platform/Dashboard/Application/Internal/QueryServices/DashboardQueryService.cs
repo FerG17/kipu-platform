@@ -51,11 +51,11 @@ public class DashboardQueryService(IProductContextFacade productContextFacade, I
         return days;
     }
 
-    public async Task<IReadOnlyCollection<TopStockProductResult>> Handle(GetTopStockProductsQuery query,
+    public async Task<IReadOnlyCollection<TopSellingProductResult>> Handle(GetTopSellingProductsQuery query,
         CancellationToken cancellationToken)
     {
-        var topProducts = await productContextFacade.GetTopStockProducts(query.BusinessId, query.Count, cancellationToken);
-        return topProducts.Select(product => new TopStockProductResult(product.ProductId, product.ProductName, product.TotalStock))
+        var topProducts = await productContextFacade.GetTopSellingProducts(query.BusinessId, query.Count, cancellationToken);
+        return topProducts.Select(product => new TopSellingProductResult(product.ProductId, product.ProductName, product.TotalSold))
             .ToList();
     }
 }

@@ -198,6 +198,26 @@ public class ProductContextFacade(
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<TopSellingProductInfo>> GetTopSellingProducts(int businessId, int count,
+        CancellationToken cancellationToken)
+    {
+        var products = await productQueryService.Handle(new GetAllProductsByBusinessIdQuery(businessId, null), cancellationToken);
+        var nameByProductId = products.ToDictionary(product => product.Id, product => product.Name);
+
+        var movements = await stockMovementRepository.FindFilteredByBusinessIdAsync(businessId, null, null, null, null,
+            cancellationToken: cancellationToken);
+
+        return movements
+            .Where(movement => movement.Type == StockMovementType.Sale)
+            .GroupBy(movement => movement.ProductId)
+            .Select(group => new TopSellingProductInfo(group.Key,
+                nameByProductId.GetValueOrDefault(group.Key, $"#{group.Key}"),
+                group.Sum(movement => movement.Quantity)))
+            .OrderByDescending(info => info.TotalSold)
+            .Take(count)
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<StockMovementReportLine>> GetStockMovementsForReport(int businessId,
         DateOnly? dateFrom, DateOnly? dateTo, int? productId, int? supplierId, CancellationToken cancellationToken)
     {

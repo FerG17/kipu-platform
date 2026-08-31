@@ -95,8 +95,11 @@ public interface IProductContextFacade
     /// <summary>Live KPI snapshot — computed on demand, never from a stored table (see Dashboard &amp; Analytics, architecture doc §6.8).</summary>
     Task<ProductKpisSnapshot> GetProductKpisSnapshot(int businessId, CancellationToken cancellationToken);
 
-    /// <summary>Ranked by real InventoryItem stock — never by quantity sold.</summary>
+    /// <summary>Ranked by real InventoryItem stock — never by quantity sold. Still used by the "Inventory" Excel report; the Dashboard widget itself moved to GetTopSellingProducts (X6 #6).</summary>
     Task<IReadOnlyCollection<TopStockProductInfo>> GetTopStockProducts(int businessId, int count, CancellationToken cancellationToken);
+
+    /// <summary>Ranked by total units sold (StockMovement rows of Type == SALE), all-time — powers the Dashboard's top-sellers widget (X6 #6).</summary>
+    Task<IReadOnlyCollection<TopSellingProductInfo>> GetTopSellingProducts(int businessId, int count, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Stock movements ("entradas/salidas") for the Dashboard
@@ -116,6 +119,8 @@ public interface IProductContextFacade
 public record ProductKpisSnapshot(int TotalProducts, int LowStockCount, int ExpiringSoonCount, decimal InventoryValue);
 
 public record TopStockProductInfo(int ProductId, string ProductName, decimal TotalStock);
+
+public record TopSellingProductInfo(int ProductId, string ProductName, decimal TotalSold);
 
 public record StockMovementReportLine(int ProductId, string ProductName, string Type, decimal Quantity, string Supplier,
     string Note, DateTimeOffset RegisteredAt);
