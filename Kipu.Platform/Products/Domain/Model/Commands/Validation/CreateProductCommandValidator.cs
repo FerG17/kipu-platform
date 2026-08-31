@@ -19,5 +19,7 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             .When(command => !string.IsNullOrEmpty(command.Barcode));
 
         RuleFor(command => command.UnitOfSale).MustBeAUnitOfSale();
+        RuleFor(command => command.UnidadDeMedida).MustBeAUnidadDeMedida();
+        RuleFor(command => command.Presentacion).MustBeAPresentacion();
     }
 }

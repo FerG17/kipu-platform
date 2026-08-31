@@ -28,6 +28,8 @@ public static class ModelBuilderExtensions
             entity.Property(product => product.Status).IsRequired().HasMaxLength(20);
             entity.Property(product => product.Barcode).HasMaxLength(64);
             entity.Property(product => product.UnitOfSale).IsRequired().HasMaxLength(20);
+            entity.Property(product => product.UnidadDeMedida).IsRequired().HasMaxLength(20);
+            entity.Property(product => product.Presentacion).IsRequired().HasMaxLength(20);
 
             entity.HasOne<Business>().WithMany().HasForeignKey(product => product.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);

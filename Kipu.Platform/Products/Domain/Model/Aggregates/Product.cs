@@ -22,13 +22,43 @@ public static class ProductUnitOfSale
 }
 
 /// <summary>
+///     How the product is physically packaged for purchase/intake (a box, a
+///     sack, a loose package, or a single unit). Purely descriptive catalog
+///     data — carries no conversion factor and never feeds into any stock
+///     arithmetic (X6 #9): a "20 sacos" intake still registers as 20, not a
+///     multiple of some per-sack weight.
+/// </summary>
+public static class ProductUnidadDeMedida
+{
+    public const string Caja = "CAJA";
+    public const string Saco = "SACO";
+    public const string Paquete = "PAQUETE";
+    public const string Unidad = "UNIDAD";
+}
+
+/// <summary>
+///     What the product is measured in for display purposes (kg, liters, or
+///     plain units) — e.g. a "Saco de harina de 50kg" is UnidadDeMedida=Saco,
+///     Presentacion=Kg. Distinct from UnitOfSale above: this is informational
+///     catalog data, not a behavioral flag, and never affects Quantity math
+///     (X6 #8/#9).
+/// </summary>
+public static class ProductPresentacion
+{
+    public const string Kg = "KG";
+    public const string Litro = "LITRO";
+    public const string Unidad = "UNIDAD";
+}
+
+/// <summary>
 ///     The product aggregate — a catalog item a business sells or stocks.
 ///     Category is a plain string (see Shared.ProductCategory): either one of
 ///     the fixed values, or a custom label the admin typed in when choosing
 ///     "Otros" — both are valid, equally-first-class category values.
 /// </summary>
 public class Product(int businessId, string name, string description, string category, decimal basePrice,
-    string? barcode = null, string unitOfSale = ProductUnitOfSale.Unit)
+    string? barcode = null, string unitOfSale = ProductUnitOfSale.Unit,
+    string unidadDeMedida = ProductUnidadDeMedida.Unidad, string presentacion = ProductPresentacion.Unidad)
 {
     public Product() : this(0, string.Empty, string.Empty, ProductCategory.Other, 0)
     {
@@ -51,12 +81,14 @@ public class Product(int businessId, string name, string description, string cat
     public string? Barcode { get; private set; } = barcode;
 
     public string UnitOfSale { get; private set; } = unitOfSale;
+    public string UnidadDeMedida { get; private set; } = unidadDeMedida;
+    public string Presentacion { get; private set; } = presentacion;
 
     public bool IsActive => Status == ProductStatus.Active;
     public bool IsSoldByWeight => UnitOfSale == ProductUnitOfSale.Weight;
 
     public Product UpdateDetails(string name, string description, string category, decimal basePrice, string? barcode,
-        string unitOfSale)
+        string unitOfSale, string unidadDeMedida, string presentacion)
     {
         Name = name;
         Description = description;
@@ -64,6 +96,8 @@ public class Product(int businessId, string name, string description, string cat
         BasePrice = basePrice;
         Barcode = barcode;
         UnitOfSale = unitOfSale;
+        UnidadDeMedida = unidadDeMedida;
+        Presentacion = presentacion;
         return this;
     }
 
