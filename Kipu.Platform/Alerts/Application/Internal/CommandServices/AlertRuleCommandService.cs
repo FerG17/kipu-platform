@@ -8,6 +8,7 @@ using Kipu.Platform.Alerts.Domain.Model.Errors;
 using Kipu.Platform.Alerts.Domain.Repositories;
 using Kipu.Platform.Alerts.Resources;
 using Kipu.Platform.Products.Interfaces.Acl;
+using Kipu.Platform.Sales.Interfaces.Acl;
 using Kipu.Platform.Shared.Application;
 using Kipu.Platform.Shared.Application.Model;
 using Kipu.Platform.Shared.Domain.Repositories;
@@ -21,7 +22,9 @@ public class AlertRuleCommandService(
     IValidator<CreateOrUpdateAlertRuleCommand> createOrUpdateAlertRuleValidator,
     IStringLocalizer<AlertsMessages> localizer,
     IExpirationAlertSweepService expirationAlertSweepService,
+    IInstallmentDueAlertSweepService installmentDueAlertSweepService,
     IProductContextFacade productContextFacade,
+    ISalesContextFacade salesContextFacade,
     IBusinessClock businessClock)
     : IAlertRuleCommandService
 {
@@ -77,6 +80,16 @@ public class AlertRuleCommandService(
                 .ToList();
             await expirationAlertSweepService.SweepBusinessAsync(command.BusinessId, batches, businessClock.Today,
                 cancellationToken);
+        }
+
+        // Same reasoning, for the installment-due threshold/enabled flag (X6 #7, decision 7).
+        if (command.AlertType == AlertType.InstallmentDue)
+        {
+            var pendingInstallments = (await salesContextFacade.GetPendingInstallmentsForDueSweep(cancellationToken))
+                .Where(info => info.BusinessId == command.BusinessId)
+                .ToList();
+            await installmentDueAlertSweepService.SweepBusinessAsync(command.BusinessId, pendingInstallments,
+                businessClock.Today, cancellationToken);
         }
 
         return Result<AlertRule>.Success(rule);

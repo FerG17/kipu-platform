@@ -440,6 +440,7 @@ builder.Services.AddScoped<IAlertRuleRepository, AlertRuleRepository>();
 builder.Services.AddScoped<IAlertCommandService, AlertCommandService>();
 builder.Services.AddScoped<IAlertRuleCommandService, AlertRuleCommandService>();
 builder.Services.AddScoped<IExpirationAlertSweepService, ExpirationAlertSweepService>();
+builder.Services.AddScoped<IInstallmentDueAlertSweepService, InstallmentDueAlertSweepService>();
 builder.Services.AddScoped<IAlertQueryService, AlertQueryService>();
 builder.Services.AddScoped<IAlertRuleQueryService, AlertRuleQueryService>();
 
@@ -451,11 +452,13 @@ builder.Services.AddScoped<IAlertsContextFacade, AlertsContextFacade>();
 builder.Services.AddScoped<IAlertNotificationDispatcher, NoOpAlertNotificationDispatcher>();
 
 AlertSweepIntervalGuard.EnsureUsable(builder.Configuration.GetValue("Alerts:SweepIntervalHours", 6.0));
+AlertSweepIntervalGuard.EnsureUsable(builder.Configuration.GetValue("Alerts:InstallmentDueSweepIntervalHours", 6.0));
 
 // Event handlers are auto-discovered by AddCortexMediator's assembly scan
 // (StockLevelChangedEventHandler, BatchRegisteredEventHandler) — no
 // explicit registration needed here.
 builder.Services.AddHostedService<AlertExpirationSweepJob>();
+builder.Services.AddHostedService<InstallmentDueSweepJob>();
 
 // Dashboard & Analytics Bounded Context — no aggregates of its own, composes
 // Product/Sales via their ACL facades (already registered above).

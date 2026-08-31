@@ -59,10 +59,11 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         // ran in CI, which has no such file, for the first time).
         Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", "http://localhost:5173");
 
-        // The alerts sweep runs once on startup and then on this interval —
-        // pushed far out so it can't fire mid-test and mutate alert state
+        // The alerts sweeps run once on startup and then on this interval —
+        // pushed far out so they can't fire mid-test and mutate alert state
         // underneath an assertion.
         Environment.SetEnvironmentVariable("Alerts__SweepIntervalHours", "24");
+        Environment.SetEnvironmentVariable("Alerts__InstallmentDueSweepIntervalHours", "24");
 
         // Every test signs up its own business, and they all look like one
         // client to the per-IP rate limiter. At the production budget of 10

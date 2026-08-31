@@ -36,4 +36,13 @@ public interface IAlertRepository : IBaseRepository<Alert>
 
     /// <summary>Every still-open alert raised for a product — closed when the product is deactivated.</summary>
     Task<IEnumerable<Alert>> FindActiveByProductIdAsync(int productId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Every still-open INSTALLMENT_DUE alert across the given sales, in
+    ///     one query — used by InstallmentDueSweepJob the same way
+    ///     FindActiveExpirationAlertsByBatchIdsAsync is used by the
+    ///     expiration sweep. Ignores query filters for the same reason.
+    /// </summary>
+    Task<IEnumerable<Alert>> FindActiveInstallmentAlertsBySaleIdsAsync(IReadOnlyCollection<int> saleIds,
+        CancellationToken cancellationToken = default);
 }

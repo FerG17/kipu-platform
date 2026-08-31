@@ -25,6 +25,7 @@ public class PaymentPlanCommandService(
     ISaleRepository saleRepository,
     IUnitOfWork unitOfWork,
     IValidator<CreatePaymentPlanCommand> createPaymentPlanValidator,
+    IValidator<UpdatePaymentInstallmentCommand> updatePaymentInstallmentValidator,
     IStringLocalizer<SalesMessages> localizer)
     : IPaymentPlanCommandService
 {
@@ -55,7 +56,16 @@ public class PaymentPlanCommandService(
             return Result<PaymentPlan>.Failure(SalesError.PaymentPlanAlreadyExists,
                 localizer[nameof(SalesError.PaymentPlanAlreadyExists)]);
 
-        var plan = new PaymentPlan(command.SaleId, command.BusinessId, command.TotalInstallments);
+        // The cashier enters every cuota's date and amount by hand (no fixed
+        // cadence, X6 #7) — the one thing never left to trust from the client
+        // is whether they add up. No margin: either it matches Sale.TotalAmount
+        // to the cent, or the plan is rejected outright (decision 1).
+        if (command.Schedule.Sum(line => line.Amount) != sale.TotalAmount)
+            return Result<PaymentPlan>.Failure(SalesError.InstallmentAmountMismatch,
+                localizer[nameof(SalesError.InstallmentAmountMismatch)]);
+
+        var schedule = command.Schedule.Select(line => (line.DueDate, line.Amount)).ToList();
+        var plan = new PaymentPlan(command.SaleId, command.BusinessId, schedule);
         await paymentPlanRepository.AddAsync(plan, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
 
@@ -77,24 +87,11 @@ public class PaymentPlanCommandService(
             return Result<PaymentPlan>.Failure(SalesError.InstallmentsFullyPaid,
                 localizer[nameof(SalesError.InstallmentsFullyPaid)]);
 
-        // The amount is always Sale.TotalAmount / TotalInstallments, computed
-        // here rather than taken from the caller — the cashier registers
-        // "the next installment", not an arbitrary figure, so there is
-        // nothing to trust from client input. Standard installments round to
-        // the cent; whatever that rounding drops or adds is folded into the
-        // LAST installment instead of silently drifting the plan's total
-        // away from the sale's real TotalAmount by a cent or two.
-        var sale = await saleRepository.FindByIdAsync(plan.SaleId, cancellationToken);
-        if (sale == null)
-            return Result<PaymentPlan>.Failure(SalesError.SaleNotFound, localizer[nameof(SalesError.SaleNotFound)]);
-
-        var standardInstallmentAmount = Math.Round(sale.TotalAmount / plan.TotalInstallments, 2, MidpointRounding.AwayFromZero);
-        var isLastInstallment = plan.PaidInstallments == plan.TotalInstallments - 1;
-        var amount = isLastInstallment
-            ? sale.TotalAmount - standardInstallmentAmount * (plan.TotalInstallments - 1)
-            : standardInstallmentAmount;
-
-        plan.RegisterPayment(amount, command.PaidByUserId);
+        // The amount now comes from the earliest unpaid PaymentInstallment in
+        // the plan's own calendar, never computed here and never taken from
+        // the caller — the cashier registers "the next cuota", not an
+        // arbitrary figure (X6 #7 replaces the old even-split calculation).
+        plan.RegisterPayment(command.PaidByUserId);
         paymentPlanRepository.Update(plan);
 
         try
@@ -110,6 +107,53 @@ public class PaymentPlanCommandService(
             return Result<PaymentPlan>.Failure(SalesError.ConcurrentModification,
                 localizer[nameof(SalesError.ConcurrentModification)]);
         }
+
+        return Result<PaymentPlan>.Success(plan);
+    }
+
+    /// <summary>
+    ///     Edits an unpaid cuota's date/amount — allowed even when other
+    ///     cuotas in the same plan are already paid (X6 #7, decision 5). The
+    ///     resulting schedule must still add up exactly to Sale.TotalAmount,
+    ///     same rule as CreatePaymentPlanCommand (decision 1).
+    /// </summary>
+    public async Task<Result<PaymentPlan>> Handle(UpdatePaymentInstallmentCommand command, CancellationToken cancellationToken)
+    {
+        if (!(await updatePaymentInstallmentValidator.ValidateAsync(command, cancellationToken)).IsValid)
+            return Result<PaymentPlan>.Failure(SalesError.InvalidInstallmentCount,
+                localizer[nameof(SalesError.InvalidInstallmentCount)]);
+
+        var plan = await paymentPlanRepository.FindByIdWithPaymentsAsync(command.PaymentPlanId, cancellationToken);
+        if (plan == null)
+            return Result<PaymentPlan>.Failure(SalesError.PaymentPlanNotFound,
+                localizer[nameof(SalesError.PaymentPlanNotFound)]);
+
+        if (plan.IsCancelled)
+            return Result<PaymentPlan>.Failure(SalesError.PaymentPlanCancelled,
+                localizer[nameof(SalesError.PaymentPlanCancelled)]);
+
+        var installment = plan.FindInstallment(command.InstallmentId);
+        if (installment == null)
+            return Result<PaymentPlan>.Failure(SalesError.InstallmentNotFound,
+                localizer[nameof(SalesError.InstallmentNotFound)]);
+
+        if (installment.IsPaid)
+            return Result<PaymentPlan>.Failure(SalesError.InstallmentAlreadyPaid,
+                localizer[nameof(SalesError.InstallmentAlreadyPaid)]);
+
+        var sale = await saleRepository.FindByIdAsync(plan.SaleId, cancellationToken);
+        if (sale == null)
+            return Result<PaymentPlan>.Failure(SalesError.SaleNotFound, localizer[nameof(SalesError.SaleNotFound)]);
+
+        var prospectiveTotal = plan.Installments.Where(other => other.Id != installment.Id).Sum(other => other.Amount)
+                                + command.Amount;
+        if (prospectiveTotal != sale.TotalAmount)
+            return Result<PaymentPlan>.Failure(SalesError.InstallmentAmountMismatch,
+                localizer[nameof(SalesError.InstallmentAmountMismatch)]);
+
+        installment.UpdateSchedule(command.DueDate, command.Amount);
+        paymentPlanRepository.Update(plan);
+        await unitOfWork.CompleteAsync(cancellationToken);
 
         return Result<PaymentPlan>.Success(plan);
     }

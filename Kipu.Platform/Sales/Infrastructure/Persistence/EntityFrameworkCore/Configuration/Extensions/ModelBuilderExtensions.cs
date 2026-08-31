@@ -3,6 +3,7 @@ using Kipu.Platform.Iam.Domain.Model.Aggregates;
 using Kipu.Platform.Products.Domain.Model.Aggregates;
 using Kipu.Platform.Sales.Domain.Model.Aggregates;
 using Kipu.Platform.Sales.Domain.Model.Entities;
+using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 
 namespace Kipu.Platform.Sales.Infrastructure.Persistence.EntityFrameworkCore.Configuration.Extensions;
 
@@ -99,6 +100,12 @@ public static class ModelBuilderExtensions
             entity.HasMany(plan => plan.Payments).WithOne().HasForeignKey(payment => payment.PaymentPlanId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.Metadata.FindNavigation(nameof(PaymentPlan.Payments))!.SetPropertyAccessMode(PropertyAccessMode.Field);
+
+            // Installments is the cuota calendar (X6 #7) — same private-field-backed
+            // treatment as Payments above.
+            entity.HasMany(plan => plan.Installments).WithOne().HasForeignKey(installment => installment.PaymentPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Metadata.FindNavigation(nameof(PaymentPlan.Installments))!.SetPropertyAccessMode(PropertyAccessMode.Field);
         });
 
         builder.Entity<InstallmentPayment>(entity =>
@@ -106,6 +113,29 @@ public static class ModelBuilderExtensions
             entity.HasKey(payment => payment.Id);
             entity.Property(payment => payment.Id).ValueGeneratedOnAdd();
             entity.Property(payment => payment.Amount).HasColumnType("decimal(10,2)");
+
+            // Which scheduled cuota this payment fulfilled — SetNull rather than
+            // Restrict/Cascade: a PaymentInstallment is never deleted on its own
+            // (only cascades away with its whole PaymentPlan), but keeping this
+            // nullable/SetNull matches InstallmentPayment's own role as an
+            // append-only audit trail that must never block on FK issues.
+            // Explicit short name — the auto-generated one (table + principal +
+            // column, all "payment_installment"-heavy) came out 65 characters,
+            // one over MySQL's 64-char identifier limit, and silently broke
+            // Migrate() partway through (the DDL before it stays applied,
+            // non-transactional in MySQL, while the migration is never
+            // recorded as done).
+            entity.HasOne<PaymentInstallment>().WithMany().HasForeignKey(payment => payment.PaymentInstallmentId)
+                .HasConstraintName("fk_installment_payments_installment_id")
+                .OnDelete(DeleteBehavior.SetNull).IsRequired(false);
+        });
+
+        builder.Entity<PaymentInstallment>(entity =>
+        {
+            entity.HasKey(installment => installment.Id);
+            entity.Property(installment => installment.Id).ValueGeneratedOnAdd();
+            entity.Property(installment => installment.Amount).HasColumnType("decimal(10,2)");
+            entity.Property(installment => installment.DueDate).HasDateOnlyConversion();
         });
     }
 }

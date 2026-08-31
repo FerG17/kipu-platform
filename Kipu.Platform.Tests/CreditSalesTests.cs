@@ -14,6 +14,17 @@ namespace Kipu.Platform.Tests;
 [Collection(KipuApiCollection.Name)]
 public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(factory)
 {
+    /// <summary>Two equal cuotas summing exactly to `total` — the schedule shape most of these tests just need, without caring about the exact dates.</summary>
+    private static object[] TwoEqualInstallments(decimal total)
+    {
+        var half = total / 2;
+        return
+        [
+            new { dueDate = "2026-09-15", amount = half },
+            new { dueDate = "2026-10-15", amount = half }
+        ];
+    }
+
     private async Task<decimal> TotalSalesAsync(HttpClient adminClient)
     {
         var response = await adminClient.GetAsync("/api/v1/dashboard/kpis");
@@ -41,7 +52,7 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         var sale = await CreateSaleAsync(admin.Client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
-        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(100m) });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
         (await admin.Client.PostAsync($"/api/v1/payment-plans/{planId}/register-payment", null)).EnsureSuccessStatusCode();
@@ -75,7 +86,7 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
         Assert.Equal(before, await TotalSalesAsync(client));
 
-        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(100m) });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
         Assert.Equal(before, await TotalSalesAsync(client));
@@ -108,7 +119,7 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
 
-        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(100m) });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
 
@@ -167,25 +178,35 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
 
-        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(50m) });
         Assert.Equal(HttpStatusCode.Conflict, plan.StatusCode);
     }
 
-    /// <summary>Rounding on a total that doesn't divide evenly must land exactly on the sale's total, remainder folded into the last installment — not silently drift the plan a cent short or over.</summary>
+    /// <summary>
+    ///     X6 #7: the cashier enters each cuota's date/amount by hand — the
+    ///     schedule they submit (33.33/33.33/33.34, the classic
+    ///     100/3-repeating remainder-on-the-last-cuota split) is exactly what
+    ///     gets paid out, in DueDate order, no server-side recalculation.
+    /// </summary>
     [Fact]
-    public async Task InstallmentAmounts_SumExactlyToTheSaleTotal_DespiteRounding()
+    public async Task InstallmentAmounts_ArePaidExactlyAsScheduled_InDueDateOrder()
     {
         var client = await CreateBusinessAsync();
         var productId = await CreateProductAsync(client, basePrice: 100m);
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
-        // 100 / 3 = 33.33 repeating — the classic rounding case.
         var sale = await CreateSaleAsync(client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
 
-        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 3 });
+        var schedule = new[]
+        {
+            new { dueDate = "2026-09-15", amount = 33.33m },
+            new { dueDate = "2026-10-15", amount = 33.33m },
+            new { dueDate = "2026-11-15", amount = 33.34m }
+        };
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
 
@@ -218,7 +239,7 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
         var sale = await CreateSaleAsync(admin.Client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
-        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(100m) });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
 
@@ -246,14 +267,14 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
     public async Task RevertingAPayment_WithNoneLeft_Returns409()
     {
         var admin = await CreateBusinessWithOwnerAsync();
-        var productId = await CreateProductAsync(admin.Client);
+        var productId = await CreateProductAsync(admin.Client, basePrice: 100m);
         var warehouseId = await GetDefaultWarehouseIdAsync(admin.Client);
         (await RegisterStockIntakeAsync(admin.Client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
         var sale = await CreateSaleAsync(admin.Client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
-        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await admin.Client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(100m) });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
 
@@ -266,14 +287,14 @@ public class CreditSalesTests(KipuApiFactory factory) : IntegrationTestBase(fact
     public async Task CancellingACreditSale_KeepsAlreadyCollectedRevenue()
     {
         var client = await CreateBusinessAsync();
-        var productId = await CreateProductAsync(client);
+        var productId = await CreateProductAsync(client, basePrice: 100m);
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
         var sale = await CreateSaleAsync(client, "CREDIT", SaleLine(productId, quantity: 1, unitPrice: 100m));
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
-        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule = TwoEqualInstallments(100m) });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
 

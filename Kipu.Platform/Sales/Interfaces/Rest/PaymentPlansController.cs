@@ -119,4 +119,22 @@ public class PaymentPlansController(
         return SalesActionResultAssembler.ToActionResult(result, problemDetailsFactory,
             plan => Ok(PaymentPlanResourceFromEntityAssembler.ToResourceFromEntity(plan)));
     }
+
+    /// <summary>
+    ///     Edits an unpaid cuota's date/amount — allowed even when other
+    ///     cuotas in the plan are already paid (X6 #7, decision 5). {id} is
+    ///     the plan's id, {installmentId} the cuota's.
+    /// </summary>
+    [HttpPatch("{id:int}/installments/{installmentId:int}")]
+    [SwaggerOperation(Summary = "Edit an unpaid cuota's date/amount", OperationId = "UpdatePaymentInstallment")]
+    [SwaggerResponse(StatusCodes.Status409Conflict, "That cuota was already paid, or the new total doesn't match the sale")]
+    public async Task<IActionResult> UpdatePaymentInstallment([FromRoute] int id, [FromRoute] int installmentId,
+        [FromBody] UpdatePaymentInstallmentResource resource, CancellationToken cancellationToken)
+    {
+        var command = UpdatePaymentInstallmentCommandFromResourceAssembler.ToCommandFromResource(id, installmentId, resource);
+        var result = await paymentPlanCommandService.Handle(command, cancellationToken);
+
+        return SalesActionResultAssembler.ToActionResult(result, problemDetailsFactory,
+            plan => Ok(PaymentPlanResourceFromEntityAssembler.ToResourceFromEntity(plan)));
+    }
 }

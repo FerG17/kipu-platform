@@ -175,7 +175,12 @@ public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(f
         saleResponse.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(saleResponse)).GetProperty("id").GetInt32();
 
-        var planResponse = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var schedule = new[]
+        {
+            new { dueDate = "2026-09-15", amount = 10m },
+            new { dueDate = "2026-10-15", amount = 10m }
+        };
+        var planResponse = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule });
         planResponse.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(planResponse)).GetProperty("id").GetInt32();
 
@@ -209,7 +214,12 @@ public class SalesIntegrityTests(KipuApiFactory factory) : IntegrationTestBase(f
         saleResponse.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(saleResponse)).GetProperty("id").GetInt32();
 
-        var planResponse = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var schedule = new[]
+        {
+            new { dueDate = "2026-09-15", amount = 10m },
+            new { dueDate = "2026-10-15", amount = 10m }
+        };
+        var planResponse = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule });
         planResponse.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(planResponse)).GetProperty("id").GetInt32();
 

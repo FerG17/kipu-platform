@@ -23,4 +23,12 @@ public interface ISaleRepository : IBaseRepository<Sale>
     /// <summary>Used to make CreateSaleCommand idempotent — see Sale.IdempotencyKey.</summary>
     Task<Sale?> FindByBusinessIdAndIdempotencyKeyAsync(int businessId, string idempotencyKey,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Bulk lookup by id, ignoring the tenant filter — feeds the
+    ///     installment-due alerts sweep (which already gathered plans across
+    ///     every business) with each sale's CustomerId. Same reasoning as
+    ///     BatchRepository.FindAllActiveAsync.
+    /// </summary>
+    Task<IEnumerable<Sale>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids, CancellationToken cancellationToken = default);
 }

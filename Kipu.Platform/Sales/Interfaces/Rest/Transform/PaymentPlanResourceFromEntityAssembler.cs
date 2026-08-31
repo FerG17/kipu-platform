@@ -13,7 +13,13 @@ public static class PaymentPlanResourceFromEntityAssembler
                 payment.PaidByUserId, payment.IsReversed, payment.ReversedAt, payment.ReversedByUserId))
             .ToList();
 
+        var installments = plan.Installments
+            .OrderBy(installment => installment.Number)
+            .Select(installment => new PaymentInstallmentResource(installment.Id, installment.Number,
+                installment.DueDate, installment.Amount, installment.IsPaid))
+            .ToList();
+
         return new PaymentPlanResource(plan.Id, plan.SaleId, plan.BusinessId, plan.TotalInstallments,
-            plan.PaidInstallments, plan.IsFullyPaid, plan.IsCancelled, payments);
+            plan.PaidInstallments, plan.IsFullyPaid, plan.IsCancelled, payments, installments);
     }
 }

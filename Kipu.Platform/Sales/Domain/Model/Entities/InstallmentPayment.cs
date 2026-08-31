@@ -8,20 +8,22 @@ namespace Kipu.Platform.Sales.Domain.Model.Entities;
 ///     it, for how much, when — instead of PaymentPlan.PaidInstallments
 ///     being a bare counter nothing could reconcile or undo.
 /// </summary>
-public class InstallmentPayment(int paymentPlanId, decimal amount, int paidByUserId)
+public class InstallmentPayment(int paymentPlanId, int? paymentInstallmentId, decimal amount, int paidByUserId)
 {
-    public InstallmentPayment() : this(0, 0m, 0)
+    public InstallmentPayment() : this(0, null, 0m, 0)
     {
     }
 
     public int Id { get; }
     public int PaymentPlanId { get; private set; } = paymentPlanId;
 
+    /// <summary>Which scheduled cuota (PaymentInstallment) this payment fulfilled — used by RevertLastPayment to know which one to mark unpaid again.</summary>
+    public int? PaymentInstallmentId { get; private set; } = paymentInstallmentId;
+
     /// <summary>
-    ///     Always Sale.TotalAmount / PaymentPlan.TotalInstallments, computed
-    ///     server-side when the payment is registered (with any rounding
-    ///     remainder folded into the last installment) — never a value the
-    ///     cashier types in, so there is nothing here to trust from the client.
+    ///     Taken from the matching PaymentInstallment.Amount at the moment the
+    ///     payment is registered — never a value the cashier types in, so
+    ///     there is nothing here to trust from the client.
     /// </summary>
     public decimal Amount { get; private set; } = amount;
 

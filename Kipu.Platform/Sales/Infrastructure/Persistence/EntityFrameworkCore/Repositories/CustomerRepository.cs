@@ -27,4 +27,15 @@ public class CustomerRepository(AppDbContext context) : BaseRepository<Customer>
             .FirstOrDefaultAsync(customer => customer.BusinessId == businessId && customer.DocumentNumber == documentNumber,
                 cancellationToken);
     }
+
+    /// <summary>IgnoreQueryFilters() deliberately — see ICustomerRepository.</summary>
+    public async Task<IEnumerable<Customer>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0) return [];
+
+        return await Context.Set<Customer>().IgnoreQueryFilters()
+            .Where(customer => idList.Contains(customer.Id)).ToListAsync(cancellationToken);
+    }
 }
