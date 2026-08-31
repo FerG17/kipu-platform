@@ -6,7 +6,7 @@ using Kipu.Platform.Sales.Interfaces.Acl;
 namespace Kipu.Platform.Sales.Application.Acl;
 
 public class SalesContextFacade(ISaleRepository saleRepository, IPaymentPlanRepository paymentPlanRepository,
-    IBusinessClock businessClock) : ISalesContextFacade
+    ICustomerRepository customerRepository, IBusinessClock businessClock) : ISalesContextFacade
 {
     /// <summary>
     ///     Paid sales' totals plus whatever has actually been collected on
@@ -73,5 +73,37 @@ public class SalesContextFacade(ISaleRepository saleRepository, IPaymentPlanRepo
                 sale.Status == SaleStatus.Credit ? collectedBySaleId.GetValueOrDefault(sale.Id, 0m) : sale.TotalAmount,
                 sale.Currency))
             .ToList();
+    }
+
+    /// <summary>
+    ///     Batched the same way ExpirationAlertSweepService's own lookup is
+    ///     (§ its doc comment): one query for plans, one for their sales, one
+    ///     for those sales' customers — instead of N+1 queries per plan.
+    /// </summary>
+    public async Task<IReadOnlyCollection<PendingInstallmentInfo>> GetPendingInstallmentsForDueSweep(CancellationToken cancellationToken)
+    {
+        var plansWithNextInstallment = (await paymentPlanRepository.FindAllPendingAcrossBusinessesAsync(cancellationToken))
+            .Select(plan => (plan, next: plan.Installments.Where(installment => !installment.IsPaid)
+                .OrderBy(installment => installment.DueDate).ThenBy(installment => installment.Number)
+                .FirstOrDefault()))
+            .Where(entry => entry.next != null)
+            .ToList();
+
+        var saleIds = plansWithNextInstallment.Select(entry => entry.plan.SaleId).Distinct().ToList();
+        var salesById = (await saleRepository.FindAllIgnoringTenantByIdsAsync(saleIds, cancellationToken))
+            .ToDictionary(sale => sale.Id);
+
+        var customerIds = salesById.Values.Where(sale => sale.CustomerId != null)
+            .Select(sale => sale.CustomerId!.Value).Distinct().ToList();
+        var customerNamesById = (await customerRepository.FindAllIgnoringTenantByIdsAsync(customerIds, cancellationToken))
+            .ToDictionary(customer => customer.Id, customer => customer.FullName);
+
+        return plansWithNextInstallment.Select(entry =>
+        {
+            var sale = salesById.GetValueOrDefault(entry.plan.SaleId);
+            var customerName = sale?.CustomerId != null ? customerNamesById.GetValueOrDefault(sale.CustomerId.Value) : null;
+            return new PendingInstallmentInfo(entry.plan.Id, entry.plan.SaleId, entry.plan.BusinessId, customerName,
+                entry.next!.Id, entry.next.DueDate, entry.next.Amount);
+        }).ToList();
     }
 }

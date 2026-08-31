@@ -3,6 +3,7 @@ using System;
 using Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831171732_AddPaymentInstallmentsAndAlertInstallmentFields")]
+    partial class AddPaymentInstallmentsAndAlertInstallmentFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -141,7 +144,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("SaleId", "Type", "Status")
                         .HasDatabaseName("ix_alerts_sale_id_type_status");
 
-                    b.ToTable("alerts", (string)null);
+                    b.ToTable("alerts");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Alerts.Domain.Model.Entities.AlertRule", b =>
@@ -176,7 +179,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                         .IsUnique()
                         .HasDatabaseName("ix_alert_rules_business_id_alert_type");
 
-                    b.ToTable("alert_rules", (string)null);
+                    b.ToTable("alert_rules");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Dashboard.Domain.Model.Entities.Report", b =>
@@ -222,7 +225,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("BusinessId")
                         .HasDatabaseName("ix_reports_business_id");
 
-                    b.ToTable("reports", (string)null);
+                    b.ToTable("reports");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Iam.Domain.Model.Aggregates.Business", b =>
@@ -263,7 +266,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasKey("Id")
                         .HasName("pk_businesses");
 
-                    b.ToTable("businesses", (string)null);
+                    b.ToTable("businesses");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Iam.Domain.Model.Aggregates.User", b =>
@@ -338,7 +341,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_users_role_id");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Iam.Domain.Model.Entities.PasswordResetCode", b =>
@@ -384,7 +387,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_password_reset_codes_user_id");
 
-                    b.ToTable("password_reset_codes", (string)null);
+                    b.ToTable("password_reset_codes");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Iam.Domain.Model.Entities.Role", b =>
@@ -403,7 +406,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasKey("Id")
                         .HasName("pk_roles");
 
-                    b.ToTable("roles", (string)null);
+                    b.ToTable("roles");
 
                     b.HasData(
                         new
@@ -447,7 +450,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                         .IsUnique()
                         .HasDatabaseName("ix_categories_business_id_name");
 
-                    b.ToTable("categories", (string)null);
+                    b.ToTable("categories");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Products.Domain.Model.Aggregates.Product", b =>
@@ -518,7 +521,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("BusinessId")
                         .HasDatabaseName("ix_products_business_id");
 
-                    b.ToTable("products", (string)null);
+                    b.ToTable("products");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Products.Domain.Model.Aggregates.Warehouse", b =>
@@ -568,7 +571,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("BusinessId")
                         .HasDatabaseName("ix_warehouses_business_id");
 
-                    b.ToTable("warehouses", (string)null);
+                    b.ToTable("warehouses");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Products.Domain.Model.Entities.Batch", b =>
@@ -629,7 +632,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("ProductId")
                         .HasDatabaseName("ix_batches_product_id");
 
-                    b.ToTable("batches", (string)null);
+                    b.ToTable("batches");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Products.Domain.Model.Entities.InventoryItem", b =>
@@ -681,7 +684,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                         .IsUnique()
                         .HasDatabaseName("ix_inventory_items_product_id_warehouse_id");
 
-                    b.ToTable("inventory_items", (string)null);
+                    b.ToTable("inventory_items");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Products.Domain.Model.Entities.ProductSupplier", b =>
@@ -713,7 +716,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                         .IsUnique()
                         .HasDatabaseName("ix_product_suppliers_product_id_supplier_id");
 
-                    b.ToTable("product_suppliers", (string)null);
+                    b.ToTable("product_suppliers");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Products.Domain.Model.Entities.StockMovement", b =>
@@ -784,7 +787,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("WarehouseId")
                         .HasDatabaseName("ix_stock_movements_warehouse_id");
 
-                    b.ToTable("stock_movements", (string)null);
+                    b.ToTable("stock_movements");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Sales.Domain.Model.Aggregates.Customer", b =>
@@ -838,7 +841,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("BusinessId")
                         .HasDatabaseName("ix_customers_business_id");
 
-                    b.ToTable("customers", (string)null);
+                    b.ToTable("customers");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Sales.Domain.Model.Aggregates.Sale", b =>
@@ -908,7 +911,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                         .IsUnique()
                         .HasDatabaseName("ix_sales_business_id_idempotency_key");
 
-                    b.ToTable("sales", (string)null);
+                    b.ToTable("sales");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Sales.Domain.Model.Entities.InstallmentPayment", b =>
@@ -959,7 +962,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("PaymentPlanId")
                         .HasDatabaseName("ix_installment_payments_payment_plan_id");
 
-                    b.ToTable("installment_payments", (string)null);
+                    b.ToTable("installment_payments");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Sales.Domain.Model.Entities.PaymentInstallment", b =>
@@ -995,7 +998,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("PaymentPlanId")
                         .HasDatabaseName("ix_payment_installments_payment_plan_id");
 
-                    b.ToTable("payment_installments", (string)null);
+                    b.ToTable("payment_installments");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Sales.Domain.Model.Entities.PaymentPlan", b =>
@@ -1040,7 +1043,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                         .IsUnique()
                         .HasDatabaseName("ix_payment_plans_sale_id");
 
-                    b.ToTable("payment_plans", (string)null);
+                    b.ToTable("payment_plans");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Sales.Domain.Model.Entities.SaleDetail", b =>
@@ -1079,7 +1082,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("SaleId")
                         .HasDatabaseName("ix_sale_details_sale_id");
 
-                    b.ToTable("sale_details", (string)null);
+                    b.ToTable("sale_details");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Suppliers.Domain.Model.Aggregates.PurchaseOrder", b =>
@@ -1141,7 +1144,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("SupplierId")
                         .HasDatabaseName("ix_purchase_orders_supplier_id");
 
-                    b.ToTable("purchase_orders", (string)null);
+                    b.ToTable("purchase_orders");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Suppliers.Domain.Model.Aggregates.Supplier", b =>
@@ -1219,7 +1222,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("BusinessId")
                         .HasDatabaseName("ix_suppliers_business_id");
 
-                    b.ToTable("suppliers", (string)null);
+                    b.ToTable("suppliers");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Suppliers.Domain.Model.Entities.PurchaseOrderDetail", b =>
@@ -1275,7 +1278,7 @@ namespace Kipu.Platform.Shared.Infrastructure.Persistence.EntityFrameworkCore.Mi
                     b.HasIndex("PurchaseId")
                         .HasDatabaseName("ix_purchase_order_details_purchase_id");
 
-                    b.ToTable("purchase_order_details", (string)null);
+                    b.ToTable("purchase_order_details");
                 });
 
             modelBuilder.Entity("Kipu.Platform.Alerts.Domain.Model.Aggregates.Alert", b =>

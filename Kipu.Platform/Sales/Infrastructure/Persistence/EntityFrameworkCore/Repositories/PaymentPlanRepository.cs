@@ -22,20 +22,20 @@ public class PaymentPlanRepository(AppDbContext context, IBusinessClock business
     /// </summary>
     public async Task<PaymentPlan?> FindByIdWithPaymentsAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await Context.Set<PaymentPlan>().Include(plan => plan.Payments)
+        return await Context.Set<PaymentPlan>().Include(plan => plan.Payments).Include(plan => plan.Installments)
             .FirstOrDefaultAsync(plan => plan.Id == id, cancellationToken);
     }
 
     public async Task<PaymentPlan?> FindBySaleIdAsync(int saleId, CancellationToken cancellationToken = default)
     {
-        return await Context.Set<PaymentPlan>().Include(plan => plan.Payments)
+        return await Context.Set<PaymentPlan>().Include(plan => plan.Payments).Include(plan => plan.Installments)
             .FirstOrDefaultAsync(plan => plan.SaleId == saleId, cancellationToken);
     }
 
     public async Task<IEnumerable<PaymentPlan>> FindPendingByBusinessIdAsync(int businessId,
         CancellationToken cancellationToken = default)
     {
-        return await Context.Set<PaymentPlan>().Include(plan => plan.Payments)
+        return await Context.Set<PaymentPlan>().Include(plan => plan.Payments).Include(plan => plan.Installments)
             .Where(plan => plan.BusinessId == businessId && !plan.IsCancelled
                                                            && plan.PaidInstallments < plan.TotalInstallments)
             .ToListAsync(cancellationToken);
@@ -45,13 +45,21 @@ public class PaymentPlanRepository(AppDbContext context, IBusinessClock business
         CancellationToken cancellationToken = default)
     {
         var query =
-            from plan in Context.Set<PaymentPlan>().Include(plan => plan.Payments)
+            from plan in Context.Set<PaymentPlan>().Include(plan => plan.Payments).Include(plan => plan.Installments)
             join sale in Context.Set<Sale>() on plan.SaleId equals sale.Id
             where sale.CustomerId == customerId && !plan.IsCancelled
                                                  && plan.PaidInstallments < plan.TotalInstallments
             select plan;
 
         return await query.ToListAsync(cancellationToken);
+    }
+
+    /// <summary>IgnoreQueryFilters() deliberately — see IPaymentPlanRepository.</summary>
+    public async Task<IEnumerable<PaymentPlan>> FindAllPendingAcrossBusinessesAsync(CancellationToken cancellationToken = default)
+    {
+        return await Context.Set<PaymentPlan>().IgnoreQueryFilters().Include(plan => plan.Installments)
+            .Where(plan => !plan.IsCancelled && plan.PaidInstallments < plan.TotalInstallments)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<InstallmentPayment>> FindCollectedInstallmentPaymentsByBusinessIdAsync(int businessId,

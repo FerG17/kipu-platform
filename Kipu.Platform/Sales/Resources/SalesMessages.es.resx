@@ -84,7 +84,16 @@
     <value>Todas las cuotas ya fueron pagadas.</value>
   </data>
   <data name="InvalidInstallmentCount" xml:space="preserve">
-    <value>El número de cuotas debe ser al menos 1.</value>
+    <value>El calendario de cuotas no es válido.</value>
+  </data>
+  <data name="InstallmentAmountMismatch" xml:space="preserve">
+    <value>La suma de las cuotas debe calzar exacto con el total de la venta.</value>
+  </data>
+  <data name="InstallmentNotFound" xml:space="preserve">
+    <value>Esa cuota no pertenece a este plan de pago.</value>
+  </data>
+  <data name="InstallmentAlreadyPaid" xml:space="preserve">
+    <value>Esa cuota ya fue pagada y no se puede editar.</value>
   </data>
   <data name="PaymentPlanCancelled" xml:space="preserve">
     <value>Este plan de pago fue cancelado junto con su venta.</value>

@@ -7,6 +7,9 @@ public static class CreatePaymentPlanCommandFromResourceAssembler
 {
     public static CreatePaymentPlanCommand ToCommandFromResource(CreatePaymentPlanResource resource, int businessId)
     {
-        return new CreatePaymentPlanCommand(resource.SaleId, businessId, resource.TotalInstallments);
+        var schedule = resource.Schedule
+            .Select(line => new InstallmentScheduleLine(line.DueDate, line.Amount))
+            .ToList();
+        return new CreatePaymentPlanCommand(resource.SaleId, businessId, schedule);
     }
 }

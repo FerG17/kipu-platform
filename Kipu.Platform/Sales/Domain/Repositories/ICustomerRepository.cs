@@ -12,4 +12,7 @@ public interface ICustomerRepository : IBaseRepository<Customer>
     /// <summary>Looks across every customer for the business (active or not) — a document number shouldn't be reusable just because the row it belonged to was deactivated.</summary>
     Task<Customer?> FindByBusinessIdAndDocumentNumberAsync(int businessId, string documentNumber,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Bulk lookup by id, ignoring the tenant filter — feeds the installment-due alerts sweep with each sale's customer name.</summary>
+    Task<IEnumerable<Customer>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids, CancellationToken cancellationToken = default);
 }

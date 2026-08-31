@@ -3,25 +3,51 @@ using Kipu.Platform.Shared.Domain.Model.Entities;
 namespace Kipu.Platform.Sales.Domain.Model.Entities;
 
 /// <summary>
-///     Credit sales tracking, kept deliberately simple per the brief: just
-///     how many installments a sale is split into, and how many have been
-///     paid — no due dates, no per-installment amounts, no changes to how a
-///     Sale itself is created/totaled/decremented (see CreateSaleCommand,
-///     untouched). Attached to an existing Sale after the fact via a
-///     separate command, at most one plan per sale.
+///     Credit sales tracking — how many installments a sale is split into
+///     and how many have been paid, backed by a real calendar of cuotas
+///     (see PaymentInstallment, X6 #7). Attached to an existing Sale after
+///     the fact via a separate command, at most one plan per sale — no
+///     changes to how a Sale itself is created/totaled/decremented (see
+///     CreateSaleCommand, untouched).
 /// </summary>
-public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IVersionedEntity
+public class PaymentPlan : IVersionedEntity
 {
     private readonly List<InstallmentPayment> _payments = [];
+    private readonly List<PaymentInstallment> _installments = [];
 
-    public PaymentPlan() : this(0, 0, 1)
+    /// <summary>
+    ///     EF's own materialization constructor — deliberately empty. The
+    ///     other constructor builds PaymentInstallment children as a side
+    ///     effect (see below); chaining this one to it used to insert a
+    ///     phantom zero-amount/default-date installment into EVERY plan EF
+    ///     loaded from the database, on top of its real ones (the parameterless
+    ///     ctor ran, added a bogus child, and then EF's Include fixup appended
+    ///     the real rows into the same list instead of replacing it).
+    /// </summary>
+    public PaymentPlan()
     {
     }
 
+    /// <summary>
+    ///     Schedule is the cuota-by-cuota calendar the frontend built (proportional
+    ///     split suggested, dates/amounts edited by the cashier) — the sum of
+    ///     its amounts is validated against Sale.TotalAmount by the caller
+    ///     (PaymentPlanCommandService), not here.
+    /// </summary>
+    public PaymentPlan(int saleId, int businessId, IReadOnlyList<(DateOnly DueDate, decimal Amount)> schedule)
+    {
+        SaleId = saleId;
+        BusinessId = businessId;
+        TotalInstallments = schedule.Count;
+
+        for (var index = 0; index < schedule.Count; index++)
+            _installments.Add(new PaymentInstallment(Id, index + 1, schedule[index].DueDate, schedule[index].Amount));
+    }
+
     public int Id { get; }
-    public int SaleId { get; private set; } = saleId;
-    public int BusinessId { get; private set; } = businessId;
-    public int TotalInstallments { get; private set; } = totalInstallments;
+    public int SaleId { get; private set; }
+    public int BusinessId { get; private set; }
+    public int TotalInstallments { get; private set; }
     public int PaidInstallments { get; private set; }
 
     /// <summary>
@@ -31,6 +57,9 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
     ///     they just stop counting toward PaidInstallments/revenue.
     /// </summary>
     public IReadOnlyCollection<InstallmentPayment> Payments => _payments.AsReadOnly();
+
+    /// <summary>The cuota-by-cuota calendar this plan was created with — see PaymentInstallment.</summary>
+    public IReadOnlyCollection<PaymentInstallment> Installments => _installments.AsReadOnly();
 
     /// <summary>
     ///     Set when the sale this plan belongs to gets cancelled — the plan
@@ -49,15 +78,21 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
     public bool IsFullyPaid => PaidInstallments >= TotalInstallments;
 
     /// <summary>
-    ///     Caller (PaymentPlanCommandService) is responsible for rejecting
-    ///     this when already fully paid or cancelled, and for computing
-    ///     `amount` (Sale.TotalAmount / TotalInstallments, remainder folded
-    ///     into the last one) — this method just records whatever it's given.
+    ///     Pays the earliest unpaid cuota by DueDate (never an arbitrary one —
+    ///     see PaymentPlanCommandService for the "pay ahead of schedule"
+    ///     confirmation the frontend shows before calling this). Caller is
+    ///     responsible for rejecting this when already fully paid or cancelled.
     /// </summary>
-    public PaymentPlan RegisterPayment(decimal amount, int paidByUserId)
+    public PaymentPlan RegisterPayment(int paidByUserId)
     {
+        var nextInstallment = _installments.Where(installment => !installment.IsPaid)
+            .OrderBy(installment => installment.DueDate)
+            .ThenBy(installment => installment.Number)
+            .First();
+
+        nextInstallment.MarkPaid();
         PaidInstallments++;
-        _payments.Add(new InstallmentPayment(Id, amount, paidByUserId));
+        _payments.Add(new InstallmentPayment(Id, nextInstallment.Id, nextInstallment.Amount, paidByUserId));
         return this;
     }
 
@@ -74,12 +109,37 @@ public class PaymentPlan(int saleId, int businessId, int totalInstallments) : IV
             .ThenByDescending(payment => payment.Id)
             .First();
         lastPayment.Reverse(reversedByUserId);
+
+        var paidInstallment = _installments.FirstOrDefault(installment => installment.Id == lastPayment.PaymentInstallmentId);
+        paidInstallment?.MarkUnpaid();
+
         PaidInstallments--;
         return this;
     }
 
     /// <summary>Whether RevertLastPayment has anything to act on.</summary>
     public bool HasReversiblePayment => _payments.Any(payment => !payment.IsReversed);
+
+    /// <summary>
+    ///     The next cuota RegisterPayment would pay, if any — used by the
+    ///     frontend to warn the cashier before paying a cuota that isn't due
+    ///     yet (X6 #7, decision 2). Null once fully paid.
+    /// </summary>
+    public PaymentInstallment? NextUnpaidInstallment => _installments.Where(installment => !installment.IsPaid)
+        .OrderBy(installment => installment.DueDate)
+        .ThenBy(installment => installment.Number)
+        .FirstOrDefault();
+
+    /// <summary>
+    ///     Edits an unpaid cuota's date/amount — allowed even when other
+    ///     cuotas in this plan are already paid. Caller (PaymentPlanCommandService)
+    ///     is responsible for rejecting an unknown/already-paid installment id
+    ///     and for re-validating the plan's total against Sale.TotalAmount.
+    /// </summary>
+    public PaymentInstallment? FindInstallment(int installmentId)
+    {
+        return _installments.FirstOrDefault(installment => installment.Id == installmentId);
+    }
 
     /// <summary>Caller (SaleCommandService, on sale cancellation) is responsible for not calling this twice.</summary>
     public PaymentPlan Cancel()

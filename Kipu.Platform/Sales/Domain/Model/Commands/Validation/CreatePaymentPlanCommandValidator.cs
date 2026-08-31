@@ -6,6 +6,11 @@ public class CreatePaymentPlanCommandValidator : AbstractValidator<CreatePayment
 {
     public CreatePaymentPlanCommandValidator()
     {
-        RuleFor(command => command.TotalInstallments).GreaterThanOrEqualTo(1);
+        RuleFor(command => command.Schedule).NotEmpty();
+        RuleForEach(command => command.Schedule).ChildRules(schedule =>
+        {
+            schedule.RuleFor(line => line.Amount).GreaterThan(0);
+            schedule.RuleFor(line => line.DueDate).NotEqual(default(DateOnly));
+        });
     }
 }

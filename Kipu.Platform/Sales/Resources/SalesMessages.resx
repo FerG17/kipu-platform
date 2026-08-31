@@ -84,7 +84,16 @@
     <value>All installments have already been paid.</value>
   </data>
   <data name="InvalidInstallmentCount" xml:space="preserve">
-    <value>Total installments must be at least 1.</value>
+    <value>The installment schedule is invalid.</value>
+  </data>
+  <data name="InstallmentAmountMismatch" xml:space="preserve">
+    <value>The installment amounts must add up exactly to the sale's total.</value>
+  </data>
+  <data name="InstallmentNotFound" xml:space="preserve">
+    <value>That installment does not belong to this payment plan.</value>
+  </data>
+  <data name="InstallmentAlreadyPaid" xml:space="preserve">
+    <value>That installment has already been paid and can no longer be edited.</value>
   </data>
   <data name="PaymentPlanCancelled" xml:space="preserve">
     <value>This payment plan was cancelled along with its sale.</value>

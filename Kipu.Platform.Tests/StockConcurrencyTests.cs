@@ -145,7 +145,7 @@ public class StockConcurrencyTests(KipuApiFactory factory) : IntegrationTestBase
     public async Task ConcurrentInstallmentPayments_CannotExceedTheInstallmentCount()
     {
         var client = await CreateBusinessAsync();
-        var productId = await CreateProductAsync(client);
+        var productId = await CreateProductAsync(client, basePrice: 100m);
         var warehouseId = await GetDefaultWarehouseIdAsync(client);
         (await RegisterStockIntakeAsync(client, productId, warehouseId, quantity: 10)).EnsureSuccessStatusCode();
 
@@ -153,7 +153,12 @@ public class StockConcurrencyTests(KipuApiFactory factory) : IntegrationTestBase
         sale.EnsureSuccessStatusCode();
         var saleId = (await ReadJsonAsync(sale)).GetProperty("id").GetInt32();
 
-        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 2 });
+        var schedule = new[]
+        {
+            new { dueDate = "2026-09-15", amount = 50m },
+            new { dueDate = "2026-10-15", amount = 50m }
+        };
+        var plan = await client.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule });
         plan.EnsureSuccessStatusCode();
         var planId = (await ReadJsonAsync(plan)).GetProperty("id").GetInt32();
 

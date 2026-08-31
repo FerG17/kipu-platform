@@ -66,4 +66,15 @@ public class SaleRepository(AppDbContext context, IBusinessClock businessClock)
             .FirstOrDefaultAsync(sale => sale.BusinessId == businessId && sale.IdempotencyKey == idempotencyKey,
                 cancellationToken);
     }
+
+    /// <summary>IgnoreQueryFilters() deliberately — see ISaleRepository.</summary>
+    public async Task<IEnumerable<Sale>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0) return [];
+
+        return await Context.Set<Sale>().IgnoreQueryFilters()
+            .Where(sale => idList.Contains(sale.Id)).ToListAsync(cancellationToken);
+    }
 }

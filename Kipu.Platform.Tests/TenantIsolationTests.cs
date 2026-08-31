@@ -252,7 +252,8 @@ public class TenantIsolationTests(KipuApiFactory factory) : IntegrationTestBase(
         var (victim, attacker) = await TwoBusinessesAsync();
         var saleId = await CreateSoldSaleAsync(victim);
 
-        var response = await attacker.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, totalInstallments = 3 });
+        var schedule = new[] { new { dueDate = "2026-09-15", amount = 10m } };
+        var response = await attacker.PostAsJsonAsync("/api/v1/payment-plans", new { saleId, schedule });
         AssertDenied(response, "attaching a payment plan to another business's sale");
     }
 

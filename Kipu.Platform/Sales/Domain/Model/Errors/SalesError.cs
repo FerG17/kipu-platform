@@ -31,6 +31,15 @@ public enum SalesError
     /// <summary>RevertInstallmentPaymentCommand against a plan with no unreversed payment to undo.</summary>
     NoPaymentToRevert,
 
+    /// <summary>The schedule's cuota amounts don't add up exactly to Sale.TotalAmount (X6 #7, decision 1 — no margin allowed).</summary>
+    InstallmentAmountMismatch,
+
+    /// <summary>UpdatePaymentInstallmentCommand against a cuota id that doesn't belong to the plan.</summary>
+    InstallmentNotFound,
+
+    /// <summary>UpdatePaymentInstallmentCommand against a cuota that's already been paid.</summary>
+    InstallmentAlreadyPaid,
+
     /// <summary>Customer name/document/phone/email outside what its columns accept.</summary>
     InvalidCustomerData,
 
