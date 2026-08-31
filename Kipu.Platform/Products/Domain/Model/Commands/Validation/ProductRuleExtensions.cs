@@ -42,4 +42,20 @@ public static class ProductRuleExtensions
     {
         return ruleBuilder.Must(value => AllowedUnitsOfSale.Contains(value));
     }
+
+    private static readonly string[] AllowedUnidadesDeMedida =
+        [ProductUnidadDeMedida.Caja, ProductUnidadDeMedida.Saco, ProductUnidadDeMedida.Paquete, ProductUnidadDeMedida.Unidad];
+
+    public static IRuleBuilderOptions<T, string> MustBeAUnidadDeMedida<T>(this IRuleBuilder<T, string> ruleBuilder)
+    {
+        return ruleBuilder.Must(value => AllowedUnidadesDeMedida.Contains(value));
+    }
+
+    private static readonly string[] AllowedPresentaciones =
+        [ProductPresentacion.Kg, ProductPresentacion.Litro, ProductPresentacion.Unidad];
+
+    public static IRuleBuilderOptions<T, string> MustBeAPresentacion<T>(this IRuleBuilder<T, string> ruleBuilder)
+    {
+        return ruleBuilder.Must(value => AllowedPresentaciones.Contains(value));
+    }
 }

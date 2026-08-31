@@ -53,7 +53,7 @@ public class ProductCommandService(
         // already committed with no suppliers tagged, and nothing rolled it
         // back or reported that half the request never landed.
         var product = new Product(command.BusinessId, command.Name, command.Description, command.Category,
-            command.BasePrice, command.Barcode, command.UnitOfSale);
+            command.BasePrice, command.Barcode, command.UnitOfSale, command.UnidadDeMedida, command.Presentacion);
         await using (var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken))
         {
             try
@@ -120,7 +120,7 @@ public class ProductCommandService(
             return Result<Product>.Failure(ProductError.SupplierNotFound, localizer[nameof(ProductError.SupplierNotFound)]);
 
         product.UpdateDetails(command.Name, command.Description, command.Category, command.BasePrice, command.Barcode,
-            command.UnitOfSale);
+            command.UnitOfSale, command.UnidadDeMedida, command.Presentacion);
         productRepository.Update(product);
         await SyncProductSuppliers(product.Id, product.BusinessId, supplierIds, cancellationToken);
         await unitOfWork.CompleteAsync(cancellationToken);
