@@ -424,11 +424,14 @@ builder.Services.AddScoped<ISalesContextFacade, SalesContextFacade>();
 
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddScoped<ISupplierPaymentPlanRepository, SupplierPaymentPlanRepository>();
 
 builder.Services.AddScoped<ISupplierCommandService, SupplierCommandService>();
 builder.Services.AddScoped<IPurchaseOrderCommandService, PurchaseOrderCommandService>();
+builder.Services.AddScoped<ISupplierPaymentPlanCommandService, SupplierPaymentPlanCommandService>();
 builder.Services.AddScoped<ISupplierQueryService, SupplierQueryService>();
 builder.Services.AddScoped<IPurchaseOrderQueryService, PurchaseOrderQueryService>();
+builder.Services.AddScoped<ISupplierPaymentPlanQueryService, SupplierPaymentPlanQueryService>();
 
 builder.Services.AddScoped<ISupplierContextFacade, SupplierContextFacade>();
 
@@ -441,6 +444,7 @@ builder.Services.AddScoped<IAlertCommandService, AlertCommandService>();
 builder.Services.AddScoped<IAlertRuleCommandService, AlertRuleCommandService>();
 builder.Services.AddScoped<IExpirationAlertSweepService, ExpirationAlertSweepService>();
 builder.Services.AddScoped<IInstallmentDueAlertSweepService, InstallmentDueAlertSweepService>();
+builder.Services.AddScoped<ISupplierInstallmentDueAlertSweepService, SupplierInstallmentDueAlertSweepService>();
 builder.Services.AddScoped<IAlertQueryService, AlertQueryService>();
 builder.Services.AddScoped<IAlertRuleQueryService, AlertRuleQueryService>();
 
@@ -453,12 +457,14 @@ builder.Services.AddScoped<IAlertNotificationDispatcher, NoOpAlertNotificationDi
 
 AlertSweepIntervalGuard.EnsureUsable(builder.Configuration.GetValue("Alerts:SweepIntervalHours", 6.0));
 AlertSweepIntervalGuard.EnsureUsable(builder.Configuration.GetValue("Alerts:InstallmentDueSweepIntervalHours", 6.0));
+AlertSweepIntervalGuard.EnsureUsable(builder.Configuration.GetValue("Alerts:SupplierInstallmentDueSweepIntervalHours", 6.0));
 
 // Event handlers are auto-discovered by AddCortexMediator's assembly scan
 // (StockLevelChangedEventHandler, BatchRegisteredEventHandler) — no
 // explicit registration needed here.
 builder.Services.AddHostedService<AlertExpirationSweepJob>();
 builder.Services.AddHostedService<InstallmentDueSweepJob>();
+builder.Services.AddHostedService<SupplierInstallmentDueSweepJob>();
 
 // Dashboard & Analytics Bounded Context — no aggregates of its own, composes
 // Product/Sales via their ACL facades (already registered above).

@@ -56,13 +56,17 @@ public static class ModelBuilderExtensions
             // Same reasoning, for InstallmentDueSweepJob's batched lookup
             // (SaleId IN (...) AND Type == INSTALLMENT_DUE AND Status != RESOLVED).
             entity.HasIndex(alert => new { alert.SaleId, alert.Type, alert.Status });
+
+            // Same reasoning, for SupplierInstallmentDueSweepJob (X6 #12).
+            entity.HasIndex(alert => new { alert.PurchaseOrderId, alert.Type, alert.Status });
         });
 
         builder.Entity<AlertRule>(entity =>
         {
             entity.HasKey(rule => rule.Id);
             entity.Property(rule => rule.Id).ValueGeneratedOnAdd();
-            entity.Property(rule => rule.AlertType).IsRequired().HasMaxLength(20);
+            // Widened from 20 to 30 for SUPPLIER_INSTALLMENT_DUE (24 chars, X6 #12).
+            entity.Property(rule => rule.AlertType).IsRequired().HasMaxLength(30);
 
             entity.HasOne<Business>().WithMany().HasForeignKey(rule => rule.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);

@@ -23,5 +23,29 @@ public enum SuppliersError
 
     /// <summary>Another request changed the same row first — a conflict the caller can retry (409), not a server fault (500).</summary>
     ConcurrentModification,
-    DatabaseError
+    DatabaseError,
+
+    // ─── Credit purchase orders (X6 #12) ────────────────────────────────────
+    SupplierPaymentPlanNotFound,
+    SupplierPaymentPlanAlreadyExists,
+
+    /// <summary>A payment plan can't be attached to (or paid against) a cancelled purchase order.</summary>
+    PurchaseOrderCancelled,
+    SupplierInstallmentsFullyPaid,
+    SupplierPaymentPlanCancelled,
+
+    /// <summary>The schedule's cuota amounts don't add up exactly to the purchase order's total (X6 #12, no margin allowed).</summary>
+    SupplierInstallmentAmountMismatch,
+
+    /// <summary>The installment schedule is structurally invalid (empty, non-positive amount, or missing date).</summary>
+    InvalidSupplierInstallmentSchedule,
+
+    /// <summary>UpdateSupplierPaymentInstallmentCommand against a cuota id that doesn't belong to the plan.</summary>
+    SupplierInstallmentNotFound,
+
+    /// <summary>UpdateSupplierPaymentInstallmentCommand against a cuota that's already been paid.</summary>
+    SupplierInstallmentAlreadyPaid,
+
+    /// <summary>RevertSupplierInstallmentPaymentCommand against a plan with no unreversed payment to undo.</summary>
+    NoSupplierPaymentToRevert
 }

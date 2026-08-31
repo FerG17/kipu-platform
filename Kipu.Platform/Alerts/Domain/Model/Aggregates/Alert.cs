@@ -94,6 +94,19 @@ public class Alert
         };
     }
 
+    /// <summary>Builds a SUPPLIER_INSTALLMENT_DUE alert for a credit purchase order's next unpaid cuota (X6 #12) — mirrors ForInstallmentDue.</summary>
+    public static Alert ForSupplierInstallmentDue(int businessId, int purchaseOrderId, string? supplierName, string severity,
+        string message, decimal amount, int daysRemaining)
+    {
+        return new Alert(businessId, null, null, null, AlertType.SupplierInstallmentDue, severity, message, null, null, null)
+        {
+            PurchaseOrderId = purchaseOrderId,
+            CustomerOrSupplierName = supplierName,
+            Amount = amount,
+            DaysRemaining = daysRemaining
+        };
+    }
+
     public int Id { get; }
     public int BusinessId { get; private set; }
     public int? ProductId { get; private set; }

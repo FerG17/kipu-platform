@@ -33,4 +33,16 @@ public interface ISupplierContextFacade
     /// </summary>
     Task<IReadOnlyCollection<int>> FilterExistingSupplierIds(int businessId, IReadOnlyCollection<int> supplierIds,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Each pending credit purchase order's next unpaid cuota, across
+    ///     every business — feeds the supplier-installment-due alerts sweep
+    ///     (X6 #12), the Suppliers-side mirror of
+    ///     ISalesContextFacade.GetPendingInstallmentsForDueSweep (X6 #7).
+    /// </summary>
+    Task<IReadOnlyCollection<PendingSupplierInstallmentInfo>> GetPendingSupplierInstallmentsForDueSweep(CancellationToken cancellationToken);
 }
+
+/// <summary>SupplierName is null when the supplier itself can no longer be resolved — the sweep falls back to a generic label.</summary>
+public record PendingSupplierInstallmentInfo(int SupplierPaymentPlanId, int PurchaseOrderId, int BusinessId, string? SupplierName,
+    int InstallmentId, DateOnly DueDate, decimal Amount);

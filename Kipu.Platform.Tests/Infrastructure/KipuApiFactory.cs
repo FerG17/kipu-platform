@@ -64,6 +64,7 @@ public class KipuApiFactory : WebApplicationFactory<Program>
         // underneath an assertion.
         Environment.SetEnvironmentVariable("Alerts__SweepIntervalHours", "24");
         Environment.SetEnvironmentVariable("Alerts__InstallmentDueSweepIntervalHours", "24");
+        Environment.SetEnvironmentVariable("Alerts__SupplierInstallmentDueSweepIntervalHours", "24");
 
         // Every test signs up its own business, and they all look like one
         // client to the per-IP rate limiter. At the production budget of 10

@@ -41,6 +41,16 @@ public static class SuppliersActionResultAssembler
             SuppliersError.InvalidSupplierData => StatusCodes.Status400BadRequest,
             SuppliersError.SupplierHasPendingOrders => StatusCodes.Status409Conflict,
             SuppliersError.ConcurrentModification => StatusCodes.Status409Conflict,
+            SuppliersError.SupplierPaymentPlanNotFound => StatusCodes.Status404NotFound,
+            SuppliersError.SupplierPaymentPlanAlreadyExists => StatusCodes.Status409Conflict,
+            SuppliersError.PurchaseOrderCancelled => StatusCodes.Status409Conflict,
+            SuppliersError.SupplierInstallmentsFullyPaid => StatusCodes.Status409Conflict,
+            SuppliersError.SupplierPaymentPlanCancelled => StatusCodes.Status409Conflict,
+            SuppliersError.SupplierInstallmentAmountMismatch => StatusCodes.Status400BadRequest,
+            SuppliersError.InvalidSupplierInstallmentSchedule => StatusCodes.Status400BadRequest,
+            SuppliersError.SupplierInstallmentNotFound => StatusCodes.Status404NotFound,
+            SuppliersError.SupplierInstallmentAlreadyPaid => StatusCodes.Status409Conflict,
+            SuppliersError.NoSupplierPaymentToRevert => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
     }

@@ -84,4 +84,16 @@ public class AlertRepository(AppDbContext context) : BaseRepository<Alert>(conte
                              && alert.Type == AlertType.InstallmentDue && alert.Status != AlertStatus.Resolved)
             .ToListAsync(cancellationToken);
     }
+
+    /// <summary>IgnoreQueryFilters() deliberately — same reasoning as FindActiveInstallmentAlertsBySaleIdsAsync.</summary>
+    public async Task<IEnumerable<Alert>> FindActiveSupplierInstallmentAlertsByPurchaseOrderIdsAsync(IReadOnlyCollection<int> purchaseOrderIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (purchaseOrderIds.Count == 0) return [];
+
+        return await Context.Set<Alert>().IgnoreQueryFilters()
+            .Where(alert => alert.PurchaseOrderId != null && purchaseOrderIds.Contains(alert.PurchaseOrderId.Value)
+                             && alert.Type == AlertType.SupplierInstallmentDue && alert.Status != AlertStatus.Resolved)
+            .ToListAsync(cancellationToken);
+    }
 }

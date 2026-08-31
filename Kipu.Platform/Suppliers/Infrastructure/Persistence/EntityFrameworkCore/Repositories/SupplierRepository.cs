@@ -29,4 +29,15 @@ public class SupplierRepository(AppDbContext context) : BaseRepository<Supplier>
             .Select(supplier => supplier.Id)
             .ToListAsync(cancellationToken);
     }
+
+    /// <summary>IgnoreQueryFilters() deliberately — see ISupplierRepository.</summary>
+    public async Task<IEnumerable<Supplier>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0) return [];
+
+        return await Context.Set<Supplier>().IgnoreQueryFilters()
+            .Where(supplier => idList.Contains(supplier.Id)).ToListAsync(cancellationToken);
+    }
 }

@@ -45,4 +45,12 @@ public interface IAlertRepository : IBaseRepository<Alert>
     /// </summary>
     Task<IEnumerable<Alert>> FindActiveInstallmentAlertsBySaleIdsAsync(IReadOnlyCollection<int> saleIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Every still-open SUPPLIER_INSTALLMENT_DUE alert across the given
+    ///     purchase orders, in one query — used by SupplierInstallmentDueSweepJob,
+    ///     mirrors FindActiveInstallmentAlertsBySaleIdsAsync (X6 #7) for X6 #12.
+    /// </summary>
+    Task<IEnumerable<Alert>> FindActiveSupplierInstallmentAlertsByPurchaseOrderIdsAsync(IReadOnlyCollection<int> purchaseOrderIds,
+        CancellationToken cancellationToken = default);
 }
