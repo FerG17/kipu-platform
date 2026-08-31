@@ -5,17 +5,20 @@ namespace Kipu.Platform.Alerts.Domain.Model.Commands.Validation;
 public class CreateOrUpdateAlertRuleCommandValidator : AbstractValidator<CreateOrUpdateAlertRuleCommand>
 {
     /// <summary>
-    ///     All 4 AlertType values are independently configurable rule types.
-    ///     EXPIRATION and EXPIRED are NOT the same rule despite both being
-    ///     about expiry: AlertExpirationSweepJob.LoadExpirationRules looks up
-    ///     a separate AlertRule row for each (own doc comment: "EXPIRATION
-    ///     and EXPIRED are separate, independently switchable rules") — a
-    ///     business can turn off "warn N days before expiry" while keeping
-    ///     "flag it once it's actually expired" on, or vice versa. An earlier
-    ///     pass at this whitelist wrongly excluded EXPIRED on the assumption
-    ///     it was derived, not configurable — it isn't.
+    ///     Independently configurable rule types. EXPIRATION and EXPIRED are
+    ///     NOT the same rule despite both being about expiry:
+    ///     AlertExpirationSweepJob.LoadExpirationRules looks up a separate
+    ///     AlertRule row for each (own doc comment: "EXPIRATION and EXPIRED
+    ///     are separate, independently switchable rules") — a business can
+    ///     turn off "warn N days before expiry" while keeping "flag it once
+    ///     it's actually expired" on, or vice versa. An earlier pass at this
+    ///     whitelist wrongly excluded EXPIRED on the assumption it was
+    ///     derived, not configurable — it isn't.
+    ///     INSTALLMENT_DUE (X6 #7) reuses this same rule mechanism for its
+    ///     editable due-soon threshold — same reasoning as EXPIRATION.
     /// </summary>
-    private static readonly string[] AllowedAlertTypes = ["LOW_STOCK", "OUT_OF_STOCK", "EXPIRATION", "EXPIRED"];
+    private static readonly string[] AllowedAlertTypes =
+        ["LOW_STOCK", "OUT_OF_STOCK", "EXPIRATION", "EXPIRED", "INSTALLMENT_DUE"];
 
     public CreateOrUpdateAlertRuleCommandValidator()
     {
