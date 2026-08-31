@@ -63,15 +63,15 @@ public class DashboardController(
         return Ok(result.Select(entry => new SalesByDayResource(entry.Date, entry.Total)));
     }
 
-    [HttpGet("top-stock-products")]
-    [SwaggerOperation(Summary = "Top products ranked by real current stock (never by quantity sold)", OperationId = "GetTopStockProducts")]
-    public async Task<IActionResult> GetTopStockProducts([FromQuery] int count, CancellationToken cancellationToken)
+    [HttpGet("top-selling-products")]
+    [SwaggerOperation(Summary = "Top products ranked by total units sold, all-time", OperationId = "GetTopSellingProducts")]
+    public async Task<IActionResult> GetTopSellingProducts([FromQuery] int count, CancellationToken cancellationToken)
     {
         var businessId = currentUserAccessor.CurrentBusinessId;
         if (businessId == null) return Unauthorized();
 
         var resolvedCount = count > 0 ? count : 5;
-        var result = await dashboardQueryService.Handle(new GetTopStockProductsQuery(businessId.Value, resolvedCount), cancellationToken);
-        return Ok(result.Select(entry => new TopStockProductResource(entry.ProductId, entry.ProductName, entry.TotalStock)));
+        var result = await dashboardQueryService.Handle(new GetTopSellingProductsQuery(businessId.Value, resolvedCount), cancellationToken);
+        return Ok(result.Select(entry => new TopSellingProductResource(entry.ProductId, entry.ProductName, entry.TotalSold)));
     }
 }
