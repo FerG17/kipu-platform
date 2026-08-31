@@ -14,6 +14,15 @@ public interface IProductContextFacade
     Task<int> CreateDefaultWarehouse(int businessId, CancellationToken cancellationToken);
 
     /// <summary>
+    ///     Seeds the fixed category vocabulary (Dairy/Grains/.../Other) for a
+    ///     newly-registered business — called by IAM's sign-up flow within
+    ///     the same transaction as CreateDefaultWarehouse, so a new business
+    ///     always has a usable category catalog from its very first login
+    ///     (X6 #5).
+    /// </summary>
+    Task SeedDefaultCategories(int businessId, CancellationToken cancellationToken);
+
+    /// <summary>
     ///     Decrements inventory after a confirmed sale — called by Sales &amp; POS.
     ///
     ///     Returns whether the stock actually came off. This used to return a

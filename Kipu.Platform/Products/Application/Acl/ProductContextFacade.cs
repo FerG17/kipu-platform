@@ -17,6 +17,7 @@ public class ProductContextFacade(
     IInventoryCommandService inventoryCommandService,
     IInventoryQueryService inventoryQueryService,
     IProductQueryService productQueryService,
+    ICategoryCommandService categoryCommandService,
     IBatchRepository batchRepository,
     IProductRepository productRepository,
     IStockMovementRepository stockMovementRepository,
@@ -29,6 +30,11 @@ public class ProductContextFacade(
             WarehouseCapacity.Medium);
         var result = await warehouseCommandService.Handle(command, cancellationToken);
         return result.IsSuccess ? result.Value!.Id : 0;
+    }
+
+    public async Task SeedDefaultCategories(int businessId, CancellationToken cancellationToken)
+    {
+        await categoryCommandService.SeedDefaultCategories(businessId, cancellationToken);
     }
 
     public async Task<bool> DecrementStock(int productId, int businessId, decimal quantity, CancellationToken cancellationToken)

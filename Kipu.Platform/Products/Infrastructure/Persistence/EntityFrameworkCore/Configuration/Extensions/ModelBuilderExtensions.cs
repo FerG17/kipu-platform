@@ -152,5 +152,18 @@ public static class ModelBuilderExtensions
             // ownership is validated in ProductCommandService before a link
             // is ever created, via ISupplierContextFacade.
         });
+
+        builder.Entity<Category>(entity =>
+        {
+            entity.HasKey(category => category.Id);
+            entity.Property(category => category.Id).ValueGeneratedOnAdd();
+            entity.Property(category => category.Name).IsRequired().HasMaxLength(50);
+
+            // A business names the same category at most once (X6 #5).
+            entity.HasIndex(category => new { category.BusinessId, category.Name }).IsUnique();
+
+            entity.HasOne<Business>().WithMany().HasForeignKey(category => category.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

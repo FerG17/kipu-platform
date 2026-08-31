@@ -119,4 +119,10 @@
   <data name="WarehouseInactive" xml:space="preserve">
     <value>This warehouse is deactivated and cannot receive or hold stock.</value>
   </data>
+  <data name="InvalidCategoryData" xml:space="preserve">
+    <value>Category name is required and must be at most 50 characters.</value>
+  </data>
+  <data name="DuplicateCategoryName" xml:space="preserve">
+    <value>A category with this name already exists.</value>
+  </data>
 </root>

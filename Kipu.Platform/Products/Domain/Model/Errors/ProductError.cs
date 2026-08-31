@@ -59,5 +59,11 @@ public enum ProductError
     /// <summary>Another request changed the same row first — a conflict the caller can retry (409), not a server fault (500).</summary>
     ConcurrentModification,
 
+    /// <summary>A category's name is empty or exceeds its column length (X6 #5).</summary>
+    InvalidCategoryData,
+
+    /// <summary>A category with this name already exists for the business (X6 #5).</summary>
+    DuplicateCategoryName,
+
     DatabaseError
 }

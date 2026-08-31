@@ -145,6 +145,7 @@ public class UserCommandService(
             // transaction, so the default warehouse is created atomically
             // together with the user and the business.
             await productContextFacade.CreateDefaultWarehouse(business.Id, cancellationToken);
+            await productContextFacade.SeedDefaultCategories(business.Id, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
 
