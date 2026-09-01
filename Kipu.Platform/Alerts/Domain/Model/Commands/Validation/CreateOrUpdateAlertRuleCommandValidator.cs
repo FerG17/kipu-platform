@@ -14,16 +14,23 @@ public class CreateOrUpdateAlertRuleCommandValidator : AbstractValidator<CreateO
     ///     it's actually expired" on, or vice versa. An earlier pass at this
     ///     whitelist wrongly excluded EXPIRED on the assumption it was
     ///     derived, not configurable — it isn't.
-    ///     INSTALLMENT_DUE (X6 #7) reuses this same rule mechanism for its
-    ///     editable due-soon threshold — same reasoning as EXPIRATION.
+    ///     INSTALLMENT_DUE (X6 #7) and SUPPLIER_INSTALLMENT_DUE (X6 #12) reuse
+    ///     this same rule mechanism for their editable due-soon threshold —
+    ///     same reasoning as EXPIRATION. (G1 shipped with only INSTALLMENT_DUE
+    ///     here, which meant its own threshold couldn't be edited from the UI
+    ///     until that omission was caught in live E2E testing — don't repeat
+    ///     it for G2.)
     /// </summary>
     private static readonly string[] AllowedAlertTypes =
-        ["LOW_STOCK", "OUT_OF_STOCK", "EXPIRATION", "EXPIRED", "INSTALLMENT_DUE"];
+        ["LOW_STOCK", "OUT_OF_STOCK", "EXPIRATION", "EXPIRED", "INSTALLMENT_DUE", "SUPPLIER_INSTALLMENT_DUE"];
 
     public CreateOrUpdateAlertRuleCommandValidator()
     {
         // Mirrors the column in Alerts' ModelBuilderExtensions (AlertRule entity).
-        RuleFor(command => command.AlertType).NotEmpty().MaximumLength(20)
+        // Widened from 20 to 30 for SUPPLIER_INSTALLMENT_DUE (24 chars, X6 #12) —
+        // caught by this validator itself rejecting it with 400 before the
+        // whitelist check below even ran.
+        RuleFor(command => command.AlertType).NotEmpty().MaximumLength(30)
             .Must(type => AllowedAlertTypes.Contains(type))
             .WithMessage($"AlertType must be one of: {string.Join(", ", AllowedAlertTypes)}.");
 

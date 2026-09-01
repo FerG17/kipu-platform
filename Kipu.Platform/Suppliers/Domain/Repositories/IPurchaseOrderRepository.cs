@@ -16,4 +16,7 @@ public interface IPurchaseOrderRepository : IBaseRepository<PurchaseOrder>
 
     /// <summary>Locates the order that owns a given detail line — used by ISupplierContextFacade for Delivery Tracking's autofill.</summary>
     Task<(PurchaseOrder Order, PurchaseOrderDetail Detail)?> FindByDetailIdAsync(int detailId, CancellationToken cancellationToken = default);
+
+    /// <summary>Bulk lookup by id, ignoring the tenant filter — feeds the supplier-installment-due alerts sweep (which already gathered plans across every business) with each order's SupplierId. Same reasoning as BatchRepository.FindAllActiveAsync.</summary>
+    Task<IEnumerable<PurchaseOrder>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids, CancellationToken cancellationToken = default);
 }

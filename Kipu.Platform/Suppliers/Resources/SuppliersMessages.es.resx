@@ -77,4 +77,34 @@
   <data name="InvalidPurchaseOrderData" xml:space="preserve">
     <value>Revisa la moneda y la descripción — alguna es inválida o demasiado larga.</value>
   </data>
+  <data name="SupplierPaymentPlanNotFound" xml:space="preserve">
+    <value>Plan de pago no encontrado.</value>
+  </data>
+  <data name="SupplierPaymentPlanAlreadyExists" xml:space="preserve">
+    <value>Esta orden de compra ya tiene un plan de pago.</value>
+  </data>
+  <data name="PurchaseOrderCancelled" xml:space="preserve">
+    <value>Esta orden de compra fue cancelada.</value>
+  </data>
+  <data name="SupplierInstallmentsFullyPaid" xml:space="preserve">
+    <value>Todas las cuotas ya fueron pagadas.</value>
+  </data>
+  <data name="SupplierPaymentPlanCancelled" xml:space="preserve">
+    <value>Este plan de pago fue cancelado junto con su orden de compra.</value>
+  </data>
+  <data name="SupplierInstallmentAmountMismatch" xml:space="preserve">
+    <value>La suma de las cuotas debe calzar exacto con el total de la orden de compra.</value>
+  </data>
+  <data name="InvalidSupplierInstallmentSchedule" xml:space="preserve">
+    <value>El calendario de cuotas no es válido.</value>
+  </data>
+  <data name="SupplierInstallmentNotFound" xml:space="preserve">
+    <value>Esa cuota no pertenece a este plan de pago.</value>
+  </data>
+  <data name="SupplierInstallmentAlreadyPaid" xml:space="preserve">
+    <value>Esa cuota ya fue pagada y no se puede editar.</value>
+  </data>
+  <data name="NoSupplierPaymentToRevert" xml:space="preserve">
+    <value>No hay ningún pago para revertir en este plan.</value>
+  </data>
 </root>

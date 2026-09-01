@@ -44,4 +44,15 @@ public class PurchaseOrderRepository(AppDbContext context) : BaseRepository<Purc
         var order = await FindByIdWithDetailsAsync(detail.PurchaseId, cancellationToken);
         return order == null ? null : (order, detail);
     }
+
+    /// <summary>IgnoreQueryFilters() deliberately — see IPurchaseOrderRepository.</summary>
+    public async Task<IEnumerable<PurchaseOrder>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0) return [];
+
+        return await Context.Set<PurchaseOrder>().IgnoreQueryFilters()
+            .Where(order => idList.Contains(order.Id)).ToListAsync(cancellationToken);
+    }
 }

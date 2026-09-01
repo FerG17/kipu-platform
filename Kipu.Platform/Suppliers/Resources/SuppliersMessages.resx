@@ -77,4 +77,34 @@
   <data name="InvalidPurchaseOrderData" xml:space="preserve">
     <value>Check the currency and description — one of them is invalid or too long.</value>
   </data>
+  <data name="SupplierPaymentPlanNotFound" xml:space="preserve">
+    <value>Payment plan not found.</value>
+  </data>
+  <data name="SupplierPaymentPlanAlreadyExists" xml:space="preserve">
+    <value>This purchase order already has a payment plan.</value>
+  </data>
+  <data name="PurchaseOrderCancelled" xml:space="preserve">
+    <value>This purchase order was cancelled.</value>
+  </data>
+  <data name="SupplierInstallmentsFullyPaid" xml:space="preserve">
+    <value>All installments have already been paid.</value>
+  </data>
+  <data name="SupplierPaymentPlanCancelled" xml:space="preserve">
+    <value>This payment plan was cancelled along with its purchase order.</value>
+  </data>
+  <data name="SupplierInstallmentAmountMismatch" xml:space="preserve">
+    <value>The installment amounts must add up exactly to the purchase order's total.</value>
+  </data>
+  <data name="InvalidSupplierInstallmentSchedule" xml:space="preserve">
+    <value>The installment schedule is invalid.</value>
+  </data>
+  <data name="SupplierInstallmentNotFound" xml:space="preserve">
+    <value>That installment does not belong to this payment plan.</value>
+  </data>
+  <data name="SupplierInstallmentAlreadyPaid" xml:space="preserve">
+    <value>That installment has already been paid and can no longer be edited.</value>
+  </data>
+  <data name="NoSupplierPaymentToRevert" xml:space="preserve">
+    <value>There is no payment left to revert on this plan.</value>
+  </data>
 </root>

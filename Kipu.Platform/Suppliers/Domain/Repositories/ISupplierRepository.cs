@@ -13,4 +13,7 @@ public interface ISupplierRepository : IBaseRepository<Supplier>
     /// <summary>Narrows a candidate id set down to the ones that actually exist and belong to this business.</summary>
     Task<IReadOnlyCollection<int>> FindExistingIdsAsync(int businessId, IReadOnlyCollection<int> supplierIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Bulk lookup by id, ignoring the tenant filter — feeds the supplier-installment-due alerts sweep with each order's supplier name.</summary>
+    Task<IEnumerable<Supplier>> FindAllIgnoringTenantByIdsAsync(IEnumerable<int> ids, CancellationToken cancellationToken = default);
 }

@@ -257,6 +257,18 @@ public class TenantIsolationTests(KipuApiFactory factory) : IntegrationTestBase(
         AssertDenied(response, "attaching a payment plan to another business's sale");
     }
 
+    /// <summary>X6 #12 (Bloque G2), Suppliers-side mirror of PaymentPlan_CannotBeAttachedToAnotherBusinessSale.</summary>
+    [Fact]
+    public async Task SupplierPaymentPlan_CannotBeAttachedToAnotherBusinessPurchaseOrder()
+    {
+        var (victim, attacker) = await TwoBusinessesAsync();
+        var purchaseOrderId = await CreatePendingPurchaseOrderAsync(victim);
+
+        var schedule = new[] { new { dueDate = "2026-09-15", amount = 10m } };
+        var response = await attacker.PostAsJsonAsync("/api/v1/supplier-payment-plans", new { purchaseOrderId, schedule });
+        AssertDenied(response, "attaching a payment plan to another business's purchase order");
+    }
+
     [Fact]
     public async Task Report_OfAnotherBusiness_CannotBeExported()
     {

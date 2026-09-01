@@ -20,6 +20,7 @@ namespace Kipu.Platform.Suppliers.Application.Internal.CommandServices;
 public class PurchaseOrderCommandService(
     IPurchaseOrderRepository purchaseOrderRepository,
     ISupplierRepository supplierRepository,
+    ISupplierPaymentPlanRepository supplierPaymentPlanRepository,
     IProductContextFacade productContextFacade,
     IUnitOfWork unitOfWork,
     IMediator mediator,
@@ -119,6 +120,21 @@ public class PurchaseOrderCommandService(
         }
 
         purchaseOrderRepository.Update(purchaseOrder);
+
+        // A credit purchase order being cancelled means the debt it created
+        // is gone too — otherwise the plan keeps showing as pending against
+        // an order that no longer exists, and can still take payments.
+        // Mirrors SaleCommandService's cancellation of PaymentPlan (X6 #7).
+        if (command.Status == PurchaseOrderStatus.Cancelled)
+        {
+            var supplierPaymentPlan = await supplierPaymentPlanRepository.FindByPurchaseOrderIdAsync(purchaseOrder.Id, cancellationToken);
+            if (supplierPaymentPlan != null)
+            {
+                supplierPaymentPlan.Cancel();
+                supplierPaymentPlanRepository.Update(supplierPaymentPlan);
+            }
+        }
+
         await unitOfWork.CompleteAsync(cancellationToken);
         return Result<PurchaseOrder>.Success(purchaseOrder);
     }

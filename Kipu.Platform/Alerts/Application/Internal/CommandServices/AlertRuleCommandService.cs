@@ -9,6 +9,7 @@ using Kipu.Platform.Alerts.Domain.Repositories;
 using Kipu.Platform.Alerts.Resources;
 using Kipu.Platform.Products.Interfaces.Acl;
 using Kipu.Platform.Sales.Interfaces.Acl;
+using Kipu.Platform.Suppliers.Interfaces.Acl;
 using Kipu.Platform.Shared.Application;
 using Kipu.Platform.Shared.Application.Model;
 using Kipu.Platform.Shared.Domain.Repositories;
@@ -23,8 +24,10 @@ public class AlertRuleCommandService(
     IStringLocalizer<AlertsMessages> localizer,
     IExpirationAlertSweepService expirationAlertSweepService,
     IInstallmentDueAlertSweepService installmentDueAlertSweepService,
+    ISupplierInstallmentDueAlertSweepService supplierInstallmentDueAlertSweepService,
     IProductContextFacade productContextFacade,
     ISalesContextFacade salesContextFacade,
+    ISupplierContextFacade supplierContextFacade,
     IBusinessClock businessClock)
     : IAlertRuleCommandService
 {
@@ -89,6 +92,16 @@ public class AlertRuleCommandService(
                 .Where(info => info.BusinessId == command.BusinessId)
                 .ToList();
             await installmentDueAlertSweepService.SweepBusinessAsync(command.BusinessId, pendingInstallments,
+                businessClock.Today, cancellationToken);
+        }
+
+        // Same reasoning, for the supplier-installment-due threshold/enabled flag (X6 #12).
+        if (command.AlertType == AlertType.SupplierInstallmentDue)
+        {
+            var pendingSupplierInstallments = (await supplierContextFacade.GetPendingSupplierInstallmentsForDueSweep(cancellationToken))
+                .Where(info => info.BusinessId == command.BusinessId)
+                .ToList();
+            await supplierInstallmentDueAlertSweepService.SweepBusinessAsync(command.BusinessId, pendingSupplierInstallments,
                 businessClock.Today, cancellationToken);
         }
 

@@ -51,6 +51,18 @@ public class AlertRuleValidationTests(KipuApiFactory factory) : IntegrationTestB
         Assert.True(response.IsSuccessStatusCode);
     }
 
+    /// <summary>X6 #12: SUPPLIER_INSTALLMENT_DUE is a real, independently configurable rule type, same as INSTALLMENT_DUE.</summary>
+    [Fact]
+    public async Task SettingAnAlertRule_WithSupplierInstallmentDueType_Succeeds()
+    {
+        var client = await CreateBusinessAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/alert-rules",
+            new { alertType = "SUPPLIER_INSTALLMENT_DUE", thresholdValue = 7, enabled = true });
+
+        Assert.True(response.IsSuccessStatusCode);
+    }
+
     [Fact]
     public async Task SettingAnAlertRule_WithAThresholdOverAYear_IsRejected()
     {
